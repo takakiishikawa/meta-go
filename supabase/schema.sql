@@ -195,6 +195,18 @@ CREATE TABLE IF NOT EXISTS metago.backlog (
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- tech_stack_items: 各プロダクトの技術スタック（package.json全依存）
+CREATE TABLE IF NOT EXISTS metago.tech_stack_items (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  product_id   UUID NOT NULL REFERENCES metago.products(id) ON DELETE CASCADE,
+  package_name TEXT NOT NULL,
+  version      TEXT,
+  category     TEXT NOT NULL,
+  is_dev       BOOLEAN NOT NULL DEFAULT false,
+  collected_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE(product_id, package_name)
+);
+
 -- api_keys: goシリーズで利用するAPI・環境変数の管理
 -- env_var_name を一意キーとし、スクリプトが自動検出してupsertする
 CREATE TABLE IF NOT EXISTS metago.api_keys (
@@ -222,6 +234,7 @@ CREATE INDEX IF NOT EXISTS idx_execution_logs_product ON metago.execution_logs(p
 CREATE INDEX IF NOT EXISTS idx_approval_queue_state ON metago.approval_queue(state);
 CREATE INDEX IF NOT EXISTS idx_psf_scores_product ON metago.psf_scores(product_id);
 CREATE INDEX IF NOT EXISTS idx_engagement_history_product ON metago.engagement_history(product_id);
+CREATE INDEX IF NOT EXISTS idx_tech_stack_items_product ON metago.tech_stack_items(product_id);
 
 -- ============================================================
 -- Row Level Security
@@ -242,6 +255,7 @@ ALTER TABLE metago.psf_metrics_definitions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE metago.engagement_history ENABLE ROW LEVEL SECURITY;
 ALTER TABLE metago.hypotheses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE metago.backlog ENABLE ROW LEVEL SECURITY;
+ALTER TABLE metago.tech_stack_items ENABLE ROW LEVEL SECURITY;
 
 -- takakiのみアクセス可能（Google OAuthのemailで判定）
 -- メールアドレスは環境に合わせて変更してください
@@ -261,7 +275,8 @@ DECLARE
     'products','scores_history','quality_items','security_items',
     'dependency_items','design_system_items','performance_metrics',
     'cost_records','execution_logs','approval_queue','psf_scores',
-    'psf_metrics_definitions','engagement_history','hypotheses','backlog'
+    'psf_metrics_definitions','engagement_history','hypotheses','backlog',
+    'tech_stack_items'
   ];
 BEGIN
   FOREACH t IN ARRAY tables LOOP
