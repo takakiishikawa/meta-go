@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
-import { Badge } from "@takaki/go-design-system"
+import { Badge, PageHeader } from "@takaki/go-design-system"
 import { ExternalLink, Package } from "lucide-react"
 
 const UPDATE_TYPE_COLORS: Record<string, string> = {
@@ -29,15 +29,11 @@ export default async function DependencyPage() {
   const minorCount = allItems.filter((i) => i.update_type === "minor" && i.state !== "done").length
 
   return (
-    <div className="flex flex-col gap-6 p-6">
-      <div>
-        <h1 className="font-bold text-foreground" style={{ fontSize: "var(--text-2xl)" }}>
-          依存・技術スタック
-        </h1>
-        <p style={{ fontSize: "var(--text-sm)", color: "var(--color-text-secondary)" }}>
-          パッケージ更新状況と技術スタック一覧
-        </p>
-      </div>
+    <>
+      <PageHeader
+        title="依存・技術スタック"
+        description="パッケージ更新状況と技術スタック一覧"
+      />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="rounded-lg border border-border bg-surface p-4">
@@ -106,6 +102,6 @@ export default async function DependencyPage() {
           </table>
         </div>
       )}
-    </div>
+    </>
   )
 }

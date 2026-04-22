@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Badge, Tabs, TabsContent, TabsList, TabsTrigger } from "@takaki/go-design-system"
+import { Badge, PageHeader, Tabs, TabsContent, TabsList, TabsTrigger } from "@takaki/go-design-system"
 import { ScoreDonut } from "@/components/score/score-donut"
 import { ExternalLink } from "lucide-react"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
@@ -50,28 +50,18 @@ export function ProductDetailClient({
   }))
 
   return (
-    <div className="flex flex-col gap-6 p-6">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <div className="size-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: color }}>
-          <span className="text-white font-bold text-sm">
-            {product.display_name[0]}
-          </span>
-        </div>
-        <div>
-          <h1 className="font-bold text-foreground" style={{ fontSize: "var(--text-2xl)" }}>
-            {product.display_name}
-          </h1>
-          <p style={{ fontSize: "var(--text-sm)", color: "var(--color-text-secondary)" }}>
-            {product.description}
-          </p>
-        </div>
-        {product.vercel_url && (
-          <a href={product.vercel_url} target="_blank" rel="noopener noreferrer" className="ml-auto">
-            <ExternalLink className="size-5" style={{ color: "var(--color-primary)" }} />
-          </a>
-        )}
-      </div>
+    <>
+      <PageHeader
+        title={product.display_name}
+        description={product.description}
+        actions={
+          product.vercel_url ? (
+            <a href={product.vercel_url} target="_blank" rel="noopener noreferrer">
+              <ExternalLink className="size-5" style={{ color: "var(--color-primary)" }} />
+            </a>
+          ) : undefined
+        }
+      />
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
@@ -165,7 +155,7 @@ export function ProductDetailClient({
           </div>
         </TabsContent>
       </Tabs>
-    </div>
+    </>
   )
 }
 

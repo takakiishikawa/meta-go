@@ -18,7 +18,7 @@ export default async function AppRootLayout({
   }
 
   return (
-    <AppLayout sidebar={<MetaGoSidebar />}>
+    <AppLayout sidebar={<MetaGoSidebar />} mainClassName="flex flex-col gap-6 p-6">
       {children}
     </AppLayout>
   )

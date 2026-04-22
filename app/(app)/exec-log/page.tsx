@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
-import { Badge } from "@takaki/go-design-system"
+import { Badge, PageHeader } from "@takaki/go-design-system"
 import { ExternalLink, ScrollText, CheckCircle2, Clock, XCircle } from "lucide-react"
 
 const STATE_CONFIG: Record<string, { icon: React.ElementType; color: string; label: string }> = {
@@ -32,15 +32,11 @@ export default async function ExecLogPage() {
   )
 
   return (
-    <div className="flex flex-col gap-6 p-6">
-      <div>
-        <h1 className="font-bold text-foreground" style={{ fontSize: "var(--text-2xl)" }}>
-          実行ログ
-        </h1>
-        <p style={{ fontSize: "var(--text-sm)", color: "var(--color-text-secondary)" }}>
-          MetaGoの自動実行履歴
-        </p>
-      </div>
+    <>
+      <PageHeader
+        title="実行ログ"
+        description="MetaGoの自動実行履歴"
+      />
 
       {/* Stats */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -154,6 +150,6 @@ export default async function ExecLogPage() {
           </div>
         </>
       )}
-    </div>
+    </>
   )
 }

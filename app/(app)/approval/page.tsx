@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
-import { Badge } from "@takaki/go-design-system"
+import { Badge, PageHeader } from "@takaki/go-design-system"
 import { Clock, CheckCircle, XCircle } from "lucide-react"
 
 export default async function ApprovalPage() {
@@ -15,15 +15,11 @@ export default async function ApprovalPage() {
   const resolved = (items ?? []).filter((i) => i.state !== "pending")
 
   return (
-    <div className="flex flex-col gap-6 p-6">
-      <div>
-        <h1 className="font-bold text-foreground" style={{ fontSize: "var(--text-2xl)" }}>
-          承認待ち
-        </h1>
-        <p style={{ fontSize: "var(--text-sm)", color: "var(--color-text-secondary)" }}>
-          人間の判断が必要なアイテム一覧
-        </p>
-      </div>
+    <>
+      <PageHeader
+        title="承認待ち"
+        description="人間の判断が必要なアイテム一覧"
+      />
 
       {pending.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-4 rounded-lg border border-dashed border-border py-20 text-center">
@@ -52,8 +48,7 @@ export default async function ApprovalPage() {
                   <td className="px-4 py-3"><Badge variant="outline">{item.category}</Badge></td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1 text-sm text-amber-600">
-                      <Clock className="size-3" />
-                      承認待ち
+                      <Clock className="size-3" />承認待ち
                     </div>
                   </td>
                   <td className="px-4 py-3 text-sm" style={{ color: "var(--color-text-secondary)" }}>
@@ -98,6 +93,6 @@ export default async function ApprovalPage() {
           </div>
         </div>
       )}
-    </div>
+    </>
   )
 }

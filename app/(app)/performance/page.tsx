@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
+import { PageHeader } from "@takaki/go-design-system"
 import { ScoreDonut } from "@/components/score/score-donut"
 import { Gauge } from "lucide-react"
 
@@ -37,15 +38,11 @@ export default async function PerformancePage() {
       : null
 
   return (
-    <div className="flex flex-col gap-6 p-6">
-      <div>
-        <h1 className="font-bold text-foreground" style={{ fontSize: "var(--text-2xl)" }}>
-          パフォーマンス
-        </h1>
-        <p style={{ fontSize: "var(--text-sm)", color: "var(--color-text-secondary)" }}>
-          Core Web Vitals とバンドルサイズの測定結果
-        </p>
-      </div>
+    <>
+      <PageHeader
+        title="パフォーマンス"
+        description="Core Web Vitals とバンドルサイズの測定結果"
+      />
 
       {/* Overall */}
       <div className="flex items-center gap-4 rounded-lg border border-border bg-surface p-4 w-fit">
@@ -105,6 +102,6 @@ export default async function PerformancePage() {
           </table>
         </div>
       )}
-    </div>
+    </>
   )
 }

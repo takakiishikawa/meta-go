@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { PageHeader } from "@takaki/go-design-system"
 import { ScoreDonut } from "@/components/score/score-donut"
 import { TrendingUp, TrendingDown, Minus } from "lucide-react"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts"
@@ -66,15 +67,11 @@ export default function PsfPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6 p-6">
-      <div>
-        <h1 className="font-bold text-foreground" style={{ fontSize: "var(--text-2xl)" }}>
-          PSF
-        </h1>
-        <p style={{ fontSize: "var(--text-sm)", color: "var(--color-text-secondary)" }}>
-          Product Super-specific Fit — 各goとtakakiの課題適合度
-        </p>
-      </div>
+    <>
+      <PageHeader
+        title="PSF"
+        description="Product Super-specific Fit — 各goとtakakiの課題適合度"
+      />
 
       {products.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-4 rounded-lg border border-dashed border-border py-20 text-center">
@@ -155,6 +152,6 @@ export default function PsfPage() {
           )}
         </>
       )}
-    </div>
+    </>
   )
 }

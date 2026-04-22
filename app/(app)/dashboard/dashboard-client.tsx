@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { AlertCircle, CheckCircle2, Clock, ArrowUpRight } from "lucide-react"
-import { Badge } from "@takaki/go-design-system"
+import { Badge, PageHeader } from "@takaki/go-design-system"
 import { ScoreDonut } from "@/components/score/score-donut"
 
 interface Product {
@@ -86,31 +86,23 @@ export function DashboardClient({
   const hasData = products.length > 0
 
   return (
-    <div className="flex flex-col gap-6 p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1
-            className="font-bold text-foreground"
-            style={{ fontSize: "var(--text-2xl)", fontWeight: "var(--font-weight-bold)" }}
-          >
-            Dashboard
-          </h1>
-          <p style={{ fontSize: "var(--text-sm)", color: "var(--color-text-secondary)" }}>
-            goシリーズ全体の健全性を俯瞰する
-          </p>
-        </div>
-        {pendingApprovals.length > 0 && (
-          <Link
-            href="/approval"
-            className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800 transition-colors hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200"
-          >
-            <AlertCircle className="size-4" />
-            承認待ち {pendingApprovals.length}件
-            <ArrowUpRight className="size-3" />
-          </Link>
-        )}
-      </div>
+    <>
+      <PageHeader
+        title="Dashboard"
+        description="goシリーズ全体の健全性を俯瞰する"
+        actions={
+          pendingApprovals.length > 0 ? (
+            <Link
+              href="/approval"
+              className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800 transition-colors hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200"
+            >
+              <AlertCircle className="size-4" />
+              承認待ち {pendingApprovals.length}件
+              <ArrowUpRight className="size-3" />
+            </Link>
+          ) : undefined
+        }
+      />
 
       {!hasData ? (
         <EmptyState />
@@ -168,7 +160,7 @@ export function DashboardClient({
           )}
         </>
       )}
-    </div>
+    </>
   )
 }
 

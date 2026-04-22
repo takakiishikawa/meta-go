@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
+import { PageHeader } from "@takaki/go-design-system"
 import { DollarSign } from "lucide-react"
 
 const SERVICES = ["vercel", "supabase", "anthropic", "other"]
@@ -50,22 +51,18 @@ export default async function CostPage() {
   const totalByCost = crossData.reduce((a, d) => a + (d.total ?? 0), 0)
 
   return (
-    <div className="flex flex-col gap-6 p-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="font-bold text-foreground" style={{ fontSize: "var(--text-2xl)" }}>
-            コスト
-          </h1>
-          <p style={{ fontSize: "var(--text-sm)", color: "var(--color-text-secondary)" }}>
-            サービス別 × プロダクト別のコスト管理
-          </p>
-        </div>
-        {latestMonth && (
-          <span className="text-sm font-medium" style={{ color: "var(--color-text-secondary)" }}>
-            {latestMonth}
-          </span>
-        )}
-      </div>
+    <>
+      <PageHeader
+        title="コスト"
+        description="サービス別 × プロダクト別のコスト管理"
+        actions={
+          latestMonth ? (
+            <span className="text-sm font-medium" style={{ color: "var(--color-text-secondary)" }}>
+              {latestMonth}
+            </span>
+          ) : undefined
+        }
+      />
 
       {/* Total */}
       <div className="flex items-center gap-3 rounded-lg border border-border bg-surface p-4 w-fit">
@@ -143,6 +140,6 @@ export default async function CostPage() {
           </table>
         </div>
       )}
-    </div>
+    </>
   )
 }

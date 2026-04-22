@@ -3,8 +3,7 @@ import { Layers } from "lucide-react"
 
 export default function ConceptPageRoute() {
   return (
-    <div className="min-h-full py-8">
-      <ConceptPage
+    <ConceptPage
         productName="MetaGo"
         productLogo={
           <div
@@ -82,7 +81,6 @@ export default function ConceptPageRoute() {
             description: "コード品質・セキュリティ・デザインシステム・パフォーマンスの4カテゴリ平均スコア。100点満点。目標: 85点以上維持",
           },
         ]}
-      />
-    </div>
+    />
   )
 }

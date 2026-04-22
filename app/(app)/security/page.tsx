@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
-import { Badge } from "@takaki/go-design-system"
+import { Badge, PageHeader } from "@takaki/go-design-system"
 import { ScoreDonut } from "@/components/score/score-donut"
 import { ExternalLink, ShieldAlert } from "lucide-react"
 
@@ -33,20 +33,15 @@ export default async function SecurityPage() {
     scores && scores.length > 0
       ? Math.round(scores.reduce((a: number, b: { score: number }) => a + b.score, 0) / scores.length)
       : null
-
   const criticalCount = openItems.filter((i) => i.severity === "critical").length
   const highCount = openItems.filter((i) => i.severity === "high").length
 
   return (
-    <div className="flex flex-col gap-6 p-6">
-      <div>
-        <h1 className="font-bold text-foreground" style={{ fontSize: "var(--text-2xl)" }}>
-          セキュリティ
-        </h1>
-        <p style={{ fontSize: "var(--text-sm)", color: "var(--color-text-secondary)" }}>
-          脆弱性と依存関係のセキュリティ問題
-        </p>
-      </div>
+    <>
+      <PageHeader
+        title="セキュリティ"
+        description="脆弱性と依存関係のセキュリティ問題"
+      />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
         <div className="flex items-center gap-4 rounded-lg border border-border bg-surface p-4">
@@ -73,9 +68,7 @@ export default async function SecurityPage() {
       {allItems.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-4 rounded-lg border border-dashed border-border py-20 text-center">
           <ShieldAlert className="size-12" style={{ color: "var(--color-text-secondary)" }} />
-          <p className="font-medium text-foreground" style={{ fontSize: "var(--text-base)" }}>
-            データがまだありません
-          </p>
+          <p className="font-medium text-foreground" style={{ fontSize: "var(--text-base)" }}>データがまだありません</p>
         </div>
       ) : (
         <div className="rounded-lg border border-border overflow-hidden">
@@ -83,9 +76,7 @@ export default async function SecurityPage() {
             <thead>
               <tr className="border-b border-border bg-surface-subtle">
                 {["プロダクト", "深刻度", "タイトル", "CVE", "状態", "PR"].map((h) => (
-                  <th key={h} className="px-4 py-3 text-left text-xs font-medium" style={{ color: "var(--color-text-secondary)" }}>
-                    {h}
-                  </th>
+                  <th key={h} className="px-4 py-3 text-left text-xs font-medium" style={{ color: "var(--color-text-secondary)" }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -94,31 +85,18 @@ export default async function SecurityPage() {
                 <tr key={item.id} className="border-b border-border last:border-0 hover:bg-surface-subtle">
                   <td className="px-4 py-3 text-sm">{(item as any).products?.display_name ?? "—"}</td>
                   <td className="px-4 py-3">
-                    <span
-                      className="rounded px-1.5 py-0.5 text-xs font-medium text-white"
-                      style={{ backgroundColor: SEVERITY_COLORS[item.severity] ?? "#6B7280" }}
-                    >
+                    <span className="rounded px-1.5 py-0.5 text-xs font-medium text-white" style={{ backgroundColor: SEVERITY_COLORS[item.severity] ?? "#6B7280" }}>
                       {item.severity}
                     </span>
                   </td>
                   <td className="px-4 py-3">
                     <div className="text-sm font-medium text-foreground">{item.title}</div>
-                    {item.description && (
-                      <div className="text-xs mt-0.5" style={{ color: "var(--color-text-secondary)" }}>{item.description}</div>
-                    )}
+                    {item.description && <div className="text-xs mt-0.5" style={{ color: "var(--color-text-secondary)" }}>{item.description}</div>}
                   </td>
-                  <td className="px-4 py-3 text-sm font-mono" style={{ color: "var(--color-text-secondary)" }}>
-                    {item.cve ?? "—"}
-                  </td>
+                  <td className="px-4 py-3 text-sm font-mono" style={{ color: "var(--color-text-secondary)" }}>{item.cve ?? "—"}</td>
+                  <td className="px-4 py-3"><Badge variant={item.state === "done" ? "default" : "outline"}>{item.state}</Badge></td>
                   <td className="px-4 py-3">
-                    <Badge variant={item.state === "done" ? "default" : "outline"}>{item.state}</Badge>
-                  </td>
-                  <td className="px-4 py-3">
-                    {item.pr_url && (
-                      <a href={item.pr_url} target="_blank" rel="noopener noreferrer">
-                        <ExternalLink className="size-4" style={{ color: "var(--color-primary)" }} />
-                      </a>
-                    )}
+                    {item.pr_url && <a href={item.pr_url} target="_blank" rel="noopener noreferrer"><ExternalLink className="size-4" style={{ color: "var(--color-primary)" }} /></a>}
                   </td>
                 </tr>
               ))}
@@ -126,6 +104,6 @@ export default async function SecurityPage() {
           </table>
         </div>
       )}
-    </div>
+    </>
   )
 }

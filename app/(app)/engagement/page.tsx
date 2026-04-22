@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { PageHeader } from "@takaki/go-design-system"
 import { Activity, TrendingUp, TrendingDown, Minus } from "lucide-react"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts"
 
@@ -59,15 +60,11 @@ export default function EngagementPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6 p-6">
-      <div>
-        <h1 className="font-bold text-foreground" style={{ fontSize: "var(--text-2xl)" }}>
-          使用パターン
-        </h1>
-        <p style={{ fontSize: "var(--text-sm)", color: "var(--color-text-secondary)" }}>
-          エンゲージメント推移（全go）
-        </p>
-      </div>
+    <>
+      <PageHeader
+        title="使用パターン"
+        description="エンゲージメント推移（全go）"
+      />
 
       {history.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-4 rounded-lg border border-dashed border-border py-20 text-center">
@@ -152,6 +149,6 @@ export default function EngagementPage() {
           )}
         </>
       )}
-    </div>
+    </>
   )
 }

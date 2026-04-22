@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
-import { Badge } from "@takaki/go-design-system"
+import { Badge, PageHeader } from "@takaki/go-design-system"
 import { ScoreDonut } from "@/components/score/score-donut"
 import { ExternalLink } from "lucide-react"
 
@@ -39,17 +39,12 @@ export default async function QualityPage() {
       : null
 
   return (
-    <div className="flex flex-col gap-6 p-6">
-      <div>
-        <h1 className="font-bold text-foreground" style={{ fontSize: "var(--text-2xl)" }}>
-          コード品質
-        </h1>
-        <p style={{ fontSize: "var(--text-sm)", color: "var(--color-text-secondary)" }}>
-          goシリーズ全体のコード品質スコアと問題点一覧
-        </p>
-      </div>
+    <>
+      <PageHeader
+        title="コード品質"
+        description="goシリーズ全体のコード品質スコアと問題点一覧"
+      />
 
-      {/* Score Summary */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="flex items-center gap-4 rounded-lg border border-border bg-surface p-4">
           <ScoreDonut score={avgScore} size={72} />
@@ -70,7 +65,6 @@ export default async function QualityPage() {
         </div>
       </div>
 
-      {/* Items Table */}
       {allItems.length === 0 ? (
         <EmptyState />
       ) : (
@@ -97,14 +91,11 @@ export default async function QualityPage() {
                     )}
                   </td>
                   <td className="px-4 py-3">
-                    <span
-                      className="rounded px-1.5 py-0.5 text-xs font-medium text-white"
-                      style={{ backgroundColor: LEVEL_COLORS[item.level] ?? "#6B7280" }}
-                    >
+                    <span className="rounded px-1.5 py-0.5 text-xs font-medium text-white" style={{ backgroundColor: LEVEL_COLORS[item.level] ?? "#6B7280" }}>
                       {item.level}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-sm">
+                  <td className="px-4 py-3">
                     <Badge variant={item.state === "done" ? "default" : "outline"}>
                       {STATE_LABELS[item.state] ?? item.state}
                     </Badge>
@@ -122,7 +113,7 @@ export default async function QualityPage() {
           </table>
         </div>
       )}
-    </div>
+    </>
   )
 }
 

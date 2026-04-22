@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
-import { Badge } from "@takaki/go-design-system"
+import { Badge, PageHeader } from "@takaki/go-design-system"
 import { Lightbulb } from "lucide-react"
 
 const PRIORITY_COLORS: Record<string, string> = {
@@ -27,15 +27,11 @@ export default async function HypothesisPage() {
   const isEmpty = hypotheses.length === 0 && backlog.length === 0
 
   return (
-    <div className="flex flex-col gap-6 p-6">
-      <div>
-        <h1 className="font-bold text-foreground" style={{ fontSize: "var(--text-2xl)" }}>
-          仮説・バックログ
-        </h1>
-        <p style={{ fontSize: "var(--text-sm)", color: "var(--color-text-secondary)" }}>
-          プロダクト別の課題仮説・解決策仮説・バックログ
-        </p>
-      </div>
+    <>
+      <PageHeader
+        title="仮説・バックログ"
+        description="プロダクト別の課題仮説・解決策仮説・バックログ"
+      />
 
       {isEmpty ? (
         <div className="flex flex-col items-center justify-center gap-4 rounded-lg border border-dashed border-border py-20 text-center">
@@ -172,6 +168,6 @@ export default async function HypothesisPage() {
           )}
         </>
       )}
-    </div>
+    </>
   )
 }
