@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
-import { PageHeader } from "@takaki/go-design-system"
+import { EmptyState, PageHeader, Spinner } from "@takaki/go-design-system"
 import { Activity, TrendingUp, TrendingDown, Minus } from "lucide-react"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts"
 
@@ -54,7 +54,7 @@ export default function EngagementPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center p-20">
-        <div className="text-sm" style={{ color: "var(--color-text-secondary)" }}>読み込み中...</div>
+        <Spinner size="lg" color="primary" />
       </div>
     )
   }
@@ -67,10 +67,11 @@ export default function EngagementPage() {
       />
 
       {history.length === 0 ? (
-        <div className="flex flex-col items-center justify-center gap-4 rounded-lg border border-dashed border-border py-20 text-center">
-          <Activity className="size-12" style={{ color: "var(--color-text-secondary)" }} />
-          <p className="font-medium text-foreground">データがまだありません</p>
-        </div>
+        <EmptyState
+          icon={<Activity className="size-12" />}
+          title="データがまだありません"
+          description="使用パターンの収集が開始されると表示されます"
+        />
       ) : (
         <>
           {/* Summary table */}

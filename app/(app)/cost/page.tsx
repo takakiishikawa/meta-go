@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
-import { PageHeader } from "@takaki/go-design-system"
+import { EmptyState, PageHeader } from "@takaki/go-design-system"
 import { DollarSign } from "lucide-react"
 
 const SERVICES = ["vercel", "supabase", "anthropic", "other"]
@@ -76,12 +76,11 @@ export default async function CostPage() {
       </div>
 
       {allRecords.length === 0 || allProducts.length === 0 ? (
-        <div className="flex flex-col items-center justify-center gap-4 rounded-lg border border-dashed border-border py-20 text-center">
-          <DollarSign className="size-12" style={{ color: "var(--color-text-secondary)" }} />
-          <p className="font-medium text-foreground" style={{ fontSize: "var(--text-base)" }}>
-            データがまだありません
-          </p>
-        </div>
+        <EmptyState
+          icon={<DollarSign className="size-12" />}
+          title="データがまだありません"
+          description="GitHub Actions cronが実行されるとデータが表示されます"
+        />
       ) : (
         <div className="rounded-lg border border-border overflow-hidden">
           <table className="w-full">

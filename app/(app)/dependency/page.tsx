@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
-import { Badge, PageHeader } from "@takaki/go-design-system"
+import { Badge, EmptyState, PageHeader } from "@takaki/go-design-system"
 import { ExternalLink, Package } from "lucide-react"
 
 const UPDATE_TYPE_COLORS: Record<string, string> = {
@@ -51,12 +51,11 @@ export default async function DependencyPage() {
       </div>
 
       {allItems.length === 0 ? (
-        <div className="flex flex-col items-center justify-center gap-4 rounded-lg border border-dashed border-border py-20 text-center">
-          <Package className="size-12" style={{ color: "var(--color-text-secondary)" }} />
-          <p className="font-medium text-foreground" style={{ fontSize: "var(--text-base)" }}>
-            データがまだありません
-          </p>
-        </div>
+        <EmptyState
+          icon={<Package className="size-12" />}
+          title="データがまだありません"
+          description="GitHub Actions cronが実行されるとデータが表示されます"
+        />
       ) : (
         <div className="rounded-lg border border-border overflow-hidden">
           <table className="w-full">
@@ -72,7 +71,7 @@ export default async function DependencyPage() {
             <tbody>
               {allItems.map((item) => (
                 <tr key={item.id} className="border-b border-border last:border-0 hover:bg-surface-subtle">
-                  <td className="px-4 py-3 text-sm">{(item as any).products?.display_name ?? "—"}</td>
+                  <td className="px-4 py-3 text-sm">{item.products?.display_name ?? "—"}</td>
                   <td className="px-4 py-3 text-sm font-mono font-medium text-foreground">{item.package_name}</td>
                   <td className="px-4 py-3 text-sm font-mono" style={{ color: "var(--color-text-secondary)" }}>{item.current_version}</td>
                   <td className="px-4 py-3 text-sm font-mono text-green-600">{item.latest_version}</td>

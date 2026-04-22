@@ -21,10 +21,9 @@ import {
   LogOut,
   Sun,
   Moon,
-  ChevronsUpDown,
-  Check,
 } from "lucide-react"
 import {
+  AppSwitcher,
   Sidebar,
   SidebarContent,
   SidebarFooter,
@@ -36,21 +35,11 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
   Avatar,
   AvatarFallback,
   AvatarImage,
 } from "@takaki/go-design-system"
 import { createClient } from "@/lib/supabase/client"
-
-// ---------------------------------------------------------------------------
-// Go apps list
-// ---------------------------------------------------------------------------
 
 const GO_APPS = [
   { name: "MetaGo",     url: "https://metago.vercel.app/",                        color: "#1E3A8A" },
@@ -60,11 +49,7 @@ const GO_APPS = [
   { name: "CookGo",     url: "https://cook-go-lovat.vercel.app/dashboard",        color: "#FF991F" },
   { name: "PhysicalGo", url: "https://physical-go.vercel.app/dashboard",          color: "#6554C0" },
   { name: "TaskGo",     url: "https://taskgo-dun.vercel.app/",                    color: "#00B8D9" },
-] as const
-
-// ---------------------------------------------------------------------------
-// Nav groups
-// ---------------------------------------------------------------------------
+]
 
 const navGroups = [
   {
@@ -78,21 +63,21 @@ const navGroups = [
     label: "Delivery",
     badge: "P1",
     items: [
-      { title: "コード品質",       href: "/quality",        icon: Code2 },
-      { title: "セキュリティ",     href: "/security",       icon: ShieldCheck },
-      { title: "依存・技術スタック", href: "/dependency",   icon: Package },
-      { title: "デザインシステム", href: "/design-system",  icon: Palette },
-      { title: "パフォーマンス",   href: "/performance",    icon: Gauge },
-      { title: "コスト",           href: "/cost",           icon: DollarSign },
-      { title: "実行ログ",         href: "/exec-log",       icon: ScrollText },
+      { title: "コード品質",         href: "/quality",       icon: Code2 },
+      { title: "セキュリティ",       href: "/security",      icon: ShieldCheck },
+      { title: "依存・技術スタック", href: "/dependency",    icon: Package },
+      { title: "デザインシステム",   href: "/design-system", icon: Palette },
+      { title: "パフォーマンス",     href: "/performance",   icon: Gauge },
+      { title: "コスト",             href: "/cost",          icon: DollarSign },
+      { title: "実行ログ",           href: "/exec-log",      icon: ScrollText },
     ],
   },
   {
     label: "Discovery",
     badge: "P2",
     items: [
-      { title: "PSF",          href: "/psf",        icon: TrendingUp },
-      { title: "使用パターン", href: "/engagement", icon: Activity },
+      { title: "PSF",            href: "/psf",        icon: TrendingUp },
+      { title: "使用パターン",   href: "/engagement", icon: Activity },
       { title: "仮説・バックログ", href: "/hypothesis", icon: Lightbulb },
     ],
   },
@@ -102,10 +87,6 @@ const footerNavItems = [
   { title: "Concept", href: "/concept",  icon: Layers },
   { title: "設定",    href: "/settings", icon: Settings },
 ]
-
-// ---------------------------------------------------------------------------
-// MetaGoSidebar
-// ---------------------------------------------------------------------------
 
 export function MetaGoSidebar() {
   const pathname = usePathname()
@@ -143,59 +124,10 @@ export function MetaGoSidebar() {
 
   return (
     <Sidebar>
-      {/* ヘッダー：AppSwitcher */}
       <SidebarHeader>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <SidebarMenuButton
-                  size="lg"
-                  className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
-                >
-                  <span
-                    className="flex size-5 shrink-0 items-center justify-center rounded-md font-bold text-white text-xs"
-                    style={{ backgroundColor: "#1E3A8A" }}
-                  >
-                    M
-                  </span>
-                  <div className="flex flex-col gap-0.5 leading-none min-w-0">
-                    <span className="text-xs text-muted-foreground">App</span>
-                    <span className="text-[15px] font-medium tracking-tight truncate">MetaGo</span>
-                  </div>
-                  <ChevronsUpDown className="ml-auto h-4 w-4 shrink-0 opacity-50" />
-                </SidebarMenuButton>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-52"
-                align="start"
-                side="bottom"
-                sideOffset={4}
-              >
-                <DropdownMenuLabel className="text-xs text-muted-foreground">Goシリーズ</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {GO_APPS.map((app) => (
-                  <DropdownMenuItem
-                    key={app.name}
-                    onSelect={() => { window.location.href = app.url }}
-                    className="gap-2"
-                  >
-                    <span
-                      className="shrink-0 rounded-full"
-                      style={{ width: 8, height: 8, backgroundColor: app.color }}
-                      aria-hidden
-                    />
-                    <span className="flex-1">{app.name}</span>
-                    {app.name === "MetaGo" && <Check className="h-4 w-4 shrink-0 opacity-70" />}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </SidebarMenuItem>
-        </SidebarMenu>
+        <AppSwitcher currentApp="MetaGo" apps={GO_APPS} placement="bottom" />
       </SidebarHeader>
 
-      {/* メインナビ */}
       <SidebarContent>
         {navGroups.map((group) => (
           <SidebarGroup key={group.label}>
@@ -231,12 +163,10 @@ export function MetaGoSidebar() {
         ))}
       </SidebarContent>
 
-      {/* フッター：ユーザー・設定・テーマ・ログアウト */}
       <SidebarFooter>
         <SidebarMenu>
-          {/* ユーザー */}
           <SidebarMenuItem>
-            <SidebarMenuButton className="cursor-pointer">
+            <SidebarMenuButton className="cursor-default">
               <Avatar className="h-5 w-5 shrink-0">
                 {avatarUrl && <AvatarImage src={avatarUrl} alt={displayName} />}
                 <AvatarFallback className="text-xs">{initials}</AvatarFallback>
@@ -245,7 +175,6 @@ export function MetaGoSidebar() {
             </SidebarMenuButton>
           </SidebarMenuItem>
 
-          {/* Concept / 設定 */}
           {footerNavItems.map(({ title, href, icon: Icon }) => (
             <SidebarMenuItem key={href}>
               <SidebarMenuButton asChild isActive={pathname === href}>
@@ -257,7 +186,6 @@ export function MetaGoSidebar() {
             </SidebarMenuItem>
           ))}
 
-          {/* テーマ切り替え */}
           <SidebarMenuItem>
             <SidebarMenuButton onClick={toggleTheme} className="cursor-pointer">
               {isDark
@@ -268,7 +196,6 @@ export function MetaGoSidebar() {
             </SidebarMenuButton>
           </SidebarMenuItem>
 
-          {/* ログアウト */}
           <SidebarMenuItem>
             <SidebarMenuButton onClick={handleSignOut} className="cursor-pointer">
               <LogOut className="h-4 w-4 shrink-0" />

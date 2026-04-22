@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
-import { Badge, PageHeader } from "@takaki/go-design-system"
+import { Badge, EmptyState, PageHeader } from "@takaki/go-design-system"
 import { ScoreDonut } from "@/components/score/score-donut"
 import { ExternalLink } from "lucide-react"
 
@@ -66,7 +66,10 @@ export default async function QualityPage() {
       </div>
 
       {allItems.length === 0 ? (
-        <EmptyState />
+        <EmptyState
+          title="データがまだありません"
+          description="GitHub Actions cronが実行されるとデータが表示されます"
+        />
       ) : (
         <div className="rounded-lg border border-border overflow-hidden">
           <table className="w-full">
@@ -82,7 +85,7 @@ export default async function QualityPage() {
             <tbody>
               {allItems.map((item) => (
                 <tr key={item.id} className="border-b border-border last:border-0 hover:bg-surface-subtle">
-                  <td className="px-4 py-3 text-sm">{(item as any).products?.display_name ?? "—"}</td>
+                  <td className="px-4 py-3 text-sm">{item.products?.display_name ?? "—"}</td>
                   <td className="px-4 py-3"><Badge variant="outline">{item.category}</Badge></td>
                   <td className="px-4 py-3">
                     <div className="text-sm font-medium text-foreground">{item.title}</div>
@@ -114,18 +117,5 @@ export default async function QualityPage() {
         </div>
       )}
     </>
-  )
-}
-
-function EmptyState() {
-  return (
-    <div className="flex flex-col items-center justify-center gap-4 rounded-lg border border-dashed border-border py-20 text-center">
-      <p className="font-medium text-foreground" style={{ fontSize: "var(--text-base)" }}>
-        データがまだありません
-      </p>
-      <p style={{ fontSize: "var(--text-sm)", color: "var(--color-text-secondary)" }}>
-        GitHub Actions cronが実行されるとデータが表示されます
-      </p>
-    </div>
   )
 }

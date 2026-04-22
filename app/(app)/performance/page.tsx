@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
-import { PageHeader } from "@takaki/go-design-system"
+import { EmptyState, PageHeader } from "@takaki/go-design-system"
 import { ScoreDonut } from "@/components/score/score-donut"
 import { Gauge } from "lucide-react"
 
@@ -34,7 +34,7 @@ export default async function PerformancePage() {
   const latest = Object.values(latestPerProduct)
   const avgScore =
     latest.length > 0
-      ? Math.round((latest as any[]).reduce((a: number, b) => a + (b.score as number), 0) / latest.length)
+      ? Math.round(latest.reduce((a: number, b) => a + ((b as any).score ?? 0), 0) / latest.length)
       : null
 
   return (
@@ -54,12 +54,11 @@ export default async function PerformancePage() {
       </div>
 
       {latest.length === 0 ? (
-        <div className="flex flex-col items-center justify-center gap-4 rounded-lg border border-dashed border-border py-20 text-center">
-          <Gauge className="size-12" style={{ color: "var(--color-text-secondary)" }} />
-          <p className="font-medium text-foreground" style={{ fontSize: "var(--text-base)" }}>
-            データがまだありません
-          </p>
-        </div>
+        <EmptyState
+          icon={<Gauge className="size-12" />}
+          title="データがまだありません"
+          description="GitHub Actions cronが実行されるとデータが表示されます"
+        />
       ) : (
         <div className="rounded-lg border border-border overflow-hidden">
           <table className="w-full">
@@ -75,13 +74,13 @@ export default async function PerformancePage() {
             <tbody>
               {(latest as any[]).map((m) => {
                 const productName = m.products?.name ?? ""
-                const color = (m as any).products?.primary_color || GO_COLORS[productName] || "#6B7280"
+                const color = m.products?.primary_color || GO_COLORS[productName] || "#6B7280"
                 return (
                   <tr key={m.id} className="border-b border-border last:border-0 hover:bg-surface-subtle">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <div className="size-2.5 rounded-full" style={{ backgroundColor: color }} />
-                        <span className="text-sm text-foreground">{(m as any).products?.display_name ?? "—"}</span>
+                        <span className="text-sm text-foreground">{m.products?.display_name ?? "—"}</span>
                       </div>
                     </td>
                     <td className="px-4 py-3">

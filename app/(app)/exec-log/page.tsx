@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
-import { Badge, PageHeader } from "@takaki/go-design-system"
+import { Badge, EmptyState, PageHeader } from "@takaki/go-design-system"
 import { ExternalLink, ScrollText, CheckCircle2, Clock, XCircle } from "lucide-react"
 
 const STATE_CONFIG: Record<string, { icon: React.ElementType; color: string; label: string }> = {
@@ -24,7 +24,7 @@ export default async function ExecLogPage() {
   const summary: Record<string, { product: string; category: string; count: number }> = allLogs.reduce(
     (acc: Record<string, { product: string; category: string; count: number }>, log) => {
       const key = `${log.product_id}:${log.category}`
-      if (!acc[key]) acc[key] = { product: (log as any).products?.display_name ?? "—", category: log.category, count: 0 }
+      if (!acc[key]) acc[key] = { product: log.products?.display_name ?? "—", category: log.category, count: 0 }
       acc[key].count++
       return acc
     },
@@ -59,12 +59,11 @@ export default async function ExecLogPage() {
       </div>
 
       {allLogs.length === 0 ? (
-        <div className="flex flex-col items-center justify-center gap-4 rounded-lg border border-dashed border-border py-20 text-center">
-          <ScrollText className="size-12" style={{ color: "var(--color-text-secondary)" }} />
-          <p className="font-medium text-foreground" style={{ fontSize: "var(--text-base)" }}>
-            データがまだありません
-          </p>
-        </div>
+        <EmptyState
+          icon={<ScrollText className="size-12" />}
+          title="データがまだありません"
+          description="MetaGoのワークフローが実行されるとログが表示されます"
+        />
       ) : (
         <>
           {/* Summary table */}
@@ -120,7 +119,7 @@ export default async function ExecLogPage() {
                     const StateIcon = stateConf.icon
                     return (
                       <tr key={log.id} className="border-b border-border last:border-0 hover:bg-surface-subtle">
-                        <td className="px-4 py-3 text-sm">{(log as any).products?.display_name ?? "—"}</td>
+                        <td className="px-4 py-3 text-sm">{log.products?.display_name ?? "—"}</td>
                         <td className="px-4 py-3"><Badge variant="outline">{log.category}</Badge></td>
                         <td className="px-4 py-3">
                           <div className="text-sm font-medium text-foreground">{log.title}</div>

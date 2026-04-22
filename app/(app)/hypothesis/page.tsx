@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
-import { Badge, PageHeader } from "@takaki/go-design-system"
+import { Badge, EmptyState, PageHeader } from "@takaki/go-design-system"
 import { Lightbulb } from "lucide-react"
 
 const PRIORITY_COLORS: Record<string, string> = {
@@ -34,10 +34,11 @@ export default async function HypothesisPage() {
       />
 
       {isEmpty ? (
-        <div className="flex flex-col items-center justify-center gap-4 rounded-lg border border-dashed border-border py-20 text-center">
-          <Lightbulb className="size-12" style={{ color: "var(--color-text-secondary)" }} />
-          <p className="font-medium text-foreground">データがまだありません</p>
-        </div>
+        <EmptyState
+          icon={<Lightbulb className="size-12" />}
+          title="データがまだありません"
+          description="仮説とバックログが追加されると表示されます"
+        />
       ) : (
         <>
           {/* Problem Hypotheses */}
@@ -60,7 +61,7 @@ export default async function HypothesisPage() {
                   <tbody>
                     {problems.map((h) => (
                       <tr key={h.id} className="border-b border-border last:border-0 hover:bg-surface-subtle">
-                        <td className="px-4 py-3 text-sm">{(h as any).products?.display_name ?? "—"}</td>
+                        <td className="px-4 py-3 text-sm">{h.products?.display_name ?? "—"}</td>
                         <td className="px-4 py-3">
                           <div className="text-sm font-medium text-foreground">{h.title}</div>
                           {h.description && (
@@ -100,7 +101,7 @@ export default async function HypothesisPage() {
                   <tbody>
                     {solutions.map((h) => (
                       <tr key={h.id} className="border-b border-border last:border-0 hover:bg-surface-subtle">
-                        <td className="px-4 py-3 text-sm">{(h as any).products?.display_name ?? "—"}</td>
+                        <td className="px-4 py-3 text-sm">{h.products?.display_name ?? "—"}</td>
                         <td className="px-4 py-3">
                           <div className="text-sm font-medium text-foreground">{h.title}</div>
                           {h.description && (
@@ -140,7 +141,7 @@ export default async function HypothesisPage() {
                   <tbody>
                     {backlog.map((item) => (
                       <tr key={item.id} className="border-b border-border last:border-0 hover:bg-surface-subtle">
-                        <td className="px-4 py-3 text-sm">{(item as any).products?.display_name ?? "—"}</td>
+                        <td className="px-4 py-3 text-sm">{item.products?.display_name ?? "—"}</td>
                         <td className="px-4 py-3">
                           <div className="text-sm font-medium text-foreground">{item.title}</div>
                           {item.description && (

@@ -1,8 +1,8 @@
 "use client"
 
 import Link from "next/link"
-import { AlertCircle, CheckCircle2, Clock, ArrowUpRight } from "lucide-react"
-import { Badge, PageHeader } from "@takaki/go-design-system"
+import { AlertCircle, Clock, ArrowUpRight } from "lucide-react"
+import { Badge, EmptyState, PageHeader } from "@takaki/go-design-system"
 import { ScoreDonut } from "@/components/score/score-donut"
 
 interface Product {
@@ -105,7 +105,10 @@ export function DashboardClient({
       />
 
       {!hasData ? (
-        <EmptyState />
+        <EmptyState
+          title="データがまだありません"
+          description="GitHub Actions cronが実行されるとデータが表示されます"
+        />
       ) : (
         <>
           {/* Product Grid */}
@@ -244,21 +247,3 @@ function ProductCard({
   )
 }
 
-function EmptyState() {
-  return (
-    <div className="flex flex-col items-center justify-center gap-4 rounded-lg border border-dashed border-border py-20 text-center">
-      <CheckCircle2 className="size-12" style={{ color: "var(--color-text-secondary)" }} />
-      <div>
-        <p
-          className="font-medium text-foreground"
-          style={{ fontSize: "var(--text-base)" }}
-        >
-          データがまだありません
-        </p>
-        <p style={{ fontSize: "var(--text-sm)", color: "var(--color-text-secondary)" }}>
-          GitHub Actions cronが実行されるとデータが表示されます
-        </p>
-      </div>
-    </div>
-  )
-}
