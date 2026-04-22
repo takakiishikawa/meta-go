@@ -17,6 +17,7 @@ import {
   Activity,
   Lightbulb,
   Layers,
+  Key,
   LogOut,
   Sun,
   Moon,
@@ -85,6 +86,7 @@ const navGroups = [
 
 const footerNavItems = [
   { title: "コンセプト", href: "/concept", icon: Layers },
+  { title: "API管理",   href: "/apis",    icon: Key },
 ]
 
 export function MetaGoSidebar() {

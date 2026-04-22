@@ -195,6 +195,21 @@ CREATE TABLE IF NOT EXISTS metago.backlog (
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- api_keys: goシリーズで利用するAPI・環境変数の管理
+-- env_var_name を一意キーとし、スクリプトが自動検出してupsertする
+CREATE TABLE IF NOT EXISTS metago.api_keys (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  env_var_name  TEXT NOT NULL UNIQUE,   -- 'OPENAI_API_KEY', 'STRIPE_SECRET_KEY', etc.
+  name          TEXT,                   -- 人が読める名前（手動編集可）
+  provider      TEXT,                   -- 'OpenAI', 'Stripe' など（手動編集可）
+  category      TEXT,                   -- 'AI / LLM', '認証', '決済' など
+  used_by       TEXT[] NOT NULL DEFAULT '{}', -- 利用プロダクトのslug配列（自動更新）
+  notes         TEXT,                   -- 備考（手動編集可）
+  auto_detected BOOLEAN NOT NULL DEFAULT true,
+  last_seen_at  TIMESTAMPTZ,            -- 最後にソースコードで検出された日時
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- ============================================================
 -- Indexes
 -- ============================================================
