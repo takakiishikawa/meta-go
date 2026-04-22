@@ -55,6 +55,19 @@ const supabase = createClient()
 - anon keyでは他スキーマを読み取れない場合がある
 - 収集スクリプトは`scripts/collect/`に配置、`tsx`で実行
 
+## Self-Heal: L1/L2 判定ロジック
+
+MetaGoのself-heal.ymlは以下のレベルで修正を分類する。
+
+| レベル | 対応 | 例 |
+|---|---|---|
+| **L1** | 自動マージ（承認不要） | ESLint auto-fix、未使用import削除、Prettier整形、patch依存更新、デザインシステム違反auto-fix |
+| **L2** | PR作成 + MetaGo承認待ち | minor/major依存更新、コード品質改善、アーキテクチャ変更 |
+
+**L1の基準:** コードロジックへの変更なし。機械的・決定論的な修正のみ。CIが通れば無条件でマージしてよい。
+
+**L2の基準:** 影響範囲の判断が必要な変更。PR作成後、MetaGoの「承認待ち」画面で承認するとマージされる。
+
 ## 環境変数
 
 ```
@@ -62,8 +75,14 @@ NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY
 NEXT_PUBLIC_SITE_URL
 ANTHROPIC_API_KEY
-GITHUB_TOKEN
+GITHUB_TOKEN              # PAT (repo + pull-requests スコープ) — approval承認/却下でGitHub APIを呼ぶ
 GITHUB_OWNER=takakiishikawa
-SUPABASE_SERVICE_ROLE_KEY  # 収集スクリプト用
+SUPABASE_SERVICE_ROLE_KEY  # 収集スクリプト用 / self-heal認証にも使用
 VERCEL_TOKEN               # コスト・デプロイ情報取得用
+```
+
+各goリポジトリのGitHub Secretsに追加が必要なもの:
+```
+METAGO_URL         # MetaGoのVercel URL (例: https://metago.vercel.app)
+METAGO_SERVICE_KEY # Supabase SERVICE_ROLE_KEY (L2通知の認証に使用)
 ```
