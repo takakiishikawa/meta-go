@@ -2,8 +2,8 @@ name: Collect Weekly Data
 
 on:
   schedule:
-    # 毎週月曜 JST 6:00 = UTC 日曜 21:00
-    - cron: '0 21 * * 0'
+    # 毎週月曜 ICT 3:00 実行 (UTC 月曜 20:00)
+    - cron: '0 20 * * 1'
   workflow_dispatch:
 
 jobs:
