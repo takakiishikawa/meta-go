@@ -259,3 +259,25 @@ BEGIN
     );
   END LOOP;
 END$$;
+
+-- ============================================================
+-- Permissions
+-- ============================================================
+
+-- スキーマ使用権限
+GRANT USAGE ON SCHEMA metago TO authenticated, anon, service_role;
+
+-- テーブル権限
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA metago TO authenticated;
+GRANT ALL ON ALL TABLES IN SCHEMA metago TO service_role;
+GRANT SELECT ON ALL TABLES IN SCHEMA metago TO anon;
+
+-- シーケンス権限
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA metago TO authenticated;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA metago TO service_role;
+
+-- 今後作成するテーブルにも自動付与
+ALTER DEFAULT PRIVILEGES IN SCHEMA metago
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO authenticated;
+ALTER DEFAULT PRIVILEGES IN SCHEMA metago
+  GRANT ALL ON TABLES TO service_role;
