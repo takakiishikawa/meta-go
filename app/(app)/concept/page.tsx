@@ -13,9 +13,9 @@ export default function ConceptPageRoute() {
             <Layers className="size-5 text-white" />
           </div>
         }
-        tagline="PSF Product Manager — takakiのもう一人のPM"
-        coreMessage="MetaGoはgoシリーズ全体を俯瞰し、品質・セキュリティ・コストを自律管理しながら、takakiがプロダクト開発の本質（PSF向上）に集中できる環境を創出する。"
-        coreValue="takakiを保守作業から解放し、PSF向上に集中させること。MetaGoが守ることで、takakiは育てることができる。"
+        tagline="PSF Product Manager — goシリーズのもう一人のPM"
+        coreMessage="MetaGoはgoシリーズ全体を俯瞰し、品質・セキュリティ・コストを自律管理しながら、プロダクト開発の本質（PSF向上）に集中できる環境を創出する。"
+        coreValue="オーナーを保守作業から解放し、PSF向上に集中させること。MetaGoが守ることで、オーナーは育てることができる。"
         scope={{
           solve: [
             "コード品質・セキュリティの継続的モニタリング",
@@ -31,7 +31,7 @@ export default function ConceptPageRoute() {
             "ユーザー獲得・マーケティング",
             "goシリーズのコードへの無断変更",
             "他goのSupabaseスキーマの変更",
-            "takakiの代わりの意思決定",
+            "オーナーの代わりの意思決定",
           ],
         }}
         productLogic={{
@@ -50,17 +50,17 @@ export default function ConceptPageRoute() {
             },
             {
               title: "実行",
-              description: "takakiが承認した変更をマージ、自律実行可能な修正は自動実行する",
+              description: "承認された変更をマージ、自律実行可能な修正は自動実行する",
             },
             {
               title: "学習",
               description: "実行結果をスコアとして蓄積し、PSF向上への貢献を継続的に改善する",
             },
           ],
-          outcome: "takakiが「作ること」に使える時間/週の最大化",
+          outcome: "「作ること」に使える時間/週の最大化",
         }}
         resultMetric={{
-          title: "takakiが「作ること」に使える時間/週",
+          title: "「作ること」に使える時間/週",
           description: "保守作業（依存更新・バグ対応・品質管理）に費やす時間を最小化し、新機能開発・PSF向上活動に集中できる時間を増やす。目標：保守作業 < 1時間/週",
         }}
         behaviorMetrics={[
@@ -70,7 +70,7 @@ export default function ConceptPageRoute() {
           },
           {
             title: "承認待ち滞留時間",
-            description: "承認キューに積まれたアイテムがtakakiに処理されるまでの平均時間。目標: 48時間以内",
+            description: "承認キューに積まれたアイテムが処理されるまでの平均時間。目標: 48時間以内",
           },
           {
             title: "PSF向上に貢献した提案数/月",

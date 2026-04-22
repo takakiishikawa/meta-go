@@ -70,7 +70,7 @@ export default function PsfPage() {
     <>
       <PageHeader
         title="PSF"
-        description="Product Super-specific Fit — 各goとtakakiの課題適合度"
+        description="Product Super-specific Fit — 各goの課題適合度スコア"
       />
 
       {products.length === 0 ? (
