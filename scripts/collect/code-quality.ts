@@ -5,6 +5,7 @@
  *   TARGET_REPO  — 処理対象リポジトリ名 (例: "native-go")。未設定時は全リポ処理。
  */
 
+import Anthropic from "@anthropic-ai/sdk"
 import { createClient } from "@supabase/supabase-js"
 import { execSync } from "child_process"
 import * as fs from "fs"
@@ -182,9 +183,7 @@ interface AiIssue {
 }
 
 async function analyzeWithClaude(repoDir: string, productName: string): Promise<AiIssue[]> {
-  const anthropic = new (await import("@anthropic-ai/sdk")).default({
-    apiKey: process.env.ANTHROPIC_API_KEY,
-  })
+  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
   // 分析対象ファイルを収集 (app/, components/, lib/, hooks/)
   let files: string[] = []
