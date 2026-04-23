@@ -221,6 +221,34 @@ function calcScore(violations: Array<{ penaltyPerHit: number; count: number }>):
   return Math.max(0, 100 - totalPenalty)
 }
 
+// ── シンプル違反の直接テキスト置換 (Claude不要) ──────────────
+
+function applySimpleFixes(repoDir: string, files: string[]): void {
+  const simpleFixes: Array<{ pattern: RegExp; replacement: string }> = [
+    { pattern: /\bfont-bold\b/g,          replacement: "font-semibold" },
+    { pattern: /\brounded-2xl\b/g,        replacement: "rounded-lg" },
+    { pattern: /\brounded-3xl\b/g,        replacement: "rounded-lg" },
+    { pattern: /\brounded-xl\b/g,         replacement: "rounded-lg" },
+    { pattern: /\bshadow-sm\b/g,          replacement: "border border-border" },
+    { pattern: /\bshadow-md\b/g,          replacement: "border border-border" },
+    { pattern: /\bshadow-lg\b/g,          replacement: "border border-border" },
+    { pattern: /\bshadow-xl\b/g,          replacement: "border border-border" },
+    { pattern: /\bshadow-2xl\b/g,         replacement: "border border-border" },
+  ]
+
+  for (const filePath of files) {
+    try {
+      let content = fs.readFileSync(filePath, "utf-8")
+      let changed = false
+      for (const fix of simpleFixes) {
+        const next = content.replace(fix.pattern, fix.replacement)
+        if (next !== content) { content = next; changed = true }
+      }
+      if (changed) fs.writeFileSync(filePath, content, "utf-8")
+    } catch {}
+  }
+}
+
 // ── メイン処理 ─────────────────────────────────────────────
 
 interface FileViolation {
@@ -337,40 +365,51 @@ async function analyzeRepo(product: any, repo: string) {
       console.log(`  ✅ No violations found`)
     }
 
-    // Claude API で高優先度違反を自動修正 (L1)
-    const highSeverityViolations: FileViolation[] = []
+    // 先にシンプルな違反を直接テキスト置換で修正 (Claude不要)
+    applySimpleFixes(repoDir, files)
+
+    // Claude API で全severity違反を自動修正 (L1)
+    const allViolations: FileViolation[] = []
     for (const entry of violationsByCategory.values()) {
-      if (entry.rule.severity !== "high") continue
-      highSeverityViolations.push(...entry.fileViolations)
+      allViolations.push(...entry.fileViolations)
     }
 
-    if (highSeverityViolations.length > 0) {
-      // ファイル単位でユニーク化
-      const fileMap = new Map<string, FileViolation>()
-      for (const v of highSeverityViolations) {
+    if (allViolations.length > 0) {
+      // ファイル単位でユニーク化 (複数カテゴリの違反を1ファイルにまとめる)
+      const fileMap = new Map<string, FileViolation & { rules: string[] }>()
+      for (const v of allViolations) {
         const existing = fileMap.get(v.fullPath)
         if (existing) {
           existing.issues.push(...v.issues)
+          if (!existing.rules.includes(v.rule)) existing.rules.push(v.rule)
         } else {
-          fileMap.set(v.fullPath, { ...v })
+          // ファイルを再読み込み (simple fixes が適用済みの内容を使う)
+          let content = v.content
+          try { content = fs.readFileSync(v.fullPath, "utf-8") } catch {}
+          fileMap.set(v.fullPath, { ...v, content, rules: [v.rule] })
         }
       }
 
-      const patchTargets = [...fileMap.values()].slice(0, 8).map((v) => ({
+      const patchTargets = [...fileMap.values()].slice(0, 15).map((v) => ({
         file: v.file,
         content: v.content,
-        issues: v.issues.slice(0, 10),
+        issues: v.issues.slice(0, 15),
       }))
 
       const rule = [
-        "go-design-systemの仕様に従って以下の違反を修正してください:",
+        "go-design-systemの仕様に従って以下の違反をすべて修正してください:",
         "1. Tailwindパレットカラー(text-blue-500等) → go-design-systemのCSS変数(var(--color-*))に変換",
         "2. style属性の#xxxxxx → var(--color-*)に変換",
-        "3. <button>/<input>/<select> → go-design-systemの<Button>/<Input>/<Select>に変換 (import追加も)",
+        "3. <button>/<input>/<select>/<textarea> → go-design-systemの<Button>/<Input>/<Select>/<Textarea>に変換 (import追加も)",
+        "4. rounded-xl/2xl/3xl → rounded-lg に変換",
+        "5. shadow-sm/md/lg/xl/2xl → border border-border クラスに変換",
+        "6. text-[12px]等の任意フォントサイズ → var(--text-xs)/var(--text-sm)等のDS変数に変換",
+        "7. style属性のfontSize px/rem → var(--text-*)に変換",
+        "8. font-bold → font-semibold に変換",
         "import元: @takaki/go-design-system",
       ].join("\n")
 
-      console.log(`  🤖 Asking Claude to fix ${patchTargets.length} files...`)
+      console.log(`  🤖 Asking Claude to fix ${patchTargets.length} files (all severities)...`)
       const patches = await fixViolationsWithClaude(patchTargets, rule)
 
       for (const patch of patches) {
@@ -385,17 +424,24 @@ async function analyzeRepo(product: any, repo: string) {
         const pushed = createBranchAndCommit(
           repoDir,
           branch,
-          `fix(design-system): DSトークン・コンポーネント適用 [L1 MetaGo]`
+          `fix(design-system): DSトークン・コンポーネント全違反修正 [L1 MetaGo]`
         )
         if (pushed) {
           await createAndMergePR(repo, {
             title: `🤖 [MetaGo L1] デザインシステム違反修正 — ${product.display_name}`,
             body: `MetaGo + Claude による go-design-system 準拠修正です。
 
-**修正内容 (high severity のみ)**
-${categorySummary.filter((s) =>
-  s.startsWith("カラー") || s.startsWith("コンポーネント")
-).map((s) => `- ${s}`).join("\n") || "- カラー・コンポーネント違反の修正"}
+**検出違反**
+${categorySummary.map((s) => `- ${s}`).join("\n") || "- 違反なし"}
+
+**修正内容**
+- Tailwindパレットカラー → var(--color-*) CSS変数
+- style属性ハードコードカラー → var(--color-*)
+- 素のHTML要素(<button>/<input>/<select>/<textarea>) → DSコンポーネント
+- rounded-xl/2xl/3xl → rounded-lg
+- shadow-* → border border-border
+- text-[Xpx] → var(--text-*)
+- font-bold → font-semibold
 
 修正ファイル数: ${patches.length} 件
 

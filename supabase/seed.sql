@@ -7,12 +7,13 @@
 -- products
 -- ============================================================
 INSERT INTO metago.products (name, display_name, description, github_repo, vercel_url, primary_color, priority) VALUES
-  ('nativego',   'NativeGo',   'Native Campレッスンを定着させるツール',       'takakiishikawa/native-go',   'https://native-go.vercel.app',   '#0052CC', 1),
-  ('carego',     'CareGo',     '良いコンディションを安定させる',               'takakiishikawa/care-go',     'https://care-go.vercel.app',     '#00875A', 2),
-  ('kenyakugo',  'KenyakuGo',  '支出の無駄を減らす',                           'takakiishikawa/kenyaku-go',  'https://kenyaku-go.vercel.app',  '#FF5630', 3),
-  ('cookgo',     'CookGo',     '健康的な自炊を継続する',                       'takakiishikawa/cook-go',     'https://cook-go.vercel.app',     '#FF991F', 4),
-  ('physicalgo', 'PhysicalGo', '身体を鍛え続ける',                             'takakiishikawa/physical-go', 'https://physical-go.vercel.app', '#6554C0', 5),
-  ('taskgo',     'TaskGo',     'やるべきタスクを整理する',                     'takakiishikawa/task-go',     'https://task-go.vercel.app',     '#00B8D9', 6)
+  ('nativego',      'NativeGo',      'Native Campレッスンを定着させるツール',  'takakiishikawa/native-go',        'https://native-go.vercel.app',   '#0052CC', 1),
+  ('carego',        'CareGo',        '良いコンディションを安定させる',          'takakiishikawa/care-go',          'https://care-go.vercel.app',     '#00875A', 2),
+  ('kenyakugo',     'KenyakuGo',     '支出の無駄を減らす',                      'takakiishikawa/kenyaku-go',       'https://kenyaku-go.vercel.app',  '#FF5630', 3),
+  ('cookgo',        'CookGo',        '健康的な自炊を継続する',                  'takakiishikawa/cook-go',          'https://cook-go.vercel.app',     '#FF991F', 4),
+  ('physicalgo',    'PhysicalGo',    '身体を鍛え続ける',                        'takakiishikawa/physical-go',      'https://physical-go.vercel.app', '#6554C0', 5),
+  ('taskgo',        'TaskGo',        'やるべきタスクを整理する',                'takakiishikawa/task-go',          'https://task-go.vercel.app',     '#00B8D9', 6),
+  ('designsystem',  'DesignSystem',  'goシリーズ共通デザインシステム',          'takakiishikawa/go-design-system', NULL,                             '#7C3AED', 7)
 ON CONFLICT (name) DO UPDATE SET
   display_name  = EXCLUDED.display_name,
   description   = EXCLUDED.description,

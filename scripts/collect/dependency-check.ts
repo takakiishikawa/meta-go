@@ -30,7 +30,8 @@ const GO_REPOS: Record<string, string> = {
   kenyakugo:  "kenyaku-go",
   cookgo:     "cook-go",
   physicalgo: "physical-go",
-  taskgo:     "task-go",
+  taskgo:       "task-go",
+  designsystem: "go-design-system",
 }
 
 interface OutdatedPackage {

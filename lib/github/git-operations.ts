@@ -11,12 +11,13 @@ export const GITHUB_TOKEN = process.env.GH_PAT || process.env.GITHUB_TOKEN!
 export const GITHUB_OWNER = process.env.GITHUB_OWNER || "takakiishikawa"
 
 export const REPO_TO_SLUG: Record<string, string> = {
-  "native-go":   "nativego",
-  "care-go":     "carego",
-  "kenyaku-go":  "kenyakugo",
-  "cook-go":     "cookgo",
-  "physical-go": "physicalgo",
-  "task-go":     "taskgo",
+  "native-go":        "nativego",
+  "care-go":          "carego",
+  "kenyaku-go":       "kenyakugo",
+  "cook-go":          "cookgo",
+  "physical-go":      "physicalgo",
+  "task-go":          "taskgo",
+  "go-design-system": "designsystem",
 }
 
 export interface PullRequest {

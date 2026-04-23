@@ -1,20 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { createClient } from "@/lib/supabase/client"
-import {
-  PageHeader,
-  EmptyState,
-  Badge,
-  Button,
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  MultiSelect,
-} from "@takaki/go-design-system"
-import { Key, Pencil, Trash2, ExternalLink, RefreshCw } from "lucide-react"
+import { PageHeader, EmptyState, Badge } from "@takaki/go-design-system"
+import { Key, ExternalLink, RefreshCw } from "lucide-react"
 
 interface ApiKey {
   id: string
@@ -36,23 +23,43 @@ interface Product {
   primary_color: string
 }
 
-const CATEGORIES = [
-  "AI / LLM",
-  "認証・Auth",
-  "データベース",
-  "決済・Payment",
-  "分析・Analytics",
-  "通知・Messaging",
-  "ストレージ",
-  "インフラ",
-  "その他",
-]
-
 const GOOGLE_PM_URL = "https://passwords.google.com"
 
-function CategoryBadge({ category }: { category: string | null }) {
-  if (!category) return <span style={{ color: "var(--color-text-secondary)", fontSize: "var(--text-xs)" }}>—</span>
-  return <Badge variant="outline">{category}</Badge>
+// Auto-infer category from env var name
+function inferCategory(envVar: string): string {
+  const n = envVar.toUpperCase()
+  if (/ANTHROPIC|OPENAI|GEMINI|CLAUDE|GPT|LLM|TOGETHER|REPLICATE|HUGGING|AI_/.test(n)) return "AI / LLM"
+  if (/SUPABASE|DATABASE_URL|POSTGRES|MYSQL|MONGO|REDIS|NEON/.test(n))                   return "データベース"
+  if (/STRIPE|PAYMENT|PAYPAL|SQUARE/.test(n))                                            return "決済・Payment"
+  if (/GOOGLE_CLIENT|GITHUB_CLIENT|AUTH|OAUTH|JWT|SESSION|NEXTAUTH/.test(n))             return "認証・Auth"
+  if (/VERCEL|GH_PAT|GITHUB_TOKEN|GITHUB_OWNER|CI_TOKEN/.test(n))                        return "インフラ"
+  if (/SLACK|DISCORD|TWILIO|SENDGRID|EMAIL|SMTP|LINE_/.test(n))                          return "通知・Messaging"
+  if (/S3_|STORAGE|CLOUDINARY|BLOB|CDN/.test(n))                                         return "ストレージ"
+  if (/GA_|ANALYTICS|MIXPANEL|SEGMENT|AMPLITUDE/.test(n))                               return "分析・Analytics"
+  return "その他"
+}
+
+// Auto-infer display name from env var name when name is null
+function inferDisplayName(envVar: string): string | null {
+  const n = envVar.toUpperCase()
+  if (n.includes("ANTHROPIC"))       return "Anthropic"
+  if (n.includes("OPENAI"))          return "OpenAI"
+  if (n.includes("GEMINI"))          return "Google Gemini"
+  if (n.includes("SUPABASE"))        return "Supabase"
+  if (n.includes("STRIPE"))          return "Stripe"
+  if (n.includes("VERCEL"))          return "Vercel"
+  if (n.includes("GITHUB"))         return "GitHub"
+  if (n.includes("GOOGLE"))         return "Google"
+  if (n.includes("NEXTAUTH"))        return "NextAuth.js"
+  if (n.includes("SENDGRID"))        return "SendGrid"
+  if (n.includes("TWILIO"))          return "Twilio"
+  if (n.includes("SLACK"))           return "Slack"
+  if (n.includes("DISCORD"))         return "Discord"
+  if (n.includes("CLOUDINARY"))      return "Cloudinary"
+  if (n.includes("S3"))              return "AWS S3"
+  if (n.includes("REDIS"))           return "Redis"
+  if (n.includes("POSTGRES"))        return "PostgreSQL"
+  return null
 }
 
 function ProductDots({ slugs, products }: { slugs: string[]; products: Product[] }) {
@@ -64,7 +71,7 @@ function ProductDots({ slugs, products }: { slugs: string[]; products: Product[]
         return (
           <span
             key={slug}
-            className="flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium"
+            className="flex items-center gap-1 rounded-full px-1.5 py-0.5 text-xs font-medium"
             style={{ backgroundColor: (p?.primary_color ?? "#6B7280") + "22", color: p?.primary_color ?? "#6B7280" }}
           >
             <span className="size-1.5 rounded-full inline-block" style={{ backgroundColor: p?.primary_color ?? "#6B7280" }} />
@@ -76,162 +83,29 @@ function ProductDots({ slugs, products }: { slugs: string[]; products: Product[]
   )
 }
 
-interface EditForm {
-  name: string
-  provider: string
-  category: string
-  notes: string
-  used_by: string[]
-}
-
-function EditDialog({
-  apiKey,
-  products,
-  open,
-  onClose,
-  onSave,
-}: {
-  apiKey: ApiKey
-  products: Product[]
-  open: boolean
-  onClose: () => void
-  onSave: (id: string, values: EditForm) => Promise<void>
-}) {
-  const [form, setForm] = useState<EditForm>({
-    name: apiKey.name ?? "",
-    provider: apiKey.provider ?? "",
-    category: apiKey.category ?? "",
-    notes: apiKey.notes ?? "",
-    used_by: apiKey.used_by ?? [],
-  })
-  const [saving, setSaving] = useState(false)
-
-  const productOptions = products.map(p => ({ value: p.name, label: p.display_name }))
-
-  async function handleSave() {
-    setSaving(true)
-    await onSave(apiKey.id, form)
-    setSaving(false)
-    onClose()
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={v => !v && onClose()}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>
-            <code className="rounded bg-muted px-1.5 py-0.5 text-sm font-mono">{apiKey.env_var_name}</code>
-          </DialogTitle>
-        </DialogHeader>
-
-        <div className="flex flex-col gap-4 py-2">
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium" style={{ color: "var(--color-text-secondary)" }}>名前（サービス名）</label>
-            <input
-              className="w-full rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary"
-              placeholder="例: OpenAI API"
-              value={form.name}
-              onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-            />
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium" style={{ color: "var(--color-text-secondary)" }}>プロバイダー</label>
-            <input
-              className="w-full rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary"
-              placeholder="例: OpenAI"
-              value={form.provider}
-              onChange={e => setForm(f => ({ ...f, provider: e.target.value }))}
-            />
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium" style={{ color: "var(--color-text-secondary)" }}>カテゴリ</label>
-            <select
-              className="w-full rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary"
-              value={form.category}
-              onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
-            >
-              <option value="">カテゴリを選択</option>
-              {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium" style={{ color: "var(--color-text-secondary)" }}>利用プロダクト</label>
-            <MultiSelect
-              options={productOptions}
-              value={form.used_by}
-              onChange={v => setForm(f => ({ ...f, used_by: v }))}
-              placeholder="プロダクトを選択"
-            />
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium" style={{ color: "var(--color-text-secondary)" }}>メモ</label>
-            <textarea
-              className="w-full rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary resize-none"
-              rows={2}
-              placeholder="用途・注意事項など"
-              value={form.notes}
-              onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
-            />
-          </div>
-        </div>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={saving}>キャンセル</Button>
-          <Button onClick={handleSave} disabled={saving}>
-            {saving ? "保存中..." : "保存"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-export function ApisClient({
-  apiKeys: initialKeys,
-  products,
-}: {
-  apiKeys: ApiKey[]
-  products: Product[]
-}) {
-  const [apiKeys, setApiKeys] = useState<ApiKey[]>(initialKeys)
-  const [editTarget, setEditTarget] = useState<ApiKey | null>(null)
-
-  async function handleSave(id: string, values: EditForm) {
-    const supabase = createClient()
-    const { data } = await supabase
-      .schema("metago")
-      .from("api_keys")
-      .update({
-        name: values.name || null,
-        provider: values.provider || null,
-        category: values.category || null,
-        notes: values.notes || null,
-        used_by: values.used_by,
-      })
-      .eq("id", id)
-      .select()
-      .single()
-
-    if (data) {
-      setApiKeys(keys => keys.map(k => k.id === id ? (data as ApiKey) : k))
-    }
-  }
-
-  async function handleDelete(id: string) {
-    if (!confirm("このエントリを削除しますか？")) return
-    const supabase = createClient()
-    await supabase.schema("metago").from("api_keys").delete().eq("id", id)
-    setApiKeys(keys => keys.filter(k => k.id !== id))
-  }
-
+export function ApisClient({ apiKeys, products }: { apiKeys: ApiKey[]; products: Product[] }) {
   const lastSeen = apiKeys
     .filter(k => k.last_seen_at)
     .sort((a, b) => new Date(b.last_seen_at!).getTime() - new Date(a.last_seen_at!).getTime())[0]
     ?.last_seen_at
+
+  // Group by resolved category
+  const grouped: Record<string, ApiKey[]> = {}
+  for (const key of apiKeys) {
+    const cat = key.category || inferCategory(key.env_var_name)
+    if (!grouped[cat]) grouped[cat] = []
+    grouped[cat].push(key)
+  }
+
+  const categoryOrder = [
+    "AI / LLM", "データベース", "認証・Auth", "決済・Payment",
+    "インフラ", "通知・Messaging", "ストレージ", "分析・Analytics", "その他",
+  ]
+  const sortedGroups = Object.entries(grouped).sort(([a], [b]) => {
+    const ai = categoryOrder.indexOf(a)
+    const bi = categoryOrder.indexOf(b)
+    return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi)
+  })
 
   return (
     <>
@@ -246,16 +120,11 @@ export function ApisClient({
                 最終スキャン: {new Date(lastSeen).toLocaleDateString("ja-JP")}
               </span>
             )}
-            <a
-              href={GOOGLE_PM_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <Button variant="outline" size="sm">
-                <Key className="size-4" />
-                Google パスワードマネージャー
-                <ExternalLink className="size-3" />
-              </Button>
+            <a href={GOOGLE_PM_URL} target="_blank" rel="noopener noreferrer"
+               className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-surface-subtle transition-colors">
+              <Key className="size-3.5" />
+              Google パスワードマネージャー
+              <ExternalLink className="size-3" />
             </a>
           </div>
         }
@@ -268,106 +137,81 @@ export function ApisClient({
           description="週次ワークフローが実行されると各goリポジトリからAPIキー名が自動スキャンされます"
         />
       ) : (
-        <div className="rounded-lg border border-border overflow-hidden">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-border bg-surface-subtle">
-                {["環境変数名", "名前 / プロバイダー", "カテゴリ", "利用プロダクト", "メモ", "最終検出", ""].map(h => (
-                  <th key={h} className="px-4 py-3 text-left text-xs font-medium" style={{ color: "var(--color-text-secondary)" }}>
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {apiKeys.map(key => (
-                <tr key={key.id} className="border-b border-border last:border-0 hover:bg-surface-subtle">
-                  {/* 環境変数名 */}
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <code className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono text-foreground">
-                        {key.env_var_name}
-                      </code>
-                      {key.auto_detected && (
-                        <span className="rounded text-[10px] px-1 font-medium" style={{ backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-secondary)" }}>
-                          自動
-                        </span>
-                      )}
-                    </div>
-                  </td>
+        <div className="flex flex-col gap-6">
+          {sortedGroups.map(([category, keys]) => (
+            <div key={category} className="flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold text-foreground">{category}</span>
+                <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>{keys.length}件</span>
+              </div>
+              <div className="rounded-lg border border-border overflow-hidden">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-border bg-surface-subtle">
+                      {["環境変数名", "サービス", "利用プロダクト", "メモ", "最終検出"].map(h => (
+                        <th key={h} className="px-4 py-2.5 text-left text-xs font-medium" style={{ color: "var(--color-text-secondary)" }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {keys.map(key => {
+                      const displayName = key.name || inferDisplayName(key.env_var_name)
+                      const displayProvider = key.provider
+                      return (
+                        <tr key={key.id} className="border-b border-border last:border-0 hover:bg-surface-subtle">
+                          {/* 環境変数名 */}
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              <code className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono text-foreground">
+                                {key.env_var_name}
+                              </code>
+                              {key.auto_detected && (
+                                <span className="rounded text-[10px] px-1 font-medium" style={{ backgroundColor: "var(--color-surface-subtle)", color: "var(--color-text-secondary)" }}>
+                                  自動
+                                </span>
+                              )}
+                            </div>
+                          </td>
 
-                  {/* 名前 / プロバイダー */}
-                  <td className="px-4 py-3">
-                    {key.name ? (
-                      <div>
-                        <div className="text-sm font-medium text-foreground">{key.name}</div>
-                        {key.provider && (
-                          <div className="text-xs" style={{ color: "var(--color-text-secondary)" }}>{key.provider}</div>
-                        )}
-                      </div>
-                    ) : (
-                      <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>未設定</span>
-                    )}
-                  </td>
+                          {/* サービス名 */}
+                          <td className="px-4 py-3">
+                            {displayName ? (
+                              <div>
+                                <div className="text-sm font-medium text-foreground">{displayName}</div>
+                                {displayProvider && (
+                                  <div className="text-xs" style={{ color: "var(--color-text-secondary)" }}>{displayProvider}</div>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>—</span>
+                            )}
+                          </td>
 
-                  {/* カテゴリ */}
-                  <td className="px-4 py-3">
-                    <CategoryBadge category={key.category} />
-                  </td>
+                          {/* 利用プロダクト */}
+                          <td className="px-4 py-3 max-w-[220px]">
+                            <ProductDots slugs={key.used_by} products={products} />
+                          </td>
 
-                  {/* 利用プロダクト */}
-                  <td className="px-4 py-3 max-w-[200px]">
-                    <ProductDots slugs={key.used_by} products={products} />
-                  </td>
+                          {/* メモ */}
+                          <td className="px-4 py-3 max-w-[180px]">
+                            <span className="text-xs line-clamp-2" style={{ color: "var(--color-text-secondary)" }}>
+                              {key.notes || "—"}
+                            </span>
+                          </td>
 
-                  {/* メモ */}
-                  <td className="px-4 py-3 max-w-[160px]">
-                    <span className="text-xs line-clamp-2" style={{ color: "var(--color-text-secondary)" }}>
-                      {key.notes || "—"}
-                    </span>
-                  </td>
-
-                  {/* 最終検出 */}
-                  <td className="px-4 py-3 text-xs whitespace-nowrap" style={{ color: "var(--color-text-secondary)" }}>
-                    {key.last_seen_at
-                      ? new Date(key.last_seen_at).toLocaleDateString("ja-JP")
-                      : "—"}
-                  </td>
-
-                  {/* アクション */}
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => setEditTarget(key)}
-                        className="rounded p-1 hover:bg-surface-subtle transition-colors"
-                        title="編集"
-                      >
-                        <Pencil className="size-3.5" style={{ color: "var(--color-text-secondary)" }} />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(key.id)}
-                        className="rounded p-1 hover:bg-surface-subtle transition-colors"
-                        title="削除"
-                      >
-                        <Trash2 className="size-3.5 text-red-500" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                          {/* 最終検出 */}
+                          <td className="px-4 py-3 text-xs whitespace-nowrap" style={{ color: "var(--color-text-secondary)" }}>
+                            {key.last_seen_at ? new Date(key.last_seen_at).toLocaleDateString("ja-JP") : "—"}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ))}
         </div>
-      )}
-
-      {editTarget && (
-        <EditDialog
-          apiKey={editTarget}
-          products={products}
-          open
-          onClose={() => setEditTarget(null)}
-          onSave={handleSave}
-        />
       )}
     </>
   )

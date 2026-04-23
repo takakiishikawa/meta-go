@@ -1,74 +1,167 @@
 import { createClient } from "@/lib/supabase/server"
 import { Badge, EmptyState, PageHeader } from "@takaki/go-design-system"
 import { ScoreDonut } from "@/components/score/score-donut"
-import { ExternalLink, Palette } from "lucide-react"
+import { Pagination } from "@/components/ui/pagination"
+import { Palette, ExternalLink } from "lucide-react"
 
-export default async function DesignSystemPage() {
+const PAGE_SIZE = 20
+
+const GO_COLORS: Record<string, string> = {
+  nativego:   "#0052CC",
+  carego:     "#00875A",
+  kenyakugo:  "#FF5630",
+  cookgo:     "#FF991F",
+  physicalgo: "#6554C0",
+  taskgo:     "#00B8D9",
+}
+
+export default async function DesignSystemPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>
+}) {
+  const { page: pageParam } = await searchParams
+  const page = Math.max(1, parseInt(pageParam ?? "1", 10))
+
   const supabase = await createClient()
 
-  const { data: items } = await supabase
-    .schema("metago")
-    .from("design_system_items")
-    .select(`*, products(display_name, primary_color)`)
-    .order("created_at", { ascending: false })
+  const [{ data: items }, { data: scores }, { data: products }] = await Promise.all([
+    supabase
+      .schema("metago")
+      .from("design_system_items")
+      .select(`*, products(name, display_name, primary_color)`)
+      .order("created_at", { ascending: false }),
+    supabase
+      .schema("metago")
+      .from("scores_history")
+      .select(`product_id, score, collected_at`)
+      .eq("category", "design_system")
+      .order("collected_at", { ascending: false }),
+    supabase
+      .schema("metago")
+      .from("products")
+      .select("id, name, display_name, primary_color")
+      .order("priority"),
+  ])
 
-  const { data: scores } = await supabase
-    .schema("metago")
-    .from("scores_history")
-    .select("*")
-    .eq("category", "design_system")
-    .order("collected_at", { ascending: false })
-    .limit(10)
+  const allItems    = items    ?? []
+  const allScores   = scores   ?? []
+  const allProducts = products ?? []
 
-  const allItems = items ?? []
-  const openItems = allItems.filter((i) => i.state !== "done")
-  const avgScore =
-    scores && scores.length > 0
-      ? Math.round(scores.reduce((a: number, b: { score: number }) => a + b.score, 0) / scores.length)
-      : null
+  // Latest score per product
+  const latestScore: Record<string, number> = {}
+  for (const s of allScores) {
+    if (!(s.product_id in latestScore)) latestScore[s.product_id] = s.score
+  }
 
-  const byCategory: Record<string, number> = allItems.reduce(
-    (acc: Record<string, number>, item) => {
-      acc[item.category] = (acc[item.category] ?? 0) + 1
-      return acc
-    },
-    {}
-  )
+  // Violation counts per product
+  const openCount: Record<string, number> = {}
+  const doneCount: Record<string, number> = {}
+  for (const item of allItems) {
+    if (item.state === "new") openCount[item.product_id] = (openCount[item.product_id] ?? 0) + 1
+    else                      doneCount[item.product_id] = (doneCount[item.product_id] ?? 0) + 1
+  }
+
+  const scoreValues = Object.values(latestScore)
+  const avgScore = scoreValues.length > 0
+    ? Math.round(scoreValues.reduce((a, b) => a + b, 0) / scoreValues.length)
+    : null
+
+  const openItems = allItems.filter(i => i.state !== "done")
+
+  // Category breakdown
+  const byCategory: Record<string, number> = {}
+  for (const item of allItems) {
+    byCategory[item.category] = (byCategory[item.category] ?? 0) + 1
+  }
+  const topCategories = Object.entries(byCategory)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+
+  const totalPages = Math.ceil(allItems.length / PAGE_SIZE)
+  const pagedItems = allItems.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   return (
     <>
-      <PageHeader
-        title="デザインシステム"
-        description="go-design-system準拠率と違反一覧"
-      />
+      <PageHeader title="デザインシステム" description="go-design-system準拠率と違反一覧" />
 
+      {/* Stats */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="flex items-center gap-4 rounded-lg border border-border bg-surface p-4">
           <ScoreDonut score={avgScore} size={72} />
           <div>
-            <div className="text-2xl font-bold text-foreground">{avgScore ? `${avgScore}%` : "—"}</div>
-            <div style={{ fontSize: "var(--text-sm)", color: "var(--color-text-secondary)" }}>準拠率</div>
+            <div className="text-2xl font-semibold text-foreground">{avgScore ?? "—"}</div>
+            <div style={{ fontSize: "var(--text-sm)", color: "var(--color-text-secondary)" }}>全go平均準拠率</div>
           </div>
         </div>
         <div className="rounded-lg border border-border bg-surface p-4">
-          <div className="text-2xl font-bold text-foreground">{openItems.length}</div>
+          <div className="text-2xl font-semibold text-foreground">{openItems.length}</div>
           <div style={{ fontSize: "var(--text-sm)", color: "var(--color-text-secondary)" }}>未修正の違反</div>
         </div>
         <div className="rounded-lg border border-border bg-surface p-4">
-          <div className="flex flex-col gap-1">
-            {Object.entries(byCategory).slice(0, 3).map(([cat, count]) => (
-              <div key={cat} className="flex items-center justify-between text-sm">
-                <span style={{ color: "var(--color-text-secondary)" }}>{cat}</span>
-                <span className="font-medium text-foreground">{count as number}</span>
-              </div>
-            ))}
-            {Object.keys(byCategory).length === 0 && (
-              <div style={{ fontSize: "var(--text-sm)", color: "var(--color-text-secondary)" }}>—</div>
-            )}
-          </div>
+          <div className="text-sm font-semibold text-foreground mb-2">違反カテゴリ Top</div>
+          {topCategories.length === 0 ? (
+            <span style={{ fontSize: "var(--text-sm)", color: "var(--color-text-secondary)" }}>—</span>
+          ) : (
+            <div className="flex flex-col gap-1">
+              {topCategories.map(([cat, count]) => (
+                <div key={cat} className="flex items-center justify-between gap-2">
+                  <span className="text-xs truncate" style={{ color: "var(--color-text-secondary)" }}>{cat}</span>
+                  <span className="text-xs font-semibold text-foreground shrink-0">{count}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
+      {/* Per-product score table */}
+      {allProducts.length > 0 && (
+        <div className="rounded-lg border border-border overflow-hidden">
+          <div className="px-4 py-3 border-b border-border bg-surface-subtle">
+            <span className="text-sm font-semibold text-foreground">プロダクト別準拠率</span>
+          </div>
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-border">
+                {["プロダクト", "スコア", "未修正", "修正済み"].map(h => (
+                  <th key={h} className="px-4 py-2.5 text-left text-xs font-medium" style={{ color: "var(--color-text-secondary)" }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {allProducts.map(product => {
+                const color = product.primary_color || GO_COLORS[product.name] || "#6B7280"
+                const score = latestScore[product.id] ?? null
+                return (
+                  <tr key={product.id} className="border-b border-border last:border-0 hover:bg-surface-subtle">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <div className="size-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
+                        <span className="text-sm text-foreground">{product.display_name}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <ScoreDonut score={score} size={36} color={color} />
+                        <span className="text-sm font-semibold text-foreground">{score ?? "—"}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="text-sm text-foreground">{openCount[product.id] ?? 0}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="text-sm" style={{ color: "var(--color-text-secondary)" }}>{doneCount[product.id] ?? 0}</span>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Violations list */}
       {allItems.length === 0 ? (
         <EmptyState
           icon={<Palette className="size-12" />}
@@ -76,42 +169,53 @@ export default async function DesignSystemPage() {
           description="GitHub Actions cronが実行されるとデータが表示されます"
         />
       ) : (
-        <div className="rounded-lg border border-border overflow-hidden">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-border bg-surface-subtle">
-                {["プロダクト", "カテゴリ", "違反内容", "状態", "PR"].map((h) => (
-                  <th key={h} className="px-4 py-3 text-left text-xs font-medium" style={{ color: "var(--color-text-secondary)" }}>
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {allItems.map((item) => (
-                <tr key={item.id} className="border-b border-border last:border-0 hover:bg-surface-subtle">
-                  <td className="px-4 py-3 text-sm">{item.products?.display_name ?? "—"}</td>
-                  <td className="px-4 py-3"><Badge variant="outline">{item.category}</Badge></td>
-                  <td className="px-4 py-3">
-                    <div className="text-sm font-medium text-foreground">{item.title}</div>
-                    {item.description && (
-                      <div className="text-xs mt-0.5" style={{ color: "var(--color-text-secondary)" }}>{item.description}</div>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    <Badge variant={item.state === "done" ? "default" : "outline"}>{item.state}</Badge>
-                  </td>
-                  <td className="px-4 py-3">
-                    {item.pr_url && (
-                      <a href={item.pr_url} target="_blank" rel="noopener noreferrer">
-                        <ExternalLink className="size-4" style={{ color: "var(--color-primary)" }} />
-                      </a>
-                    )}
-                  </td>
+        <div className="flex flex-col gap-3">
+          <span className="text-sm font-semibold text-foreground">
+            違反一覧 <span style={{ color: "var(--color-text-secondary)", fontWeight: 400 }}>({allItems.length}件)</span>
+          </span>
+          <div className="rounded-lg border border-border overflow-hidden">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-border bg-surface-subtle">
+                  {["プロダクト", "カテゴリ", "違反内容", "状態", "PR"].map(h => (
+                    <th key={h} className="px-4 py-3 text-left text-xs font-medium" style={{ color: "var(--color-text-secondary)" }}>{h}</th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {pagedItems.map(item => (
+                  <tr key={item.id} className="border-b border-border last:border-0 hover:bg-surface-subtle">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <div className="size-2 rounded-full shrink-0" style={{ backgroundColor: item.products?.primary_color || "#6B7280" }} />
+                        <span className="text-sm text-foreground whitespace-nowrap">{item.products?.display_name ?? "—"}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <Badge variant="outline">{item.category}</Badge>
+                    </td>
+                    <td className="px-4 py-3 max-w-xs">
+                      <div className="text-sm font-medium text-foreground">{item.title}</div>
+                      {item.description && (
+                        <div className="text-xs mt-0.5 line-clamp-2" style={{ color: "var(--color-text-secondary)" }}>{item.description}</div>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <Badge variant={item.state === "done" ? "default" : "outline"}>{item.state}</Badge>
+                    </td>
+                    <td className="px-4 py-3">
+                      {item.pr_url && (
+                        <a href={item.pr_url} target="_blank" rel="noopener noreferrer">
+                          <ExternalLink className="size-4" style={{ color: "var(--color-primary)" }} />
+                        </a>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <Pagination page={page} totalPages={totalPages} basePath="/design-system" />
         </div>
       )}
     </>

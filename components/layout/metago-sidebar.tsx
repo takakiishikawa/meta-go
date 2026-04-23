@@ -62,7 +62,6 @@ const navGroups = [
   },
   {
     label: "Delivery",
-    badge: "P1",
     items: [
       { title: "コード品質",         href: "/quality",       icon: Code2 },
       { title: "セキュリティ",       href: "/security",      icon: ShieldCheck },
@@ -75,7 +74,6 @@ const navGroups = [
   },
   {
     label: "Discovery",
-    badge: "P2",
     items: [
       { title: "PSF",            href: "/psf",        icon: TrendingUp },
       { title: "使用パターン",   href: "/engagement", icon: Activity },
@@ -132,20 +130,7 @@ export function MetaGoSidebar() {
       <SidebarContent>
         {navGroups.map((group) => (
           <SidebarGroup key={group.label}>
-            <SidebarGroupLabel className="flex items-center gap-2">
-              {group.label}
-              {group.badge && (
-                <span
-                  className="rounded px-1 text-[10px] font-medium"
-                  style={{
-                    backgroundColor: "var(--color-surface-subtle)",
-                    color: "var(--color-text-secondary)",
-                  }}
-                >
-                  {group.badge}
-                </span>
-              )}
-            </SidebarGroupLabel>
+            <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 {group.items.map((item) => (
