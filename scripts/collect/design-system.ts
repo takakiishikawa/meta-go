@@ -1,5 +1,14 @@
 /**
- * デザインシステム準拠率チェック → 違反をDB保存 + Claude APIで自動修正PR作成 (L1)
+ * go-design-system 準拠チェック → 違反をDB保存 + Claude APIで自動修正PR作成 (L1)
+ *
+ * 判定基準: takakiishikawa/go-design-system の仕様に基づく
+ *   - カラー: --color-* CSS変数を使用 (Tailwindパレット直書き禁止)
+ *   - テキスト: --text-* CSS変数を使用 (px直書き禁止)
+ *   - 角丸: rounded-xl 以上禁止 (--radius-lg = 6px が上限)
+ *   - Shadow: shadow-* 系禁止 (border + --color-border-* を使う)
+ *   - コンポーネント: DSコンポーネントを使用 (<button>/<input>等の素HTML禁止)
+ *   - フォント: font-bold 禁止 (font-semibold を使う)
+ *   - DesignTokens: app/layout.tsx での使用を推奨
  *
  * 環境変数:
  *   TARGET_REPO  — 処理対象リポジトリ名 (例: "native-go")。未設定時は全リポ処理。
@@ -30,95 +39,189 @@ const GO_REPOS: Record<string, string> = {
   taskgo:     "task-go",
 }
 
-interface ViolationPattern {
-  category: string
-  pattern: RegExp
-  description: string
-  rule: string
-}
+// ============================================================
+// go-design-system の仕様から導いた違反パターン
+// ============================================================
 
-// Tailwind パレットカラー名一覧
+// Tailwind パレットカラー名 (DS定義外)
 const TW_COLORS = [
   "red","orange","amber","yellow","lime","green","emerald","teal",
   "cyan","sky","blue","indigo","violet","purple","fuchsia","pink","rose",
   "slate","gray","zinc","neutral","stone",
 ].join("|")
 
-// Tailwind カラー系プレフィックス
-const TW_PREFIXES = [
+// カラー系 Tailwind プレフィックス
+const TW_COLOR_PREFIXES = [
   "text","bg","border","ring","fill","stroke","shadow","outline",
   "from","to","via","decoration","divide","placeholder","caret","accent",
 ].join("|")
 
-const VIOLATION_PATTERNS: ViolationPattern[] = [
-  // 1. Tailwind パレットカラークラス直書き (最頻出違反)
-  //    例: text-blue-500, bg-red-100, border-green-300
+interface ViolationRule {
+  category: string
+  severity: "high" | "medium" | "low"
+  pattern: RegExp
+  description: string
+  rule: string
+  penaltyPerHit: number
+}
+
+const VIOLATION_RULES: ViolationRule[] = [
+  // ── 高優先度: カラー ───────────────────────────────────
   {
-    category: "Tailwindカラー直書き",
+    category: "カラー/Tailwindパレット直書き",
+    severity: "high",
+    // text-blue-500, bg-red-100, border-green-300, etc.
     pattern: new RegExp(
-      `(?:${TW_PREFIXES})-(${TW_COLORS})-(?:50|100|200|300|400|500|600|700|800|900|950)(?![\\w-])`,
+      `(?:${TW_COLOR_PREFIXES})-(${TW_COLORS})-(?:50|100|200|300|400|500|600|700|800|900|950)(?![\\w-])`,
       "g"
     ),
-    description: "Tailwindパレットカラー直書き。go-design-systemのCSS変数(var(--color-*))またはDSコンポーネントのpropsを使用してください",
-    rule: "className内のTailwindパレットカラー(text-blue-500等)をvar(--color-*)トークンに置き換えてください",
+    description: "Tailwindパレットカラー直書き。go-design-systemのCSS変数(var(--color-*))を使用してください",
+    rule: "className内のTailwindパレットカラー(text-blue-500等)はDS CSS変数(var(--color-*))またはDSコンポーネントpropsに置き換えてください",
+    penaltyPerHit: 3,
   },
-
-  // 2. Tailwind arbitrary カラー値 (text-[#xxx], bg-[rgb(...)])
   {
-    category: "任意カラー値直書き",
-    pattern: /(?:text|bg|border|ring|fill|stroke|from|to|via)\-\[(?:#[0-9a-fA-F]{3,8}|rgb[a]?\()/g,
+    category: "カラー/任意カラー値直書き",
+    severity: "high",
+    // text-[#xxx], bg-[rgb(...)], etc.
+    pattern: /(?:text|bg|border|ring|fill|stroke|from|to|via)-\[(?:#[0-9a-fA-F]{3,8}|rgb[a]?\()/g,
     description: "Tailwind arbitrary値でカラーを直接指定。var(--color-*)トークンを使用してください",
-    rule: "className内のarbitrary color値([#xxx]等)をvar(--color-*)に置き換えてください",
+    rule: "className内のarbitrary color([#xxx]等)はvar(--color-*)に置き換えてください",
+    penaltyPerHit: 5,
+  },
+  {
+    category: "カラー/style属性hex直書き",
+    severity: "high",
+    // style={{ color: '#1E3A8A' }}, style={{ backgroundColor: 'rgb(30,58,138)' }}
+    pattern: /style=\{[^}]*(?:color|background(?:Color)?|borderColor|fill|stroke):\s*['"](?:#[0-9a-fA-F]{3,8}|rgb[a]?\()/g,
+    description: "style属性に直接カラーコード。var(--color-*)トークンを使用してください",
+    rule: "style属性のcolor系プロパティはvar(--color-*)に置き換えてください",
+    penaltyPerHit: 5,
   },
 
-  // 3. style属性内の直接カラーコード
-  //    例: style={{ color: '#1E3A8A' }}, style={{ backgroundColor: "rgb(30,58,138)" }}
+  // ── 高優先度: コンポーネント ───────────────────────────
   {
-    category: "styleカラー直書き",
-    pattern: /style=\{[^}]*(?:color|background(?:Color)?|borderColor|fill|stroke):\s*['"](?:#[0-9a-fA-F]{3,8}|rgb)/g,
-    description: "style属性内に直接カラーコードを指定。var(--color-*)トークンを使用してください",
-    rule: "style属性のcolor系プロパティをvar(--color-*)に置き換えてください",
+    category: "コンポーネント/素のbutton使用",
+    severity: "high",
+    // <button class= や <button onClick= (JSXの素HTML要素)
+    pattern: /<button\s+(?:class|onClick|type|disabled)/g,
+    description: "DSの<Button>コンポーネントではなく素の<button>を使用",
+    rule: "<button>→go-design-systemの<Button>コンポーネントを使用してください",
+    penaltyPerHit: 4,
+  },
+  {
+    category: "コンポーネント/素のinput使用",
+    severity: "high",
+    pattern: /<input\s+(?:type|class|onChange|value|placeholder)/g,
+    description: "DSの<Input>/<SearchInput>/<NumberInput>ではなく素の<input>を使用",
+    rule: "<input>→go-design-systemの<Input>コンポーネントを使用してください",
+    penaltyPerHit: 4,
+  },
+  {
+    category: "コンポーネント/素のselect使用",
+    severity: "high",
+    pattern: /<select\s+(?:class|onChange|value|name)/g,
+    description: "DSの<Select>/<Combobox>ではなく素の<select>を使用",
+    rule: "<select>→go-design-systemの<Select>コンポーネントを使用してください",
+    penaltyPerHit: 4,
+  },
+  {
+    category: "コンポーネント/素のtextarea使用",
+    severity: "medium",
+    pattern: /<textarea\s+(?:class|onChange|value|rows|placeholder)/g,
+    description: "DSの<Textarea>ではなく素の<textarea>を使用",
+    rule: "<textarea>→go-design-systemの<Textarea>コンポーネントを使用してください",
+    penaltyPerHit: 3,
   },
 
-  // 4. style属性内の直接フォントサイズ (px/rem直書き)
-  //    例: style={{ fontSize: '12px' }}, style={{ fontSize: '0.75rem' }}
+  // ── 中優先度: スタイル ────────────────────────────────
   {
-    category: "フォントサイズ直書き",
+    category: "スタイル/角丸超過",
+    severity: "medium",
+    // rounded-xl, rounded-2xl, rounded-3xl (DS上限はrounded-lg=6px)
+    pattern: /rounded-(?:xl|2xl|3xl)\b/g,
+    description: "go-design-system の角丸上限(--radius-lg=6px)を超えている。rounded-xl以上は禁止",
+    rule: "rounded-xl以上はrounded-md(4px)またはrounded-lg(6px)に変更してください",
+    penaltyPerHit: 2,
+  },
+  {
+    category: "スタイル/shadow使用",
+    severity: "medium",
+    // shadow-sm, shadow-md, shadow-lg, shadow-xl, shadow-2xl
+    pattern: /\bshadow-(?:sm|md|lg|xl|2xl)\b/g,
+    description: "DSの設計指針では shadowより border+borderColor を優先する",
+    rule: "shadow-*はborder + var(--color-border)に置き換えることを検討してください",
+    penaltyPerHit: 1,
+  },
+  {
+    category: "スタイル/フォントサイズpx直書き",
+    severity: "medium",
+    // style={{ fontSize: '12px' }}, style={{ fontSize: '0.75rem' }}
     pattern: /style=\{[^}]*fontSize:\s*['"]?(?:\d+px|\d*\.\d+rem)/g,
-    description: "style属性内にpx/rem値で直接フォントサイズを指定。var(--text-*)トークンを使用してください",
-    rule: "style属性のfontSizeをvar(--text-*)に置き換えてください",
+    description: "style属性のfontSizeにpx/rem直書き。var(--text-*)トークンを使用してください",
+    rule: "style属性のfontSizeはvar(--text-xs|sm|base|lg|xl...)に置き換えてください",
+    penaltyPerHit: 3,
   },
-
-  // 5. Tailwind arbitrary フォントサイズ (text-[12px], text-[0.75rem])
   {
-    category: "任意フォントサイズ直書き",
+    category: "スタイル/任意フォントサイズ",
+    severity: "medium",
+    // text-[12px], text-[0.75rem]
     pattern: /text-\[(?:\d+px|\d*\.\d+rem)\]/g,
-    description: "Tailwind arbitrary値でフォントサイズを直接指定。var(--text-*)トークンを使用してください",
-    rule: "text-[12px]等の任意値をvar(--text-*)に置き換えてください",
+    description: "Tailwind arbitrary値でフォントサイズ直書き。var(--text-*)を使用してください",
+    rule: "text-[12px]等はvar(--text-*)またはDSのtext-xs等に置き換えてください",
+    penaltyPerHit: 3,
   },
 
-  // 6. go-design-system の代わりに素のHTML要素を使用
-  //    例: <button class, <input type=, <select name=
+  // ── 低優先度: フォント ────────────────────────────────
   {
-    category: "素のHTML要素使用",
-    pattern: /<(?:button|input|select|textarea)\s+(?!.*\/\/)/g,
-    description: "go-design-systemのButtonやInputコンポーネントではなく素のHTML要素を使用",
-    rule: "<button>→<Button>, <input>→<Input>等、go-design-systemコンポーネントを使用してください",
+    category: "スタイル/font-bold使用",
+    severity: "low",
+    // font-bold (DS設計指針: semibold優先)
+    pattern: /\bfont-bold\b/g,
+    description: "go-design-systemの設計指針ではfont-bold(700)よりfont-semibold(600)を優先",
+    rule: "font-bold→font-semiboldに変更することを検討してください",
+    penaltyPerHit: 1,
   },
 ]
+
+// ── ファイルスキャン ──────────────────────────────────────
 
 function findTsxFiles(dir: string): string[] {
   const result: string[] = []
   try {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      if (entry.name === "node_modules" || entry.name === ".git" || entry.name === ".next") continue
+      if (["node_modules", ".git", ".next", "dist"].includes(entry.name)) continue
       const fullPath = path.join(dir, entry.name)
       if (entry.isDirectory()) result.push(...findTsxFiles(fullPath))
-      else if (entry.name.endsWith(".tsx") || entry.name.endsWith(".ts")) result.push(fullPath)
+      else if (/\.(tsx?|jsx?)$/.test(entry.name)) result.push(fullPath)
     }
   } catch {}
   return result
 }
+
+// ── DesignTokens 使用チェック ──────────────────────────────
+
+function checkDesignTokensUsage(repoDir: string): boolean {
+  const layoutPaths = [
+    path.join(repoDir, "app", "layout.tsx"),
+    path.join(repoDir, "app", "layout.ts"),
+    path.join(repoDir, "src", "app", "layout.tsx"),
+  ]
+  for (const p of layoutPaths) {
+    if (!fs.existsSync(p)) continue
+    const content = fs.readFileSync(p, "utf-8")
+    if (content.includes("DesignTokens") || content.includes("go-design-system")) return true
+  }
+  return false
+}
+
+// ── スコア計算 ─────────────────────────────────────────────
+
+function calcScore(violations: Array<{ penaltyPerHit: number; count: number }>): number {
+  const totalPenalty = violations.reduce((s, v) => s + v.penaltyPerHit * v.count, 0)
+  return Math.max(0, 100 - totalPenalty)
+}
+
+// ── メイン処理 ─────────────────────────────────────────────
 
 interface FileViolation {
   file: string
@@ -126,6 +229,7 @@ interface FileViolation {
   content: string
   issues: string[]
   category: string
+  rule: string
 }
 
 async function analyzeRepo(product: any, repo: string) {
@@ -135,9 +239,25 @@ async function analyzeRepo(product: any, repo: string) {
   try {
     repoDir = cloneRepo(repo)
 
-    const allViolations: FileViolation[] = []
     const files = findTsxFiles(repoDir)
-    console.log(`  📂 Scanning ${files.length} TS/TSX files...`)
+    console.log(`  📂 Scanning ${files.length} files...`)
+
+    // DesignTokens コンポーネント使用チェック
+    const usesDesignTokens = checkDesignTokensUsage(repoDir)
+    if (!usesDesignTokens) {
+      console.log(`  ⚠️  <DesignTokens> not found in app/layout.tsx`)
+    }
+
+    // 違反集計
+    const violationsByCategory = new Map<string, {
+      rule: ViolationRule
+      count: number
+      fileViolations: FileViolation[]
+    }>()
+
+    for (const rule of VIOLATION_RULES) {
+      violationsByCategory.set(rule.category, { rule, count: 0, fileViolations: [] })
+    }
 
     for (const filePath of files) {
       let content: string
@@ -148,75 +268,119 @@ async function analyzeRepo(product: any, repo: string) {
       }
       const relPath = path.relative(repoDir, filePath)
 
-      for (const vp of VIOLATION_PATTERNS) {
-        const matches = [...content.matchAll(new RegExp(vp.pattern.source, "g"))]
+      for (const rule of VIOLATION_RULES) {
+        const matches = [...content.matchAll(new RegExp(rule.pattern.source, "g"))]
         if (matches.length === 0) continue
 
-        const existing = allViolations.find((v) => v.file === relPath && v.category === vp.category)
-        const issues = matches.map((m) => `L: ${m[0].substring(0, 80)}`)
+        const entry = violationsByCategory.get(rule.category)!
+        entry.count += matches.length
+        entry.fileViolations.push({
+          file: relPath,
+          fullPath: filePath,
+          content,
+          issues: matches.map((m) => m[0].substring(0, 80)),
+          category: rule.category,
+          rule: rule.rule,
+        })
+      }
+    }
 
-        if (existing) {
-          existing.issues.push(...issues)
-        } else {
-          allViolations.push({
-            file: relPath,
-            fullPath: filePath,
-            content,
-            issues,
-            category: vp.category,
-          })
-        }
+    // DB保存 & ログ出力
+    let totalPenalty = 0
+    const categorySummary: string[] = []
 
-        // DB に違反記録
+    for (const [category, entry] of violationsByCategory) {
+      if (entry.count === 0) continue
+
+      const penalty = entry.rule.penaltyPerHit * entry.count
+      totalPenalty += penalty
+      categorySummary.push(`${category}:${entry.count}件(-${penalty}pt)`)
+
+      for (const fv of entry.fileViolations.slice(0, 10)) {
         await supabase.schema("metago").from("design_system_items").upsert(
           {
-            product_id: product.id,
-            category: vp.category,
-            title: `${vp.category}違反: ${relPath}`,
-            description: `${vp.description} (${matches.length}箇所)`,
-            state: "new",
+            product_id:  product.id,
+            category:    category,
+            title:       `${category}: ${fv.file}`,
+            description: `${entry.rule.description} (${fv.issues.length}箇所) | ${fv.issues[0] ?? ""}`,
+            state:       "new",
           },
           { onConflict: "product_id,title", ignoreDuplicates: false }
         )
       }
     }
 
-    // スコア計算（違反ファイル数ベース、1ファイルあたり-3点、最低0点）
-    const violatedFileCount = allViolations.length
-    const totalHits = allViolations.reduce((s, v) => s + v.issues.length, 0)
-    const score = Math.max(0, 100 - violatedFileCount * 3)
+    // DesignTokens 未使用も記録
+    if (!usesDesignTokens) {
+      totalPenalty += 10
+      await supabase.schema("metago").from("design_system_items").upsert(
+        {
+          product_id:  product.id,
+          category:    "設定/DesignTokens未使用",
+          title:       "設定/DesignTokens未使用: app/layout.tsx",
+          description: "app/layout.tsx で<DesignTokens>コンポーネントが見つかりません。go-design-systemのブランドカラーが適用されていない可能性があります",
+          state:       "new",
+        },
+        { onConflict: "product_id,title", ignoreDuplicates: true }
+      )
+    }
+
+    const score = Math.max(0, 100 - totalPenalty)
     await supabase.schema("metago").from("scores_history").insert({
       product_id: product.id,
-      category: "design_system",
+      category:   "design_system",
       score,
     })
 
-    // カテゴリ別サマリー
-    const byCategory = new Map<string, number>()
-    for (const v of allViolations) {
-      byCategory.set(v.category, (byCategory.get(v.category) ?? 0) + v.issues.length)
+    console.log(`  score: ${score} (penalty: ${totalPenalty})`)
+    if (categorySummary.length > 0) {
+      console.log(`  violations:`)
+      for (const s of categorySummary) console.log(`    ${s}`)
+    } else {
+      console.log(`  ✅ No violations found`)
     }
-    const summary = [...byCategory.entries()].map(([k, n]) => `${k}:${n}`).join(", ")
-    console.log(`  violated files: ${violatedFileCount}, total hits: ${totalHits}, score: ${score}`)
-    if (summary) console.log(`  breakdown: ${summary}`)
 
-    // Claude API で自動修正
-    if (allViolations.length > 0) {
-      const patchTargets = allViolations.slice(0, 10).map((v) => ({
+    // Claude API で高優先度違反を自動修正 (L1)
+    const highSeverityViolations: FileViolation[] = []
+    for (const entry of violationsByCategory.values()) {
+      if (entry.rule.severity !== "high") continue
+      highSeverityViolations.push(...entry.fileViolations)
+    }
+
+    if (highSeverityViolations.length > 0) {
+      // ファイル単位でユニーク化
+      const fileMap = new Map<string, FileViolation>()
+      for (const v of highSeverityViolations) {
+        const existing = fileMap.get(v.fullPath)
+        if (existing) {
+          existing.issues.push(...v.issues)
+        } else {
+          fileMap.set(v.fullPath, { ...v })
+        }
+      }
+
+      const patchTargets = [...fileMap.values()].slice(0, 8).map((v) => ({
         file: v.file,
         content: v.content,
-        issues: v.issues,
+        issues: v.issues.slice(0, 10),
       }))
 
-      const rule =
-        "デザインシステムトークンを使用してください。style属性内の直接カラーコードは var(--color-*) に、直接px値は var(--text-*) に置き換えてください。"
+      const rule = [
+        "go-design-systemの仕様に従って以下の違反を修正してください:",
+        "1. Tailwindパレットカラー(text-blue-500等) → go-design-systemのCSS変数(var(--color-*))に変換",
+        "2. style属性の#xxxxxx → var(--color-*)に変換",
+        "3. <button>/<input>/<select> → go-design-systemの<Button>/<Input>/<Select>に変換 (import追加も)",
+        "import元: @takaki/go-design-system",
+      ].join("\n")
 
       console.log(`  🤖 Asking Claude to fix ${patchTargets.length} files...`)
       const patches = await fixViolationsWithClaude(patchTargets, rule)
 
       for (const patch of patches) {
         const fullPath = path.join(repoDir, patch.filePath)
-        fs.writeFileSync(fullPath, patch.newContent, "utf-8")
+        if (fs.existsSync(fullPath)) {
+          fs.writeFileSync(fullPath, patch.newContent, "utf-8")
+        }
       }
 
       if (hasChanges(repoDir)) {
@@ -224,19 +388,21 @@ async function analyzeRepo(product: any, repo: string) {
         const pushed = createBranchAndCommit(
           repoDir,
           branch,
-          `fix(design-system): デザイントークン適用 [L1 MetaGo]`
+          `fix(design-system): DSトークン・コンポーネント適用 [L1 MetaGo]`
         )
         if (pushed) {
           await createAndMergePR(repo, {
             title: `🤖 [MetaGo L1] デザインシステム違反修正 — ${product.display_name}`,
-            body: `MetaGo + Claude によるデザインシステム違反の自動修正です。
+            body: `MetaGo + Claude による go-design-system 準拠修正です。
 
-**修正内容**
-- 直接カラーコード → \`var(--color-*)\` トークンへ置換
-- 直接フォントサイズ → \`var(--text-*)\` トークンへ置換
-- 修正ファイル数: ${patches.length} 件
+**修正内容 (high severity のみ)**
+${categorySummary.filter((s) =>
+  s.startsWith("カラー") || s.startsWith("コンポーネント")
+).map((s) => `- ${s}`).join("\n") || "- カラー・コンポーネント違反の修正"}
 
-> L1: 自動マージ対象。スタイルトークンの置換のみです。`,
+修正ファイル数: ${patches.length} 件
+
+> L1: 自動マージ対象。スタイルトークンとDSコンポーネントへの置き換えのみです。`,
             head: branch,
             labels: ["metago-auto-merge"],
           })
@@ -247,10 +413,10 @@ async function analyzeRepo(product: any, repo: string) {
     console.error(`  ❌ Failed: ${repo}`, e)
     await supabase.schema("metago").from("execution_logs").insert({
       product_id: product.id,
-      category: "design-system",
-      title: `デザインシステムチェック失敗: ${repo}`,
+      category:   "design-system",
+      title:      `デザインシステムチェック失敗: ${repo}`,
       description: String(e),
-      state: "failed",
+      state:      "failed",
     })
   } finally {
     if (repoDir) cleanup(repoDir)
@@ -258,7 +424,7 @@ async function analyzeRepo(product: any, repo: string) {
 }
 
 async function main() {
-  console.log("🚀 Starting design system compliance check...")
+  console.log("🚀 Starting design system compliance check (based on go-design-system spec)...")
 
   const { data: products } = await supabase.schema("metago").from("products").select("*")
   if (!products?.length) return
