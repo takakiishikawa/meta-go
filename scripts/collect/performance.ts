@@ -125,18 +125,19 @@ async function processProduct(product: any) {
   if (metrics.cls   > THRESHOLDS.cls)   issues.push(`CLS ${metrics.cls} > ${THRESHOLDS.cls}`)
   if (metrics.score < THRESHOLDS.score) issues.push(`score ${metrics.score} < ${THRESHOLDS.score}`)
 
+  // 既存のパフォーマンス問題レコードを削除してから新規挿入
+  await supabase.schema("metago").from("quality_items")
+    .delete().eq("product_id", product.id).eq("category", "Performance")
+
   for (const issue of issues) {
-    await supabase.schema("metago").from("quality_items").upsert(
-      {
-        product_id:  product.id,
-        category:    "Performance",
-        title:       `パフォーマンス: ${issue}`,
-        description: `Lighthouse計測結果: ${issue}`,
-        state:       "new",
-        level:       "L1",
-      },
-      { onConflict: "product_id,title", ignoreDuplicates: true }
-    )
+    await supabase.schema("metago").from("quality_items").insert({
+      product_id:  product.id,
+      category:    "Performance",
+      title:       `パフォーマンス: ${issue}`,
+      description: `Lighthouse計測結果: ${issue}`,
+      state:       "new",
+      level:       "L1",
+    })
   }
 }
 

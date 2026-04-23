@@ -164,13 +164,104 @@ async function runLintAndFix(repoDir: string, productName: string): Promise<{
 async function runTscCheck(repoDir: string): Promise<string[]> {
   const errors: string[] = []
   try {
-    execSync("npx tsc --noEmit", { cwd: repoDir, stdio: "pipe" })
+    execSync("npx tsc --noEmit", { cwd: repoDir, stdio: "pipe", timeout: 120_000 })
   } catch (e: any) {
     const output = e.stdout?.toString() ?? ""
     const lines = output.split("\n").filter((l: string) => l.includes(": error TS"))
     errors.push(...lines.slice(0, 20))
   }
   return errors
+}
+
+interface AiIssue {
+  title: string
+  category: string
+  description: string
+  severity: "high" | "medium" | "low"
+  file?: string
+}
+
+async function analyzeWithClaude(repoDir: string, productName: string): Promise<AiIssue[]> {
+  const anthropic = new (await import("@anthropic-ai/sdk")).default({
+    apiKey: process.env.ANTHROPIC_API_KEY,
+  })
+
+  // 分析対象ファイルを収集 (app/, components/, lib/, hooks/)
+  let files: string[] = []
+  try {
+    files = execSync(
+      `find . -type f \\( -name "*.ts" -o -name "*.tsx" \\) ` +
+      `-not -path "./node_modules/*" -not -path "./.next/*" ` +
+      `\\( -path "./app/*" -o -path "./components/*" -o -path "./lib/*" -o -path "./hooks/*" \\) ` +
+      `| head -30`,
+      { cwd: repoDir, stdio: "pipe" }
+    ).toString().trim().split("\n").filter(Boolean)
+  } catch {
+    return []
+  }
+
+  if (files.length === 0) return []
+  console.log(`  🤖 Claude AI analysis: reading ${files.length} files...`)
+
+  // ファイル内容を収集 (合計60KB制限)
+  const fileSections: string[] = []
+  let totalChars = 0
+  for (const f of files) {
+    try {
+      const content = fs.readFileSync(path.join(repoDir, f), "utf-8")
+      if (totalChars + content.length > 60_000) break
+      fileSections.push(`=== ${f} ===\n${content}`)
+      totalChars += content.length
+    } catch {}
+  }
+
+  const sourceCode = fileSections.join("\n\n")
+
+  const MAX_RETRIES = 3
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const message = await anthropic.messages.create({
+        model: "claude-sonnet-4-5",
+        max_tokens: 4096,
+        messages: [{
+          role: "user",
+          content: `You are a senior engineer auditing a Next.js TypeScript application called "${productName}" for technical debt and future risk.
+
+Analyze the following source files and identify concrete issues that could cause bugs, maintenance burden, or scalability problems in the future.
+
+${sourceCode}
+
+Return a JSON array of issues. Each issue must have:
+- "title": short title (max 80 chars, in Japanese)
+- "category": one of "設計/アーキテクチャ" | "エラーハンドリング" | "型安全性" | "パフォーマンス" | "セキュリティ" | "保守性" | "重複コード"
+- "description": detailed explanation in Japanese (max 300 chars) including WHY it's a problem and WHAT could go wrong
+- "severity": "high" | "medium" | "low"
+- "file": the most relevant file path (optional)
+
+Focus ONLY on real, observable problems in this specific code. Do NOT invent generic suggestions. Limit to the 15 most impactful issues.
+
+Return ONLY the JSON array with no explanation or markdown.`,
+        }],
+      })
+
+      const text = message.content[0]?.type === "text" ? message.content[0].text : ""
+      const cleaned = text.replace(/^```[^\n]*\n?/, "").replace(/\n?```$/, "").trim()
+      const parsed = JSON.parse(cleaned.startsWith("[") ? cleaned : "[]")
+      console.log(`  🤖 Claude found ${parsed.length} issues`)
+      return parsed as AiIssue[]
+    } catch (e: any) {
+      const isRateLimit = e?.status === 429 || e?.error?.error?.type === "rate_limit_error"
+      if (isRateLimit && attempt < MAX_RETRIES) {
+        const wait = 60_000 * attempt
+        console.warn(`  Rate limit (attempt ${attempt}/${MAX_RETRIES}), waiting ${wait / 1000}s...`)
+        await new Promise(r => setTimeout(r, wait))
+        continue
+      }
+      console.warn("  Claude analysis failed:", String(e).slice(0, 200))
+      return []
+    }
+  }
+  return []
 }
 
 async function processRepo(product: any, repo: string) {
@@ -182,9 +273,14 @@ async function processRepo(product: any, repo: string) {
 
     const { violations, fixedCount } = await runLintAndFix(repoDir, product.name)
     const tscErrors = await runTscCheck(repoDir)
+    const aiIssues = await analyzeWithClaude(repoDir, product.display_name)
 
-    // 違反を DB に保存
-    const allIssues = [
+    // 既存レコードを削除してから新規挿入 (unique制約なしのためupsertは使わない)
+    await supabase.schema("metago").from("quality_items")
+      .delete().eq("product_id", product.id)
+
+    // ESLint/TSC違反を保存
+    const lintIssues = [
       ...violations.map((v) => ({
         product_id: product.id,
         category: "ESLint",
@@ -202,24 +298,37 @@ async function processRepo(product: any, repo: string) {
         level: "L1",
       })),
     ]
-
-    for (const issue of allIssues.slice(0, 50)) {
-      await supabase
-        .schema("metago")
-        .from("quality_items")
-        .upsert(issue, { onConflict: "product_id,title,description", ignoreDuplicates: true })
+    for (const issue of lintIssues.slice(0, 50)) {
+      await supabase.schema("metago").from("quality_items").insert(issue)
     }
 
-    // スコア計算
-    const totalViolations = violations.length + tscErrors.length
-    const score = Math.max(0, 100 - totalViolations * 2)
+    // Claude AI 分析結果を保存
+    for (const issue of aiIssues.slice(0, 15)) {
+      await supabase.schema("metago").from("quality_items").insert({
+        product_id: product.id,
+        category: issue.category,
+        title: issue.title.substring(0, 200),
+        description: issue.file
+          ? `[${issue.file}] ${issue.description}`.substring(0, 500)
+          : issue.description.substring(0, 500),
+        state: "new",
+        level: issue.severity === "high" ? "L1" : "L2",
+      })
+    }
+
+    // スコア計算: ESLint/TSC + AI分析の重み付き
+    const lintScore = Math.max(0, 100 - (violations.length + tscErrors.length) * 2)
+    const aiPenalty = aiIssues.filter(i => i.severity === "high").length * 5 +
+                      aiIssues.filter(i => i.severity === "medium").length * 2
+    const score = Math.max(0, Math.round((lintScore + Math.max(0, 100 - aiPenalty)) / 2))
+
     await supabase.schema("metago").from("scores_history").insert({
       product_id: product.id,
       category: "quality",
       score,
     })
 
-    // L1 自動修正 PR
+    // L1 自動修正 PR (ESLint/Prettier のみ)
     if (hasChanges(repoDir)) {
       const branch = `metago/code-quality-${new Date().toISOString().slice(0, 10)}`
       const pushed = createBranchAndCommit(
@@ -244,7 +353,7 @@ async function processRepo(product: any, repo: string) {
       }
     }
 
-    console.log(`  ✓ violations: ${violations.length}, tsc: ${tscErrors.length}, score: ${score}`)
+    console.log(`  ✓ ESLint: ${violations.length}, TSC: ${tscErrors.length}, AI issues: ${aiIssues.length}, score: ${score}`)
   } catch (e) {
     console.error(`  ❌ Failed: ${repo}`, e)
     await supabase.schema("metago").from("execution_logs").insert({

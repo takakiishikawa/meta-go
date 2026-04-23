@@ -285,6 +285,9 @@ async function analyzeRepo(product: any, repo: string) {
       }
     }
 
+    // 既存レコードを削除してから新規挿入 (unique制約なしのためupsertは使わない)
+    await supabase.schema("metago").from("design_system_items").delete().eq("product_id", product.id)
+
     // DB保存 & ログ出力
     let totalPenalty = 0
     const categorySummary: string[] = []
@@ -297,32 +300,26 @@ async function analyzeRepo(product: any, repo: string) {
       categorySummary.push(`${category}:${entry.count}件(-${penalty}pt)`)
 
       for (const fv of entry.fileViolations.slice(0, 10)) {
-        await supabase.schema("metago").from("design_system_items").upsert(
-          {
-            product_id:  product.id,
-            category:    category,
-            title:       `${category}: ${fv.file}`,
-            description: `${entry.rule.description} (${fv.issues.length}箇所) | ${fv.issues[0] ?? ""}`,
-            state:       "new",
-          },
-          { onConflict: "product_id,title", ignoreDuplicates: false }
-        )
+        await supabase.schema("metago").from("design_system_items").insert({
+          product_id:  product.id,
+          category:    category,
+          title:       `${category}: ${fv.file}`,
+          description: `${entry.rule.description} (${fv.issues.length}箇所) | ${fv.issues[0] ?? ""}`,
+          state:       "new",
+        })
       }
     }
 
     // DesignTokens 未使用も記録
     if (!usesDesignTokens) {
       totalPenalty += 10
-      await supabase.schema("metago").from("design_system_items").upsert(
-        {
-          product_id:  product.id,
-          category:    "設定/DesignTokens未使用",
-          title:       "設定/DesignTokens未使用: app/layout.tsx",
-          description: "app/layout.tsx で<DesignTokens>コンポーネントが見つかりません。go-design-systemのブランドカラーが適用されていない可能性があります",
-          state:       "new",
-        },
-        { onConflict: "product_id,title", ignoreDuplicates: true }
-      )
+      await supabase.schema("metago").from("design_system_items").insert({
+        product_id:  product.id,
+        category:    "設定/DesignTokens未使用",
+        title:       "設定/DesignTokens未使用: app/layout.tsx",
+        description: "app/layout.tsx で<DesignTokens>コンポーネントが見つかりません。go-design-systemのブランドカラーが適用されていない可能性があります",
+        state:       "new",
+      })
     }
 
     const score = Math.max(0, 100 - totalPenalty)
