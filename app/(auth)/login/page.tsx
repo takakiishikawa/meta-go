@@ -1,22 +1,22 @@
-"use client"
+"use client";
 
-import { Suspense } from "react"
-import { useSearchParams } from "next/navigation"
-import { LoginPage } from "@takaki/go-design-system"
+import { Suspense } from "react";
+import { useSearchParams } from "next/navigation";
+import { LoginPage } from "@takaki/go-design-system";
 
 function LoginContent() {
-  const searchParams = useSearchParams()
-  const _error = searchParams.get("error")
+  const searchParams = useSearchParams();
+  const _error = searchParams.get("error");
 
   async function handleGoogleSignIn() {
-    const { createClient } = await import("@/lib/supabase/client")
-    const supabase = createClient()
+    const { createClient } = await import("@/lib/supabase/client");
+    const supabase = createClient();
     await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
         redirectTo: `${window.location.origin}/auth/callback`,
       },
-    })
+    });
   }
 
   return (
@@ -33,7 +33,7 @@ function LoginContent() {
       tagline="PSF Product Manager — goシリーズの自律管理プラットフォーム"
       onGoogleSignIn={handleGoogleSignIn}
     />
-  )
+  );
 }
 
 export default function LoginPageRoute() {
@@ -41,5 +41,5 @@ export default function LoginPageRoute() {
     <Suspense>
       <LoginContent />
     </Suspense>
-  )
+  );
 }

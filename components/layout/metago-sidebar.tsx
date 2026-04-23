@@ -1,8 +1,8 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import { usePathname } from "next/navigation"
-import Link from "next/link"
+import * as React from "react";
+import { usePathname } from "next/navigation";
+import Link from "next/link";
 import {
   LayoutDashboard,
   ClipboardList,
@@ -21,7 +21,7 @@ import {
   LogOut,
   Sun,
   Moon,
-} from "lucide-react"
+} from "lucide-react";
 import {
   AppSwitcher,
   Sidebar,
@@ -38,88 +38,118 @@ import {
   Avatar,
   AvatarFallback,
   AvatarImage,
-} from "@takaki/go-design-system"
-import { createClient } from "@/lib/supabase/client"
+} from "@takaki/go-design-system";
+import { createClient } from "@/lib/supabase/client";
 
 const GO_APPS = [
-  { name: "MetaGo",          url: "https://metago.vercel.app/",                        color: "#1E3A8A" },
-  { name: "NativeGo",        url: "https://english-learning-app-black.vercel.app/",    color: "#0052CC" },
-  { name: "CareGo",          url: "https://care-go-mu.vercel.app/dashboard",           color: "#00875A" },
-  { name: "KenyakuGo",       url: "https://kenyaku-go.vercel.app/",                    color: "#FF5630" },
-  { name: "CookGo",          url: "https://cook-go-lovat.vercel.app/dashboard",        color: "#FF991F" },
-  { name: "PhysicalGo",      url: "https://physical-go.vercel.app/dashboard",          color: "#6554C0" },
-  { name: "TaskGo",          url: "https://taskgo-dun.vercel.app/",                    color: "#00B8D9" },
-  { name: "DesignSystem",    url: "https://github.com/takakiishikawa/go-design-system", color: "#7C3AED" },
-]
+  { name: "MetaGo", url: "https://metago.vercel.app/", color: "#1E3A8A" },
+  {
+    name: "NativeGo",
+    url: "https://english-learning-app-black.vercel.app/",
+    color: "#0052CC",
+  },
+  {
+    name: "CareGo",
+    url: "https://care-go-mu.vercel.app/dashboard",
+    color: "#00875A",
+  },
+  {
+    name: "KenyakuGo",
+    url: "https://kenyaku-go.vercel.app/",
+    color: "#FF5630",
+  },
+  {
+    name: "CookGo",
+    url: "https://cook-go-lovat.vercel.app/dashboard",
+    color: "#FF991F",
+  },
+  {
+    name: "PhysicalGo",
+    url: "https://physical-go.vercel.app/dashboard",
+    color: "#6554C0",
+  },
+  { name: "TaskGo", url: "https://taskgo-dun.vercel.app/", color: "#00B8D9" },
+  {
+    name: "DesignSystem",
+    url: "https://github.com/takakiishikawa/go-design-system",
+    color: "#7C3AED",
+  },
+];
 
 const navGroups = [
   {
     label: "Overview",
     items: [
-      { title: "Dashboard",   href: "/dashboard", icon: LayoutDashboard },
-      { title: "承認待ち",    href: "/approval",  icon: ClipboardList },
+      { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+      { title: "承認待ち", href: "/approval", icon: ClipboardList },
     ],
   },
   {
     label: "Delivery",
     items: [
-      { title: "コード品質",         href: "/quality",       icon: Code2 },
-      { title: "セキュリティ",       href: "/security",      icon: ShieldCheck },
-      { title: "依存・技術スタック", href: "/dependency",    icon: Package },
-      { title: "デザインシステム",   href: "/design-system", icon: Palette },
-      { title: "パフォーマンス",     href: "/performance",   icon: Gauge },
-      { title: "コスト",             href: "/cost",          icon: DollarSign },
-      { title: "実行ログ",           href: "/exec-log",      icon: ScrollText },
+      { title: "コード品質", href: "/quality", icon: Code2 },
+      { title: "セキュリティ", href: "/security", icon: ShieldCheck },
+      { title: "依存・技術スタック", href: "/dependency", icon: Package },
+      { title: "デザインシステム", href: "/design-system", icon: Palette },
+      { title: "パフォーマンス", href: "/performance", icon: Gauge },
+      { title: "コスト", href: "/cost", icon: DollarSign },
+      { title: "実行ログ", href: "/exec-log", icon: ScrollText },
     ],
   },
   {
     label: "Discovery",
     items: [
-      { title: "PSF",            href: "/psf",        icon: TrendingUp },
-      { title: "使用パターン",   href: "/engagement", icon: Activity },
+      { title: "PSF", href: "/psf", icon: TrendingUp },
+      { title: "使用パターン", href: "/engagement", icon: Activity },
       { title: "仮説・バックログ", href: "/hypothesis", icon: Lightbulb },
     ],
   },
-]
+];
 
 const footerNavItems = [
   { title: "コンセプト", href: "/concept", icon: Layers },
-  { title: "API管理",   href: "/apis",    icon: Key },
-]
+  { title: "API管理", href: "/apis", icon: Key },
+];
 
 export function MetaGoSidebar() {
-  const pathname = usePathname()
-  const [displayName, setDisplayName] = React.useState("")
-  const [avatarUrl, setAvatarUrl] = React.useState("")
-  const [isDark, setIsDark] = React.useState(false)
+  const pathname = usePathname();
+  const [displayName, setDisplayName] = React.useState("");
+  const [avatarUrl, setAvatarUrl] = React.useState("");
+  const [isDark, setIsDark] = React.useState(false);
 
   React.useEffect(() => {
-    const supabase = createClient()
+    const supabase = createClient();
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) return
-      setDisplayName(user.user_metadata?.display_name || user.email?.split("@")[0] || "User")
-      setAvatarUrl(user.user_metadata?.avatar_url || "")
-    })
-    const update = () => setIsDark(document.documentElement.classList.contains("dark"))
-    update()
-    const obs = new MutationObserver(update)
-    obs.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] })
-    return () => obs.disconnect()
-  }, [])
+      if (!user) return;
+      setDisplayName(
+        user.user_metadata?.display_name || user.email?.split("@")[0] || "User",
+      );
+      setAvatarUrl(user.user_metadata?.avatar_url || "");
+    });
+    const update = () =>
+      setIsDark(document.documentElement.classList.contains("dark"));
+    update();
+    const obs = new MutationObserver(update);
+    obs.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+    return () => obs.disconnect();
+  }, []);
 
   function toggleTheme() {
-    const next = isDark ? "light" : "dark"
-    localStorage.setItem("theme", next)
-    document.documentElement.classList.toggle("dark", next === "dark")
+    const next = isDark ? "light" : "dark";
+    localStorage.setItem("theme", next);
+    document.documentElement.classList.toggle("dark", next === "dark");
   }
 
   async function handleSignOut() {
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    window.location.href = "/login"
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    window.location.href = "/login";
   }
 
-  const initials = (displayName || "M").charAt(0).toUpperCase()
+  const initials = (displayName || "M").charAt(0).toUpperCase();
 
   return (
     <Sidebar>
@@ -135,7 +165,10 @@ export function MetaGoSidebar() {
               <SidebarMenu>
                 {group.items.map((item) => (
                   <SidebarMenuItem key={item.href}>
-                    <SidebarMenuButton asChild isActive={pathname === item.href}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={pathname === item.href}
+                    >
                       <Link href={item.href}>
                         <item.icon className="h-4 w-4 shrink-0" />
                         {item.title}
@@ -157,7 +190,9 @@ export function MetaGoSidebar() {
                 {avatarUrl && <AvatarImage src={avatarUrl} alt={displayName} />}
                 <AvatarFallback className="text-xs">{initials}</AvatarFallback>
               </Avatar>
-              <span className="truncate flex-1 min-w-0">{displayName || "—"}</span>
+              <span className="truncate flex-1 min-w-0">
+                {displayName || "—"}
+              </span>
             </SidebarMenuButton>
           </SidebarMenuItem>
 
@@ -174,16 +209,20 @@ export function MetaGoSidebar() {
 
           <SidebarMenuItem>
             <SidebarMenuButton onClick={toggleTheme} className="cursor-pointer">
-              {isDark
-                ? <Moon className="h-4 w-4 shrink-0" />
-                : <Sun className="h-4 w-4 shrink-0" />
-              }
+              {isDark ? (
+                <Moon className="h-4 w-4 shrink-0" />
+              ) : (
+                <Sun className="h-4 w-4 shrink-0" />
+              )}
               {isDark ? "ダーク" : "ライト"}
             </SidebarMenuButton>
           </SidebarMenuItem>
 
           <SidebarMenuItem>
-            <SidebarMenuButton onClick={handleSignOut} className="cursor-pointer">
+            <SidebarMenuButton
+              onClick={handleSignOut}
+              className="cursor-pointer"
+            >
               <LogOut className="h-4 w-4 shrink-0" />
               ログアウト
             </SidebarMenuButton>
@@ -193,5 +232,5 @@ export function MetaGoSidebar() {
 
       <SidebarRail />
     </Sidebar>
-  )
+  );
 }
