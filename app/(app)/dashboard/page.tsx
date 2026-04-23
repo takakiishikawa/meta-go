@@ -1,28 +1,28 @@
-import { createClient } from "@/lib/supabase/server"
-import { DashboardClient } from "./dashboard-client"
+import { createClient } from "@/lib/supabase/server";
+import { DashboardClient } from "./dashboard-client";
 
 export default async function DashboardPage() {
-  const supabase = await createClient()
+  const supabase = await createClient();
 
   const { data: products } = await supabase
     .schema("metago")
     .from("products")
     .select("*")
-    .order("priority")
+    .order("priority");
 
   const { data: latestScores } = await supabase
     .schema("metago")
     .from("scores_history")
     .select("*")
     .order("collected_at", { ascending: false })
-    .limit(100)
+    .limit(100);
 
   const { data: pendingApprovals } = await supabase
     .schema("metago")
     .from("approval_queue")
     .select("*")
     .eq("state", "pending")
-    .order("created_at", { ascending: false })
+    .order("created_at", { ascending: false });
 
   return (
     <DashboardClient
@@ -30,5 +30,5 @@ export default async function DashboardPage() {
       latestScores={latestScores ?? []}
       pendingApprovals={pendingApprovals ?? []}
     />
-  )
+  );
 }

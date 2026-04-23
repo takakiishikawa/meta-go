@@ -1,12 +1,12 @@
-"use client"
+"use client";
 
-import { PieChart, Pie, Cell } from "recharts"
+import { PieChart, Pie, Cell } from "recharts";
 
 interface ScoreDonutProps {
-  score: number | null
-  size?: number
-  color?: string
-  strokeWidth?: number
+  score: number | null;
+  size?: number;
+  color?: string;
+  strokeWidth?: number;
 }
 
 export function ScoreDonut({
@@ -15,14 +15,14 @@ export function ScoreDonut({
   color = "#1E3A8A",
   strokeWidth = 8,
 }: ScoreDonutProps) {
-  const val = score ?? 0
-  const data = [
-    { value: val },
-    { value: 100 - val },
-  ]
+  const val = score ?? 0;
+  const data = [{ value: val }, { value: 100 - val }];
 
   return (
-    <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
+    <div
+      className="relative flex items-center justify-center"
+      style={{ width: size, height: size }}
+    >
       <PieChart width={size} height={size}>
         <Pie
           data={data}
@@ -41,10 +41,13 @@ export function ScoreDonut({
       </PieChart>
       <div
         className="absolute inset-0 flex items-center justify-center font-semibold"
-        style={{ fontSize: size * 0.22, color: score !== null ? color : "var(--color-text-secondary)" }}
+        style={{
+          fontSize: size * 0.22,
+          color: score !== null ? color : "var(--color-text-secondary)",
+        }}
       >
         {score !== null ? score : "—"}
       </div>
     </div>
-  )
+  );
 }

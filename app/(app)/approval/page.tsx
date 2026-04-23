@@ -1,17 +1,19 @@
-import { createClient } from "@/lib/supabase/server"
-import { PageHeader } from "@takaki/go-design-system"
-import { ApprovalClient } from "./approval-client"
+import { createClient } from "@/lib/supabase/server";
+import { PageHeader } from "@takaki/go-design-system";
+import { ApprovalClient } from "./approval-client";
 
 export default async function ApprovalPage() {
-  const supabase = await createClient()
+  const supabase = await createClient();
 
   const { data: items } = await supabase
     .schema("metago")
     .from("approval_queue")
     .select(`*, products(display_name, primary_color)`)
-    .order("created_at", { ascending: false })
+    .order("created_at", { ascending: false });
 
-  const pendingCount = (items ?? []).filter((i) => i.state === "pending").length
+  const pendingCount = (items ?? []).filter(
+    (i) => i.state === "pending",
+  ).length;
 
   return (
     <>
@@ -25,5 +27,5 @@ export default async function ApprovalPage() {
       />
       <ApprovalClient items={(items ?? []) as any} />
     </>
-  )
+  );
 }

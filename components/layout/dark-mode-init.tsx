@@ -23,6 +23,6 @@ export function DarkModeInit() {
     if(stored==='dark') document.documentElement.classList.add('dark');
     else if(stored==='light') document.documentElement.classList.remove('dark');
     else{apply();schedule();}
-  })();`
-  return <script dangerouslySetInnerHTML={{ __html: script }} />
+  })();`;
+  return <script dangerouslySetInnerHTML={{ __html: script }} />;
 }

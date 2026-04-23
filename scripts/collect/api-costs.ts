@@ -6,9 +6,11 @@
  */
 
 async function main() {
-  console.log("🚀 api-costs: Not yet implemented.")
-  console.log("   Vercel / Supabase / Anthropic billing APIs are not publicly available.")
-  console.log("   Manual entry via /cost page for now.")
+  console.log("🚀 api-costs: Not yet implemented.");
+  console.log(
+    "   Vercel / Supabase / Anthropic billing APIs are not publicly available.",
+  );
+  console.log("   Manual entry via /cost page for now.");
 }
 
-main().catch(console.error)
+main().catch(console.error);
