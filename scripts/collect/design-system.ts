@@ -37,18 +37,73 @@ interface ViolationPattern {
   rule: string
 }
 
+// Tailwind パレットカラー名一覧
+const TW_COLORS = [
+  "red","orange","amber","yellow","lime","green","emerald","teal",
+  "cyan","sky","blue","indigo","violet","purple","fuchsia","pink","rose",
+  "slate","gray","zinc","neutral","stone",
+].join("|")
+
+// Tailwind カラー系プレフィックス
+const TW_PREFIXES = [
+  "text","bg","border","ring","fill","stroke","shadow","outline",
+  "from","to","via","decoration","divide","placeholder","caret","accent",
+].join("|")
+
 const VIOLATION_PATTERNS: ViolationPattern[] = [
+  // 1. Tailwind パレットカラークラス直書き (最頻出違反)
+  //    例: text-blue-500, bg-red-100, border-green-300
   {
-    category: "カラー",
-    pattern: /style=\{?\{[^}]*color:\s*['"]#[0-9a-fA-F]{3,6}['"]/g,
-    description: "デザイントークン（var(--color-*)）を使わず直接カラーコードを使用",
-    rule: "style属性内の color に直接カラーコード（#xxxxxx）を使わず、var(--color-*) トークンを使用してください",
+    category: "Tailwindカラー直書き",
+    pattern: new RegExp(
+      `(?:${TW_PREFIXES})-(${TW_COLORS})-(?:50|100|200|300|400|500|600|700|800|900|950)(?![\\w-])`,
+      "g"
+    ),
+    description: "Tailwindパレットカラー直書き。go-design-systemのCSS変数(var(--color-*))またはDSコンポーネントのpropsを使用してください",
+    rule: "className内のTailwindパレットカラー(text-blue-500等)をvar(--color-*)トークンに置き換えてください",
   },
+
+  // 2. Tailwind arbitrary カラー値 (text-[#xxx], bg-[rgb(...)])
   {
-    category: "フォントサイズ",
-    pattern: /style=\{?\{[^}]*fontSize:\s*['"]?\d+px/g,
-    description: "デザイントークン（var(--text-*)）を使わず直接フォントサイズを指定",
-    rule: "style属性内の fontSize に直接px値を使わず、var(--text-*) トークンを使用してください",
+    category: "任意カラー値直書き",
+    pattern: /(?:text|bg|border|ring|fill|stroke|from|to|via)\-\[(?:#[0-9a-fA-F]{3,8}|rgb[a]?\()/g,
+    description: "Tailwind arbitrary値でカラーを直接指定。var(--color-*)トークンを使用してください",
+    rule: "className内のarbitrary color値([#xxx]等)をvar(--color-*)に置き換えてください",
+  },
+
+  // 3. style属性内の直接カラーコード
+  //    例: style={{ color: '#1E3A8A' }}, style={{ backgroundColor: "rgb(30,58,138)" }}
+  {
+    category: "styleカラー直書き",
+    pattern: /style=\{[^}]*(?:color|background(?:Color)?|borderColor|fill|stroke):\s*['"](?:#[0-9a-fA-F]{3,8}|rgb)/g,
+    description: "style属性内に直接カラーコードを指定。var(--color-*)トークンを使用してください",
+    rule: "style属性のcolor系プロパティをvar(--color-*)に置き換えてください",
+  },
+
+  // 4. style属性内の直接フォントサイズ (px/rem直書き)
+  //    例: style={{ fontSize: '12px' }}, style={{ fontSize: '0.75rem' }}
+  {
+    category: "フォントサイズ直書き",
+    pattern: /style=\{[^}]*fontSize:\s*['"]?(?:\d+px|\d*\.\d+rem)/g,
+    description: "style属性内にpx/rem値で直接フォントサイズを指定。var(--text-*)トークンを使用してください",
+    rule: "style属性のfontSizeをvar(--text-*)に置き換えてください",
+  },
+
+  // 5. Tailwind arbitrary フォントサイズ (text-[12px], text-[0.75rem])
+  {
+    category: "任意フォントサイズ直書き",
+    pattern: /text-\[(?:\d+px|\d*\.\d+rem)\]/g,
+    description: "Tailwind arbitrary値でフォントサイズを直接指定。var(--text-*)トークンを使用してください",
+    rule: "text-[12px]等の任意値をvar(--text-*)に置き換えてください",
+  },
+
+  // 6. go-design-system の代わりに素のHTML要素を使用
+  //    例: <button class, <input type=, <select name=
+  {
+    category: "素のHTML要素使用",
+    pattern: /<(?:button|input|select|textarea)\s+(?!.*\/\/)/g,
+    description: "go-design-systemのButtonやInputコンポーネントではなく素のHTML要素を使用",
+    rule: "<button>→<Button>, <input>→<Input>等、go-design-systemコンポーネントを使用してください",
   },
 ]
 
@@ -82,6 +137,7 @@ async function analyzeRepo(product: any, repo: string) {
 
     const allViolations: FileViolation[] = []
     const files = findTsxFiles(repoDir)
+    console.log(`  📂 Scanning ${files.length} TS/TSX files...`)
 
     for (const filePath of files) {
       let content: string
@@ -125,16 +181,24 @@ async function analyzeRepo(product: any, repo: string) {
       }
     }
 
-    // スコア計算
-    const totalViolations = allViolations.reduce((s, v) => s + v.issues.length, 0)
-    const score = Math.max(0, 100 - totalViolations * 5)
+    // スコア計算（違反ファイル数ベース、1ファイルあたり-3点、最低0点）
+    const violatedFileCount = allViolations.length
+    const totalHits = allViolations.reduce((s, v) => s + v.issues.length, 0)
+    const score = Math.max(0, 100 - violatedFileCount * 3)
     await supabase.schema("metago").from("scores_history").insert({
       product_id: product.id,
       category: "design_system",
       score,
     })
 
-    console.log(`  violations: ${totalViolations}, score: ${score}`)
+    // カテゴリ別サマリー
+    const byCategory = new Map<string, number>()
+    for (const v of allViolations) {
+      byCategory.set(v.category, (byCategory.get(v.category) ?? 0) + v.issues.length)
+    }
+    const summary = [...byCategory.entries()].map(([k, n]) => `${k}:${n}`).join(", ")
+    console.log(`  violated files: ${violatedFileCount}, total hits: ${totalHits}, score: ${score}`)
+    if (summary) console.log(`  breakdown: ${summary}`)
 
     // Claude API で自動修正
     if (allViolations.length > 0) {
