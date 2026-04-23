@@ -1,8 +1,21 @@
 /**
- * 各goをcloneしてESLint/TSC解析 → 違反をDB保存 + 自動修正PR作成 (L1)
+ * 各goのコード品質を評価軸ベースでClaudeが分析 → DB保存 + ESLint自動修正PR (L1)
+ *
+ * スコアはESLintの違反数ではなく、Claudeが7つの評価軸で実際にコードを読んで採点する。
+ * ESLint/Prettierは引き続き自動修正 (L1) として実行されるが、スコアには影響しない。
+ *
+ * 評価軸:
+ *   1. クリーンコード    — 命名/SRP/DRY/KISS
+ *   2. 拡張性           — 抽象化/疎結合/OCP
+ *   3. 可読性           — 構造/ロジックの明確さ/一貫性
+ *   4. エラーハンドリング — 例外処理の網羅性/UX
+ *   5. 型安全性         — TypeScript活用度/any回避
+ *   6. コンポーネント設計 — 再利用性/責務分離/propsの適切さ
+ *   7. テスト可能性      — 副作用の分離/依存性の注入可能性
  *
  * 環境変数:
- *   TARGET_REPO  — 処理対象リポジトリ名 (例: "native-go")。未設定時は全リポ処理。
+ *   TARGET_REPO        — 対象リポジトリ名 (例: "native-go")。未設定時は全リポ処理。
+ *   ANTHROPIC_API_KEY  — Claude API キー
  */
 
 import Anthropic from "@anthropic-ai/sdk"
@@ -32,123 +45,317 @@ const GO_REPOS: Record<string, string> = {
   taskgo:     "task-go",
 }
 
-interface LintMessage {
-  ruleId: string | null
-  message: string
-  line: number
-  column: number
-  severity: number
+// ============================================================
+// 評価軸定義
+// ============================================================
+
+interface QualityAxis {
+  id: string
+  name: string        // 日本語名（DBのcategoryに使用）
+  weight: number      // スコア重み
+  criterion: string   // Claudeへの評価基準説明
 }
 
-interface LintResult {
-  filePath: string
-  messages: LintMessage[]
-  errorCount: number
-  warningCount: number
+const QUALITY_AXES: QualityAxis[] = [
+  {
+    id: "clean_code",
+    name: "クリーンコード",
+    weight: 2.0,
+    criterion: `
+・変数名・関数名は意図を明確に表しているか（略語や1文字変数の過剰使用がないか）
+・関数/コンポーネントは単一責任原則を守っているか（1つのことだけやっているか）
+・DRY原則: 同じロジックが複数箇所にコピーされていないか
+・マジックナンバー・ハードコード文字列が適切に定数化されているか
+・関数の引数が多すぎないか（4個以上は要注意）`.trim(),
+  },
+  {
+    id: "extensibility",
+    name: "拡張性",
+    weight: 2.0,
+    criterion: `
+・新機能追加時に既存コードを大きく変更しなくて済む設計か
+・ハードコードされた条件分岐（if/switch）が今後の拡張を阻害しないか
+・データ取得・ビジネスロジック・UI表示が適切に分離されているか
+・設定値や定数が一元管理されているか
+・コンポーネントのpropsが柔軟か（固すぎず複雑すぎず）`.trim(),
+  },
+  {
+    id: "readability",
+    name: "可読性",
+    weight: 1.5,
+    criterion: `
+・コードを読んで何をしているか直感的に理解できるか
+・複雑なロジックに適切なコメントがあるか（自明でないものに限り）
+・ファイルの長さが適切か（300行超は分割検討）
+・ネストの深さが適切か（3段以上のネストは危険信号）
+・関連するコードがまとまって配置されているか`.trim(),
+  },
+  {
+    id: "error_handling",
+    name: "エラーハンドリング",
+    weight: 2.0,
+    criterion: `
+・API呼び出し・非同期処理にエラーハンドリングがあるか（try/catch、.catch）
+・エラー時にユーザーに適切なフィードバックがあるか（エラーメッセージ表示）
+・エラーが握り潰されていないか（空のcatchブロック）
+・型に nullable な値を適切に処理しているか（null/undefined チェック）
+・フォームのバリデーションエラーが適切に処理されているか`.trim(),
+  },
+  {
+    id: "type_safety",
+    name: "型安全性",
+    weight: 1.5,
+    criterion: `
+・any型の使用が最小限に抑えられているか
+・外部API・DBのレスポンスに適切な型定義があるか
+・型ガードが適切に使われているか（as でのキャストに頼りすぎていないか）
+・Props の型定義が適切か（省略可能フィールドが明示されているか）
+・型定義ファイルが整理されているか`.trim(),
+  },
+  {
+    id: "component_design",
+    name: "コンポーネント設計",
+    weight: 2.0,
+    criterion: `
+・コンポーネントの粒度が適切か（大きすぎず小さすぎず）
+・再利用可能なコンポーネントが適切に抽出されているか
+・ページコンポーネントにビジネスロジックが入り込んでいないか
+・Clientコンポーネントの範囲が最小化されているか（Server Componentsの活用）
+・コンポーネント間のデータフローが明確か（props drilling が深くないか）`.trim(),
+  },
+  {
+    id: "testability",
+    name: "テスト可能性",
+    weight: 1.0,
+    criterion: `
+・副作用（API呼び出し、localStorage等）が関数内に混在しておらず、分離しやすい構造か
+・テストを書こうとしたときに外部依存を差し替えられる設計か
+・純粋関数（同じ入力→同じ出力）が多く、ロジックが独立しているか
+・グローバルな状態への依存が最小か`.trim(),
+  },
+]
+
+// ============================================================
+// Claude による評価
+// ============================================================
+
+interface AxisEvaluation {
+  axisId: string
+  score: number   // 0-100
+  findings: Array<{
+    title: string
+    description: string
+    severity: "high" | "medium" | "low"
+    file?: string
+  }>
 }
 
-async function runLintAndFix(repoDir: string, productName: string): Promise<{
-  violations: Array<{ file: string; rule: string; message: string }>
-  fixedCount: number
-}> {
-  const violations: Array<{ file: string; rule: string; message: string }> = []
+interface ClaudeEvaluationResult {
+  axes: AxisEvaluation[]
+  overallScore: number
+}
 
+function collectSourceFiles(repoDir: string): string {
+  let files: string[] = []
+  try {
+    // 重要度順: app/ > components/ > lib/ > hooks/、ファイルサイズ降順
+    files = execSync(
+      `find . -type f \\( -name "*.ts" -o -name "*.tsx" \\) ` +
+      `-not -path "./node_modules/*" -not -path "./.next/*" ` +
+      `-not -name "*.test.*" -not -name "*.spec.*" ` +
+      `\\( -path "./app/*" -o -path "./components/*" -o -path "./lib/*" -o -path "./hooks/*" \\) ` +
+      `| xargs ls -S 2>/dev/null | head -40`,
+      { cwd: repoDir, stdio: "pipe" }
+    ).toString().trim().split("\n").filter(Boolean)
+  } catch {
+    try {
+      files = execSync(
+        `find . -type f \\( -name "*.ts" -o -name "*.tsx" \\) ` +
+        `-not -path "./node_modules/*" -not -path "./.next/*" | head -30`,
+        { cwd: repoDir, stdio: "pipe" }
+      ).toString().trim().split("\n").filter(Boolean)
+    } catch {
+      return ""
+    }
+  }
+
+  const sections: string[] = []
+  let totalChars = 0
+  const MAX_CHARS = 70_000
+
+  for (const f of files) {
+    const filePath = path.isAbsolute(f) ? f : path.join(repoDir, f)
+    try {
+      const content = fs.readFileSync(filePath, "utf-8")
+      if (totalChars + content.length > MAX_CHARS) break
+      const relPath = path.relative(repoDir, filePath)
+      sections.push(`=== ${relPath} ===\n${content}`)
+      totalChars += content.length
+    } catch {}
+  }
+
+  console.log(`  収集ファイル数: ${sections.length} (${Math.round(totalChars / 1000)}KB)`)
+  return sections.join("\n\n")
+}
+
+async function evaluateCodeQuality(
+  repoDir: string,
+  productName: string,
+  anthropic: Anthropic
+): Promise<ClaudeEvaluationResult> {
+  const sourceCode = collectSourceFiles(repoDir)
+  if (!sourceCode) {
+    console.warn("  ソースコードが取得できませんでした")
+    return { axes: [], overallScore: 0 }
+  }
+
+  const axesDescription = QUALITY_AXES.map(ax =>
+    `### ${ax.name} (id: ${ax.id})\n${ax.criterion}`
+  ).join("\n\n")
+
+  const prompt = `あなたはNext.js/TypeScriptアプリの経験豊富なシニアエンジニアです。
+「${productName}」のソースコードを以下の7つの評価軸で客観的に採点してください。
+
+## 評価軸と基準
+
+${axesDescription}
+
+## ソースコード
+
+${sourceCode}
+
+## 採点ルール
+
+- 各軸を 0〜100 点で採点する（100点満点の厳しい採点基準で）
+- 点数の目安: 90+ = 模範的, 75-89 = 良好, 60-74 = 改善余地あり, 40-59 = 問題あり, 0-39 = 深刻な問題
+- コードに実際に存在する問題のみを報告する（推測・汎用アドバイスは不要）
+- 各軸で最大4件の具体的な問題点を日本語で記載する
+
+## 出力形式
+
+以下のJSONのみを返してください（説明文・マークダウン不要）:
+
+{
+  "axes": [
+    {
+      "axisId": "clean_code",
+      "score": 72,
+      "findings": [
+        {
+          "title": "短い問題タイトル（50文字以内）",
+          "description": "なぜ問題か、何が起きるかの具体的説明（250文字以内）",
+          "severity": "high",
+          "file": "app/page.tsx"
+        }
+      ]
+    }
+  ]
+}`
+
+  const MAX_RETRIES = 3
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      console.log(`  🤖 Claude評価実行中... (試行 ${attempt}/${MAX_RETRIES})`)
+      const message = await anthropic.messages.create({
+        model: "claude-sonnet-4-5",
+        max_tokens: 4096,
+        messages: [{ role: "user", content: prompt }],
+      })
+
+      const text = message.content[0]?.type === "text" ? message.content[0].text : ""
+      const cleaned = text.replace(/^```[^\n]*\n?/, "").replace(/\n?```$/, "").trim()
+
+      let parsed: { axes: AxisEvaluation[] }
+      try {
+        parsed = JSON.parse(cleaned)
+      } catch {
+        // JSON部分だけ抽出
+        const jsonMatch = cleaned.match(/\{[\s\S]*\}/)
+        if (!jsonMatch) throw new Error("JSONが見つかりません")
+        parsed = JSON.parse(jsonMatch[0])
+      }
+
+      const axes = parsed.axes ?? []
+
+      // 加重平均スコア計算
+      let totalWeight = 0
+      let weightedSum = 0
+      for (const ax of axes) {
+        const def = QUALITY_AXES.find(q => q.id === ax.axisId)
+        if (!def) continue
+        weightedSum += ax.score * def.weight
+        totalWeight += def.weight
+      }
+      const overallScore = totalWeight > 0
+        ? Math.round(weightedSum / totalWeight)
+        : 0
+
+      // 評価結果をログ出力
+      console.log(`  📊 評価結果:`)
+      for (const ax of axes) {
+        const def = QUALITY_AXES.find(q => q.id === ax.axisId)
+        const label = def?.name ?? ax.axisId
+        const bar = "█".repeat(Math.round(ax.score / 10)) + "░".repeat(10 - Math.round(ax.score / 10))
+        console.log(`     ${label.padEnd(14)}: ${String(ax.score).padStart(3)}点 ${bar} (${ax.findings.length}件の問題)`)
+      }
+      console.log(`  🏆 総合スコア: ${overallScore}点`)
+
+      return { axes, overallScore }
+    } catch (e: any) {
+      const isRateLimit = e?.status === 429 || e?.error?.error?.type === "rate_limit_error"
+      if (isRateLimit && attempt < MAX_RETRIES) {
+        const wait = 60_000 * attempt
+        console.warn(`  レート制限 (${attempt}/${MAX_RETRIES}回目)、${wait / 1000}秒待機...`)
+        await new Promise(r => setTimeout(r, wait))
+        continue
+      }
+      console.warn("  Claude評価失敗:", String(e).slice(0, 300))
+      return { axes: [], overallScore: 0 }
+    }
+  }
+  return { axes: [], overallScore: 0 }
+}
+
+// ============================================================
+// ESLint / Prettier 自動修正（スコアには影響しない）
+// ============================================================
+
+interface LintMessage { ruleId: string | null; message: string; line: number; severity: number }
+interface LintResult { filePath: string; messages: LintMessage[] }
+
+async function runLintAndFix(repoDir: string): Promise<{ fixedCount: number; hasLintIssues: boolean }> {
   // deps install
   try {
     execSync("npm ci", { cwd: repoDir, stdio: "pipe", timeout: 300_000 })
     console.log("  npm ci: OK")
-  } catch (e: any) {
-    console.warn("  npm ci failed, falling back to npm install:", e.stderr?.toString().slice(0, 200))
+  } catch {
     try {
       execSync("npm install --legacy-peer-deps", { cwd: repoDir, stdio: "pipe", timeout: 300_000 })
       console.log("  npm install: OK")
-    } catch (e2: any) {
-      console.warn("  npm install also failed:", e2.stderr?.toString().slice(0, 200))
+    } catch (e: any) {
+      console.warn("  deps install failed:", e.stderr?.toString().slice(0, 100))
     }
   }
 
-  // TS/TSX ファイル数を確認 (診断用)
+  // TS/TSXファイル数（診断用）
   try {
-    const tsFileCount = execSync(
+    const count = execSync(
       `find . -type f \\( -name "*.ts" -o -name "*.tsx" \\) -not -path "./node_modules/*" -not -path "./.next/*" | wc -l`,
       { cwd: repoDir, stdio: "pipe" }
     ).toString().trim()
-    console.log(`  TS/TSX files found: ${tsFileCount}`)
+    console.log(`  TS/TSXファイル数: ${count}`)
   } catch {}
 
-  // ESLint JSON出力で違反を収集
-  // next lint を優先、なければ npx eslint にフォールバック
-  const lintReportPath = path.join(repoDir, ".metago-lint.json")
-  const hasNextLint = fs.existsSync(path.join(repoDir, ".eslintrc.json")) ||
-                      fs.existsSync(path.join(repoDir, ".eslintrc.js")) ||
-                      fs.existsSync(path.join(repoDir, "eslint.config.js")) ||
-                      fs.existsSync(path.join(repoDir, "eslint.config.mjs"))
+  let hasLintIssues = false
 
-  const lintCmd = hasNextLint
-    ? `npx next lint --format json 2>"${lintReportPath}" || npx eslint . --ext .ts,.tsx --format json --output-file "${lintReportPath}"`
-    : `npx eslint . --ext .ts,.tsx --format json --output-file "${lintReportPath}"`
-
-  try {
-    // next lint は stdout に出力するので別途ハンドル
-    if (hasNextLint) {
-      try {
-        const out = execSync(`npx next lint --format json`, { cwd: repoDir, stdio: "pipe", timeout: 120_000 })
-        fs.writeFileSync(lintReportPath, out.toString())
-      } catch (e: any) {
-        // next lint は違反があると非ゼロ終了 + stderr に JSON
-        const output = e.stdout?.toString() || e.stderr?.toString() || "[]"
-        fs.writeFileSync(lintReportPath, output)
-      }
-    } else {
-      try {
-        execSync(
-          `npx eslint . --ext .ts,.tsx --format json --output-file "${lintReportPath}"`,
-          { cwd: repoDir, stdio: "pipe", timeout: 120_000 }
-        )
-      } catch {
-        // 違反があると非ゼロ終了するので catch する
-      }
-    }
-  } catch {}
-
-  if (fs.existsSync(lintReportPath)) {
-    try {
-      const raw = fs.readFileSync(lintReportPath, "utf-8").trim()
-      // next lint JSON形式は [{ filePath, messages }] と同じ
-      const results: LintResult[] = JSON.parse(raw.startsWith("[") ? raw : "[]")
-      let fileCount = 0
-      for (const result of results) {
-        if (result.messages?.length > 0) fileCount++
-        const relFile = path.relative(repoDir, result.filePath)
-        for (const msg of result.messages ?? []) {
-          if (msg.severity >= 1) {
-            violations.push({
-              file: relFile,
-              rule: msg.ruleId ?? "unknown",
-              message: `${relFile}:${msg.line} ${msg.message}`,
-            })
-          }
-        }
-      }
-      console.log(`  ESLint: ${results.length} files checked, ${violations.length} violations`)
-    } catch (e) {
-      console.warn("  ESLint report parse failed:", e)
-    }
-    fs.unlinkSync(lintReportPath)
-  } else {
-    console.warn("  ESLint report not generated")
-  }
-
-  // ESLint --fix で自動修正
-  let fixedCount = 0
+  // ESLint --fix
   try {
     execSync(
-      `npx eslint . --ext .ts,.tsx --fix`,
+      `npx eslint . --ext .ts,.tsx --fix --ignore-pattern '.next' --ignore-pattern 'node_modules'`,
       { cwd: repoDir, stdio: "pipe", timeout: 120_000 }
     )
-    if (hasChanges(repoDir)) fixedCount = violations.length
   } catch {
-    if (hasChanges(repoDir)) fixedCount = violations.length
+    hasLintIssues = true
   }
 
   // Prettier
@@ -159,175 +366,74 @@ async function runLintAndFix(repoDir: string, productName: string): Promise<{
     )
   } catch {}
 
-  return { violations, fixedCount }
+  const changed = hasChanges(repoDir)
+  console.log(`  ESLint/Prettier: ${changed ? "修正あり" : "修正なし"}`)
+
+  return { fixedCount: changed ? 1 : 0, hasLintIssues }
 }
 
-async function runTscCheck(repoDir: string): Promise<string[]> {
-  const errors: string[] = []
-  try {
-    execSync("npx tsc --noEmit", { cwd: repoDir, stdio: "pipe", timeout: 120_000 })
-  } catch (e: any) {
-    const output = e.stdout?.toString() ?? ""
-    const lines = output.split("\n").filter((l: string) => l.includes(": error TS"))
-    errors.push(...lines.slice(0, 20))
-  }
-  return errors
-}
-
-interface AiIssue {
-  title: string
-  category: string
-  description: string
-  severity: "high" | "medium" | "low"
-  file?: string
-}
-
-async function analyzeWithClaude(repoDir: string, productName: string): Promise<AiIssue[]> {
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-
-  // 分析対象ファイルを収集 (app/, components/, lib/, hooks/)
-  let files: string[] = []
-  try {
-    files = execSync(
-      `find . -type f \\( -name "*.ts" -o -name "*.tsx" \\) ` +
-      `-not -path "./node_modules/*" -not -path "./.next/*" ` +
-      `\\( -path "./app/*" -o -path "./components/*" -o -path "./lib/*" -o -path "./hooks/*" \\) ` +
-      `| head -30`,
-      { cwd: repoDir, stdio: "pipe" }
-    ).toString().trim().split("\n").filter(Boolean)
-  } catch {
-    return []
-  }
-
-  if (files.length === 0) return []
-  console.log(`  🤖 Claude AI analysis: reading ${files.length} files...`)
-
-  // ファイル内容を収集 (合計60KB制限)
-  const fileSections: string[] = []
-  let totalChars = 0
-  for (const f of files) {
-    try {
-      const content = fs.readFileSync(path.join(repoDir, f), "utf-8")
-      if (totalChars + content.length > 60_000) break
-      fileSections.push(`=== ${f} ===\n${content}`)
-      totalChars += content.length
-    } catch {}
-  }
-
-  const sourceCode = fileSections.join("\n\n")
-
-  const MAX_RETRIES = 3
-  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-    try {
-      const message = await anthropic.messages.create({
-        model: "claude-sonnet-4-5",
-        max_tokens: 4096,
-        messages: [{
-          role: "user",
-          content: `You are a senior engineer auditing a Next.js TypeScript application called "${productName}" for technical debt and future risk.
-
-Analyze the following source files and identify concrete issues that could cause bugs, maintenance burden, or scalability problems in the future.
-
-${sourceCode}
-
-Return a JSON array of issues. Each issue must have:
-- "title": short title (max 80 chars, in Japanese)
-- "category": one of "設計/アーキテクチャ" | "エラーハンドリング" | "型安全性" | "パフォーマンス" | "セキュリティ" | "保守性" | "重複コード"
-- "description": detailed explanation in Japanese (max 300 chars) including WHY it's a problem and WHAT could go wrong
-- "severity": "high" | "medium" | "low"
-- "file": the most relevant file path (optional)
-
-Focus ONLY on real, observable problems in this specific code. Do NOT invent generic suggestions. Limit to the 15 most impactful issues.
-
-Return ONLY the JSON array with no explanation or markdown.`,
-        }],
-      })
-
-      const text = message.content[0]?.type === "text" ? message.content[0].text : ""
-      const cleaned = text.replace(/^```[^\n]*\n?/, "").replace(/\n?```$/, "").trim()
-      const parsed = JSON.parse(cleaned.startsWith("[") ? cleaned : "[]")
-      console.log(`  🤖 Claude found ${parsed.length} issues`)
-      return parsed as AiIssue[]
-    } catch (e: any) {
-      const isRateLimit = e?.status === 429 || e?.error?.error?.type === "rate_limit_error"
-      if (isRateLimit && attempt < MAX_RETRIES) {
-        const wait = 60_000 * attempt
-        console.warn(`  Rate limit (attempt ${attempt}/${MAX_RETRIES}), waiting ${wait / 1000}s...`)
-        await new Promise(r => setTimeout(r, wait))
-        continue
-      }
-      console.warn("  Claude analysis failed:", String(e).slice(0, 200))
-      return []
-    }
-  }
-  return []
-}
+// ============================================================
+// メイン処理
+// ============================================================
 
 async function processRepo(product: any, repo: string) {
-  console.log(`\n🔍 Code quality: ${product.display_name} (${repo})`)
+  console.log(`\n🔍 コード品質評価: ${product.display_name} (${repo})`)
   let repoDir: string | null = null
+
+  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
   try {
     repoDir = cloneRepo(repo)
 
-    const { violations, fixedCount } = await runLintAndFix(repoDir, product.name)
-    const tscErrors = await runTscCheck(repoDir)
-    const aiIssues = await analyzeWithClaude(repoDir, product.display_name)
+    // 1. Claude による7軸評価（スコアの根拠）
+    const evaluation = await evaluateCodeQuality(repoDir, product.display_name, anthropic)
 
-    // 既存レコードを削除してから新規挿入 (unique制約なしのためupsertは使わない)
-    await supabase.schema("metago").from("quality_items")
-      .delete().eq("product_id", product.id)
+    // 2. ESLint/Prettier 自動修正（L1 PR用、スコアに影響しない）
+    const { fixedCount, hasLintIssues } = await runLintAndFix(repoDir)
 
-    // ESLint/TSC違反を保存
-    const lintIssues = [
-      ...violations.map((v) => ({
-        product_id: product.id,
-        category: "ESLint",
-        title: v.rule,
-        description: v.message.substring(0, 500),
-        state: "new",
-        level: "L1",
-      })),
-      ...tscErrors.map((e) => ({
-        product_id: product.id,
-        category: "TypeScript",
-        title: "型エラー",
-        description: e.substring(0, 500),
-        state: "new",
-        level: "L1",
-      })),
-    ]
-    for (const issue of lintIssues.slice(0, 50)) {
-      await supabase.schema("metago").from("quality_items").insert(issue)
+    // 3. 既存レコードを全削除してから新規挿入
+    await supabase.schema("metago").from("quality_items").delete().eq("product_id", product.id)
+
+    // 4. 評価軸ごとの問題をDBに保存
+    for (const axisResult of evaluation.axes) {
+      const def = QUALITY_AXES.find(q => q.id === axisResult.axisId)
+      if (!def) continue
+
+      for (const finding of axisResult.findings) {
+        await supabase.schema("metago").from("quality_items").insert({
+          product_id:  product.id,
+          category:    def.name,
+          title:       finding.title.substring(0, 200),
+          description: finding.file
+            ? `[${finding.file}] ${finding.description}`.substring(0, 500)
+            : finding.description.substring(0, 500),
+          state: "new",
+          level: finding.severity === "high" ? "L1" : "L2",
+        })
+      }
+
+      // 軸スコアが低い場合はサマリーも追加
+      if (axisResult.score < 60) {
+        await supabase.schema("metago").from("quality_items").insert({
+          product_id:  product.id,
+          category:    def.name,
+          title:       `[${def.name}] スコア低下: ${axisResult.score}点`,
+          description: `${def.name}の評価が${axisResult.score}点と基準(60点)を下回っています。${def.criterion.split("\n")[0]}`,
+          state: "new",
+          level: axisResult.score < 40 ? "L1" : "L2",
+        })
+      }
     }
 
-    // Claude AI 分析結果を保存
-    for (const issue of aiIssues.slice(0, 15)) {
-      await supabase.schema("metago").from("quality_items").insert({
-        product_id: product.id,
-        category: issue.category,
-        title: issue.title.substring(0, 200),
-        description: issue.file
-          ? `[${issue.file}] ${issue.description}`.substring(0, 500)
-          : issue.description.substring(0, 500),
-        state: "new",
-        level: issue.severity === "high" ? "L1" : "L2",
-      })
-    }
-
-    // スコア計算: ESLint/TSC + AI分析の重み付き
-    const lintScore = Math.max(0, 100 - (violations.length + tscErrors.length) * 2)
-    const aiPenalty = aiIssues.filter(i => i.severity === "high").length * 5 +
-                      aiIssues.filter(i => i.severity === "medium").length * 2
-    const score = Math.max(0, Math.round((lintScore + Math.max(0, 100 - aiPenalty)) / 2))
-
+    // 5. スコア保存（Claudeの加重平均）
+    const score = evaluation.overallScore
     await supabase.schema("metago").from("scores_history").insert({
       product_id: product.id,
-      category: "quality",
+      category:   "quality",
       score,
     })
 
-    // L1 自動修正 PR (ESLint/Prettier のみ)
+    // 6. L1 自動修正 PR (ESLint/Prettier のみ)
     if (hasChanges(repoDir)) {
       const branch = `metago/code-quality-${new Date().toISOString().slice(0, 10)}`
       const pushed = createBranchAndCommit(
@@ -338,29 +444,24 @@ async function processRepo(product: any, repo: string) {
       if (pushed) {
         await createAndMergePR(repo, {
           title: `🤖 [MetaGo L1] コード品質自動修正 — ${product.display_name}`,
-          body: `MetaGo による ESLint 自動修正・Prettier 整形です。
-
-**修正内容**
-- ESLint violations: ${violations.length} 件 (自動修正: ${fixedCount} 件)
-- TypeScript errors: ${tscErrors.length} 件 (参考表示のみ)
-- Prettier 整形
+          body:  `MetaGo による ESLint 自動修正・Prettier 整形です。
 
 > L1: 自動マージ対象。コードロジックへの変更はありません。`,
-          head: branch,
+          head:   branch,
           labels: ["metago-auto-merge"],
         })
       }
     }
 
-    console.log(`  ✓ ESLint: ${violations.length}, TSC: ${tscErrors.length}, AI issues: ${aiIssues.length}, score: ${score}`)
+    console.log(`  ✅ 完了: 総合スコア ${score}点、問題 ${evaluation.axes.reduce((s, a) => s + a.findings.length, 0)}件`)
   } catch (e) {
     console.error(`  ❌ Failed: ${repo}`, e)
     await supabase.schema("metago").from("execution_logs").insert({
-      product_id: product.id,
-      category: "code-quality",
-      title: `コード品質チェック失敗: ${repo}`,
+      product_id:  product.id,
+      category:    "code-quality",
+      title:       `コード品質チェック失敗: ${repo}`,
       description: String(e),
-      state: "failed",
+      state:       "failed",
     })
   } finally {
     if (repoDir) cleanup(repoDir)
@@ -368,7 +469,7 @@ async function processRepo(product: any, repo: string) {
 }
 
 async function main() {
-  console.log("🚀 Starting code quality collection...")
+  console.log("🚀 コード品質評価開始（7軸 Claude分析）...")
 
   const { data: products } = await supabase.schema("metago").from("products").select("*")
   if (!products?.length) return
@@ -382,7 +483,7 @@ async function main() {
     await processRepo(product, repo)
   }
 
-  console.log("\n✅ Code quality collection complete")
+  console.log("\n✅ コード品質評価完了")
 }
 
 main().catch((e) => {
