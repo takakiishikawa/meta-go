@@ -18,6 +18,7 @@ export const REPO_TO_SLUG: Record<string, string> = {
   "physical-go":      "physicalgo",
   "task-go":          "taskgo",
   "go-design-system": "designsystem",
+  "meta-go":          "metago",
 }
 
 export interface PullRequest {

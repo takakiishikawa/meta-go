@@ -24,6 +24,7 @@ const GO_REPOS: Record<string, string> = {
   physicalgo: "physical-go",
   taskgo:       "task-go",
   designsystem: "go-design-system",
+  metago:       "meta-go",
 }
 
 async function githubFetch(path: string) {

@@ -13,7 +13,8 @@ INSERT INTO metago.products (name, display_name, description, github_repo, verce
   ('cookgo',        'CookGo',        '健康的な自炊を継続する',                  'takakiishikawa/cook-go',          'https://cook-go.vercel.app',     '#FF991F', 4),
   ('physicalgo',    'PhysicalGo',    '身体を鍛え続ける',                        'takakiishikawa/physical-go',      'https://physical-go.vercel.app', '#6554C0', 5),
   ('taskgo',        'TaskGo',        'やるべきタスクを整理する',                'takakiishikawa/task-go',          'https://task-go.vercel.app',     '#00B8D9', 6),
-  ('designsystem',  'DesignSystem',  'goシリーズ共通デザインシステム',          'takakiishikawa/go-design-system', NULL,                             '#7C3AED', 7)
+  ('designsystem',  'DesignSystem',  'goシリーズ共通デザインシステム',          'takakiishikawa/go-design-system', NULL,                             '#7C3AED', 7),
+  ('metago',        'MetaGo',        'goシリーズ全体を管理する自律的PM',         'takakiishikawa/meta-go',          NULL,                             '#1E3A8A', 8)
 ON CONFLICT (name) DO UPDATE SET
   display_name  = EXCLUDED.display_name,
   description   = EXCLUDED.description,
