@@ -55,18 +55,27 @@ const supabase = createClient()
 - anon keyでは他スキーマを読み取れない場合がある
 - 収集スクリプトは`scripts/collect/`に配置、`tsx`で実行
 
-## Self-Heal: L1/L2 判定ロジック
+## Self-Heal: L1/L2 判定ロジック（中央集権型）
 
-MetaGoのself-heal.ymlは以下のレベルで修正を分類する。
+MetaGoが中央でcloneして解析・修正PRを作成する。各goにself-heal.ymlは不要。
 
-| レベル | 対応 | 例 |
+| レベル | 対応 | 具体例 |
 |---|---|---|
-| **L1** | 自動マージ（承認不要） | ESLint auto-fix、未使用import削除、Prettier整形、patch依存更新、デザインシステム違反auto-fix |
-| **L2** | PR作成 + MetaGo承認待ち | minor/major依存更新、コード品質改善、アーキテクチャ変更 |
+| **L1** | 自動マージ（承認不要） | ESLint auto-fix、未使用import、Prettier、any型修正、patch/minor依存更新、デザインシステム違反(Claude修正)、Lighthouse改善 |
+| **L2** | PR作成 + MetaGo承認待ち | **major依存更新のみ** |
 
-**L1の基準:** コードロジックへの変更なし。機械的・決定論的な修正のみ。CIが通れば無条件でマージしてよい。
+**L1の基準:** コードロジックへの変更なし。CI通過で即マージ。  
+**L2の基準:** 実質 major 依存更新のみ。承認待ちページで承認するとマージされる。
 
-**L2の基準:** 影響範囲の判断が必要な変更。PR作成後、MetaGoの「承認待ち」画面で承認するとマージされる。
+## アーキテクチャ（中央集権型）
+
+| フェーズ | スクリプト | 頻度 | 内容 |
+|---|---|---|---|
+| API系 | `github-data.ts`, `vercel-data.ts`, `supabase-data.ts` | Daily | APIのみ、clone不要 |
+| clone系(並列) | `code-quality.ts`, `design-system.ts`, `performance.ts` | Daily | matrix strategy で6リポ並列 |
+| PR同期 | `pr-status.ts` | Daily | open PRをapproval_queueに同期 |
+| 依存更新 | `dependency-check.ts` | Weekly | patch/minor→L1, major→L2 |
+| その他 | `supabase-data.ts --psf-snapshot`, `api-keys.ts` | Weekly | PSFスナップ、APIキースキャン |
 
 ## 環境変数
 
