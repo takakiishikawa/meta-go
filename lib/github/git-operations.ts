@@ -52,7 +52,7 @@ export function createBranchAndCommit(repoDir: string, branch: string, message: 
   execSync(`git -C "${repoDir}" checkout -b "${branch}"`)
   execSync(`git -C "${repoDir}" add -A`)
   execSync(`git -C "${repoDir}" commit -m "${message}"`)
-  execSync(`git -C "${repoDir}" push origin "${branch}"`)
+  execSync(`git -C "${repoDir}" push --force origin "${branch}"`)
   return true
 }
 
