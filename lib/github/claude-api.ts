@@ -28,14 +28,16 @@ export async function fixFileWithClaude(params: {
     return null
   }
 
-  try {
-    const message = await anthropic.messages.create({
-      model: "claude-sonnet-4-5",
-      max_tokens: 8096,
-      messages: [
-        {
-          role: "user",
-          content: `You are fixing code violations in a TypeScript/React file.
+  const MAX_RETRIES = 3
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const message = await anthropic.messages.create({
+        model: "claude-sonnet-4-5",
+        max_tokens: 4096,
+        messages: [
+          {
+            role: "user",
+            content: `You are fixing code violations in a TypeScript/React file.
 
 File: ${fileName}
 
@@ -50,21 +52,31 @@ ${fileContent}
 \`\`\`
 
 Fix all listed violations. Return ONLY the complete fixed file content with no explanation, no markdown code fences, no prefix text.`,
-        },
-      ],
-    })
+          },
+        ],
+      })
 
-    const content = message.content[0]
-    if (content.type !== "text") return null
+      const content = message.content[0]
+      if (content.type !== "text") return null
 
-    return content.text
-      .replace(/^```[^\n]*\n/, "")
-      .replace(/\n```$/, "")
-      .trim()
-  } catch (e) {
-    console.warn(`Claude API error for ${fileName}:`, e)
-    return null
+      return content.text
+        .replace(/^```[^\n]*\n/, "")
+        .replace(/\n```$/, "")
+        .trim()
+    } catch (e: any) {
+      const isRateLimit =
+        e?.status === 429 || e?.error?.error?.type === "rate_limit_error"
+      if (isRateLimit && attempt < MAX_RETRIES) {
+        const wait = 60_000 * attempt
+        console.warn(`  Rate limit hit for ${fileName} (attempt ${attempt}/${MAX_RETRIES}), waiting ${wait / 1000}s...`)
+        await new Promise(r => setTimeout(r, wait))
+        continue
+      }
+      console.warn(`Claude API error for ${fileName}:`, e)
+      return null
+    }
   }
+  return null
 }
 
 /**
@@ -86,8 +98,8 @@ export async function fixViolationsWithClaude(
     if (fixed) {
       patches.push({ filePath: v.file, newContent: fixed })
     }
-    // Rate limit pause
-    await new Promise((r) => setTimeout(r, 500))
+    // Rate limit pause: 6リポ並列実行を考慮して長めに待つ
+    await new Promise((r) => setTimeout(r, 3000))
   }
 
   return patches

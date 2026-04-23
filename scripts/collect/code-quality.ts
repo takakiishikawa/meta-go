@@ -54,28 +54,72 @@ async function runLintAndFix(repoDir: string, productName: string): Promise<{
 
   // deps install
   try {
-    execSync("npm ci --prefer-offline", { cwd: repoDir, stdio: "pipe" })
-  } catch {
-    execSync("npm install --legacy-peer-deps", { cwd: repoDir, stdio: "pipe" })
+    execSync("npm ci", { cwd: repoDir, stdio: "pipe", timeout: 300_000 })
+    console.log("  npm ci: OK")
+  } catch (e: any) {
+    console.warn("  npm ci failed, falling back to npm install:", e.stderr?.toString().slice(0, 200))
+    try {
+      execSync("npm install --legacy-peer-deps", { cwd: repoDir, stdio: "pipe", timeout: 300_000 })
+      console.log("  npm install: OK")
+    } catch (e2: any) {
+      console.warn("  npm install also failed:", e2.stderr?.toString().slice(0, 200))
+    }
   }
 
-  // ESLint JSON出力で違反を収集
-  const lintReportPath = path.join(repoDir, ".metago-lint.json")
+  // TS/TSX ファイル数を確認 (診断用)
   try {
-    execSync(
-      `npx eslint . --ext .ts,.tsx --format json --output-file "${lintReportPath}" --ignore-pattern '.next' --ignore-pattern 'node_modules'`,
+    const tsFileCount = execSync(
+      `find . -type f \\( -name "*.ts" -o -name "*.tsx" \\) -not -path "./node_modules/*" -not -path "./.next/*" | wc -l`,
       { cwd: repoDir, stdio: "pipe" }
-    )
-  } catch {
-    // ESLintはエラーがあると非ゼロ終了するので catch する
-  }
+    ).toString().trim()
+    console.log(`  TS/TSX files found: ${tsFileCount}`)
+  } catch {}
+
+  // ESLint JSON出力で違反を収集
+  // next lint を優先、なければ npx eslint にフォールバック
+  const lintReportPath = path.join(repoDir, ".metago-lint.json")
+  const hasNextLint = fs.existsSync(path.join(repoDir, ".eslintrc.json")) ||
+                      fs.existsSync(path.join(repoDir, ".eslintrc.js")) ||
+                      fs.existsSync(path.join(repoDir, "eslint.config.js")) ||
+                      fs.existsSync(path.join(repoDir, "eslint.config.mjs"))
+
+  const lintCmd = hasNextLint
+    ? `npx next lint --format json 2>"${lintReportPath}" || npx eslint . --ext .ts,.tsx --format json --output-file "${lintReportPath}"`
+    : `npx eslint . --ext .ts,.tsx --format json --output-file "${lintReportPath}"`
+
+  try {
+    // next lint は stdout に出力するので別途ハンドル
+    if (hasNextLint) {
+      try {
+        const out = execSync(`npx next lint --format json`, { cwd: repoDir, stdio: "pipe", timeout: 120_000 })
+        fs.writeFileSync(lintReportPath, out.toString())
+      } catch (e: any) {
+        // next lint は違反があると非ゼロ終了 + stderr に JSON
+        const output = e.stdout?.toString() || e.stderr?.toString() || "[]"
+        fs.writeFileSync(lintReportPath, output)
+      }
+    } else {
+      try {
+        execSync(
+          `npx eslint . --ext .ts,.tsx --format json --output-file "${lintReportPath}"`,
+          { cwd: repoDir, stdio: "pipe", timeout: 120_000 }
+        )
+      } catch {
+        // 違反があると非ゼロ終了するので catch する
+      }
+    }
+  } catch {}
 
   if (fs.existsSync(lintReportPath)) {
     try {
-      const results: LintResult[] = JSON.parse(fs.readFileSync(lintReportPath, "utf-8"))
+      const raw = fs.readFileSync(lintReportPath, "utf-8").trim()
+      // next lint JSON形式は [{ filePath, messages }] と同じ
+      const results: LintResult[] = JSON.parse(raw.startsWith("[") ? raw : "[]")
+      let fileCount = 0
       for (const result of results) {
+        if (result.messages?.length > 0) fileCount++
         const relFile = path.relative(repoDir, result.filePath)
-        for (const msg of result.messages) {
+        for (const msg of result.messages ?? []) {
           if (msg.severity >= 1) {
             violations.push({
               file: relFile,
@@ -85,16 +129,21 @@ async function runLintAndFix(repoDir: string, productName: string): Promise<{
           }
         }
       }
-    } catch {}
+      console.log(`  ESLint: ${results.length} files checked, ${violations.length} violations`)
+    } catch (e) {
+      console.warn("  ESLint report parse failed:", e)
+    }
     fs.unlinkSync(lintReportPath)
+  } else {
+    console.warn("  ESLint report not generated")
   }
 
   // ESLint --fix で自動修正
   let fixedCount = 0
   try {
     execSync(
-      `npx eslint . --ext .ts,.tsx --fix --ignore-pattern '.next' --ignore-pattern 'node_modules'`,
-      { cwd: repoDir, stdio: "pipe" }
+      `npx eslint . --ext .ts,.tsx --fix`,
+      { cwd: repoDir, stdio: "pipe", timeout: 120_000 }
     )
     if (hasChanges(repoDir)) fixedCount = violations.length
   } catch {
@@ -104,8 +153,8 @@ async function runLintAndFix(repoDir: string, productName: string): Promise<{
   // Prettier
   try {
     execSync(
-      `npx prettier --write "**/*.{ts,tsx,js,json,css}" --ignore-path .gitignore 2>/dev/null`,
-      { cwd: repoDir, stdio: "pipe" }
+      `npx prettier --write "**/*.{ts,tsx,js,json,css}"`,
+      { cwd: repoDir, stdio: "pipe", timeout: 60_000 }
     )
   } catch {}
 
