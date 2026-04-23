@@ -1,24 +1,20 @@
 /**
- * 各goリポジトリのソースコードをスキャンして環境変数（API Key名）を収集する
+ * 各goリポジトリをcloneしてソースコードから環境変数名を収集する
  *
- * 収集方法:
- * 1. .env.example / .env.local.example を取得してパース
- * 2. ソースコード内の process.env.XXXX パターンを検索（GitHub Code Search API）
- * 3. next.config.ts の env セクションをパース
- *
+ * GitHub Code Search APIの代わりにローカルclone + grep で確実に検出する。
  * 結果を metago.api_keys テーブルに upsert する（env_var_name が一意キー）
  */
 
 import { createClient } from "@supabase/supabase-js"
+import { execSync } from "child_process"
+import * as fs from "fs"
+import * as path from "path"
+import { cloneRepo, cleanup } from "../../lib/github/git-operations"
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!
-const GITHUB_TOKEN = process.env.GITHUB_TOKEN!
-const GITHUB_OWNER = process.env.GITHUB_OWNER || "takakiishikawa"
-
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
 
-// slug → repoName のマッピング
 const GO_REPOS: Record<string, string> = {
   nativego:   "native-go",
   carego:     "care-go",
@@ -28,15 +24,13 @@ const GO_REPOS: Record<string, string> = {
   taskgo:     "task-go",
 }
 
-// 自動提供されるため除外する変数名
 const SKIP_VARS = new Set([
   "NODE_ENV", "PORT", "HOST", "CI", "TZ", "PATH",
   "NEXT_RUNTIME", "VERCEL_ENV", "VERCEL_URL", "VERCEL_REGION",
   "VERCEL_GIT_COMMIT_SHA", "VERCEL_GIT_COMMIT_REF",
   "VERCEL_GIT_PROVIDER", "VERCEL_GIT_REPO_SLUG",
+  "NEXT_TELEMETRY_DISABLED",
 ])
-
-// system prefix は除外
 const SKIP_PREFIXES = ["npm_", "VERCEL_GIT_", "GITHUB_"]
 
 function shouldSkip(name: string): boolean {
@@ -46,106 +40,82 @@ function shouldSkip(name: string): boolean {
   return false
 }
 
-async function githubFetch(path: string, raw = false): Promise<string | null> {
-  const res = await fetch(`https://api.github.com${path}`, {
-    headers: {
-      Authorization: `Bearer ${GITHUB_TOKEN}`,
-      Accept: raw
-        ? "application/vnd.github.v3.raw"
-        : "application/vnd.github+json",
-      "X-GitHub-Api-Version": "2022-11-28",
-    },
-  })
-  if (!res.ok) return null
-  return raw ? res.text() : JSON.stringify(await res.json())
-}
-
 function parseEnvFile(content: string): string[] {
-  const vars: string[] = []
-  for (const line of content.split("\n")) {
-    const trimmed = line.trim()
-    if (!trimmed || trimmed.startsWith("#")) continue
-    const match = trimmed.match(/^([A-Z][A-Z0-9_]{2,})\s*=/)
-    if (match && !shouldSkip(match[1])) vars.push(match[1])
-  }
-  return vars
+  return content
+    .split("\n")
+    .flatMap(line => {
+      const trimmed = line.trim()
+      if (!trimmed || trimmed.startsWith("#")) return []
+      const m = trimmed.match(/^([A-Z][A-Z0-9_]{2,})\s*=/)
+      return m && !shouldSkip(m[1]) ? [m[1]] : []
+    })
 }
 
-function parseSourceCode(content: string): string[] {
-  const vars: string[] = []
-  const pattern = /process\.env\.([A-Z][A-Z0-9_]{2,})/g
-  let match: RegExpExecArray | null
-  while ((match = pattern.exec(content)) !== null) {
-    if (!shouldSkip(match[1])) vars.push(match[1])
-  }
-  return vars
-}
-
-async function scanRepo(slug: string, repo: string): Promise<string[]> {
+function grepSourceCode(repoDir: string): string[] {
   const found = new Set<string>()
-  const repoPath = `/repos/${GITHUB_OWNER}/${repo}`
+  const pattern = /process\.env\.([A-Z][A-Z0-9_]{2,})/g
 
-  // 1. .env.example 系ファイルを試す
-  const envFiles = [
-    ".env.example",
-    ".env.local.example",
-    ".env.sample",
-    "example.env",
-    ".env.template",
-  ]
-  for (const file of envFiles) {
-    const content = await githubFetch(`${repoPath}/contents/${file}`, true)
-    if (content) {
-      parseEnvFile(content).forEach(v => found.add(v))
-      console.log(`  [${slug}] ${file}: ${found.size} vars found`)
-    }
+  // TypeScript/JavaScript ファイルを再帰的に検索
+  let files: string[] = []
+  try {
+    files = execSync(
+      `find "${repoDir}" -type f \\( -name "*.ts" -o -name "*.tsx" -o -name "*.js" -o -name "*.mjs" \\) -not -path "*/node_modules/*" -not -path "*/.next/*"`,
+      { stdio: "pipe" }
+    )
+      .toString()
+      .trim()
+      .split("\n")
+      .filter(Boolean)
+  } catch {
+    return []
   }
 
-  // 2. GitHub Code Search で process.env パターンを検索
-  // Rate limit: 10 req/min → 短いsleep を入れる
-  await new Promise(r => setTimeout(r, 6000))
-
-  const searchQuery = encodeURIComponent(
-    `process.env repo:${GITHUB_OWNER}/${repo} language:TypeScript`
-  )
-  const searchRaw = await githubFetch(
-    `/search/code?q=${searchQuery}&per_page=30`
-  )
-
-  if (searchRaw) {
-    const searchData = JSON.parse(searchRaw)
-    const items = searchData.items ?? []
-
-    for (const item of items.slice(0, 10)) {
-      // 各ファイルを取得してパース（rate limit対策で間隔を開ける）
-      await new Promise(r => setTimeout(r, 1500))
-      const fileContent = await githubFetch(
-        `${repoPath}/contents/${item.path}`,
-        true
-      )
-      if (fileContent) {
-        parseSourceCode(fileContent).forEach(v => found.add(v))
+  for (const file of files) {
+    try {
+      const content = fs.readFileSync(file, "utf-8")
+      let m: RegExpExecArray | null
+      while ((m = pattern.exec(content)) !== null) {
+        if (!shouldSkip(m[1])) found.add(m[1])
       }
-    }
-    console.log(`  [${slug}] code search: ${found.size} total vars`)
-  }
-
-  // 3. next.config.ts / next.config.js も確認
-  for (const configFile of ["next.config.ts", "next.config.js", "next.config.mjs"]) {
-    const content = await githubFetch(`${repoPath}/contents/${configFile}`, true)
-    if (content) {
-      parseSourceCode(content).forEach(v => found.add(v))
+      pattern.lastIndex = 0
+    } catch {
+      // 読めないファイルはスキップ
     }
   }
 
   return [...found]
 }
 
-async function upsertApiKeys(
-  envVarName: string,
-  productSlug: string
-): Promise<void> {
-  // env_var_name で upsert し、used_by に productSlug を追加
+async function scanRepo(slug: string, repo: string): Promise<string[]> {
+  const found = new Set<string>()
+  let repoDir: string | null = null
+
+  try {
+    repoDir = cloneRepo(repo)
+
+    // 1. .env.example 系ファイル
+    for (const file of [".env.example", ".env.local.example", ".env.sample", "example.env"]) {
+      const filePath = path.join(repoDir, file)
+      if (fs.existsSync(filePath)) {
+        const vars = parseEnvFile(fs.readFileSync(filePath, "utf-8"))
+        vars.forEach(v => found.add(v))
+        console.log(`  [${slug}] ${file}: ${vars.length} vars`)
+      }
+    }
+
+    // 2. ソースコード全体を grep
+    const sourceVars = grepSourceCode(repoDir)
+    sourceVars.forEach(v => found.add(v))
+    console.log(`  [${slug}] source grep: ${sourceVars.length} vars (total: ${found.size})`)
+
+  } finally {
+    if (repoDir) cleanup(repoDir)
+  }
+
+  return [...found]
+}
+
+async function upsertApiKey(envVarName: string, productSlug: string): Promise<void> {
   const { data: existing } = await supabase
     .schema("metago")
     .from("api_keys")
@@ -177,16 +147,15 @@ async function upsertApiKeys(
 }
 
 async function main() {
-  console.log("=== API Keys Scanner ===")
+  console.log("=== API Keys Scanner (clone mode) ===")
 
   for (const [slug, repo] of Object.entries(GO_REPOS)) {
     console.log(`\nScanning ${slug} (${repo})...`)
     try {
       const vars = await scanRepo(slug, repo)
-      console.log(`  Found ${vars.length} env vars`)
-
+      console.log(`  → ${vars.length} env vars detected`)
       for (const v of vars) {
-        await upsertApiKeys(v, slug)
+        await upsertApiKey(v, slug)
       }
     } catch (err) {
       console.error(`  Error scanning ${slug}:`, err)

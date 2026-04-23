@@ -62,18 +62,32 @@ export function cleanup(dir: string) {
 
 // ── GitHub API ────────────────────────────────────────────
 
-async function ghFetch(path: string, options: RequestInit = {}) {
-  const res = await fetch(`https://api.github.com${path}`, {
-    ...options,
-    headers: {
-      Authorization: `Bearer ${GITHUB_TOKEN}`,
-      Accept: "application/vnd.github+json",
-      "Content-Type": "application/json",
-      "X-GitHub-Api-Version": "2022-11-28",
-      ...(options.headers ?? {}),
-    },
-  })
-  return res
+async function ghFetch(path: string, options: RequestInit = {}, retries = 3): Promise<Response> {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(`https://api.github.com${path}`, {
+        ...options,
+        headers: {
+          Authorization: `Bearer ${GITHUB_TOKEN}`,
+          Accept: "application/vnd.github+json",
+          "Content-Type": "application/json",
+          "X-GitHub-Api-Version": "2022-11-28",
+          ...(options.headers ?? {}),
+        },
+      })
+      return res
+    } catch (e: any) {
+      const isSocketError = e?.cause?.code === "UND_ERR_SOCKET" || e?.cause?.code === "ECONNRESET"
+      if (attempt < retries && isSocketError) {
+        const wait = attempt * 3000
+        console.warn(`  Network error on attempt ${attempt}/${retries} (${e?.cause?.code}), retrying in ${wait / 1000}s...`)
+        await new Promise(r => setTimeout(r, wait))
+        continue
+      }
+      throw e
+    }
+  }
+  throw new Error("ghFetch: exhausted retries")
 }
 
 export async function createPR(
