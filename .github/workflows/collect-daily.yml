@@ -84,10 +84,8 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
 
-      - name: Install Chrome for Lighthouse
-        run: |
-          which chromium-browser || which google-chrome || \
-          (sudo apt-get update -q && sudo apt-get install -y -q chromium-browser 2>/dev/null || true)
+      - name: Setup Chrome for Lighthouse
+        uses: browser-actions/setup-chrome@v1
 
       - name: Performance measurement (${{ matrix.repo }})
         run: npx tsx scripts/collect/performance.ts
