@@ -317,13 +317,82 @@ ${sourceCode}
 }
 
 // ============================================================
-// ESLint / Prettier 自動修正（スコアには影響しない）
+// ESLint / Prettier / TSC 自動修正（スコアには影響しない）
 // ============================================================
 
 interface LintMessage { ruleId: string | null; message: string; line: number; severity: number }
 interface LintResult { filePath: string; messages: LintMessage[] }
 
-async function runLintAndFix(repoDir: string): Promise<{ fixedCount: number; hasLintIssues: boolean }> {
+async function fixTscErrors(repoDir: string, anthropic: Anthropic): Promise<void> {
+  let tscOutput = ""
+  try {
+    execSync("npx tsc --noEmit", { cwd: repoDir, stdio: "pipe", timeout: 120_000 })
+    console.log("  TSC: エラーなし")
+    return
+  } catch (e: any) {
+    tscOutput = e.stdout?.toString() ?? ""
+  }
+
+  const errorLines = tscOutput.split("\n").filter(l => l.includes(": error TS"))
+  if (errorLines.length === 0) return
+  console.log(`  TSC: ${errorLines.length}件のエラーを検出 → Claude修正開始`)
+
+  // エラーをファイルごとにグループ化
+  const fileErrors = new Map<string, string[]>()
+  for (const line of errorLines) {
+    const m = line.match(/^(.+?)\(\d+,\d+\): error /)
+    if (!m) continue
+    const file = m[1].trim()
+    if (!fileErrors.has(file)) fileErrors.set(file, [])
+    fileErrors.get(file)!.push(line)
+  }
+
+  for (const [file, errors] of fileErrors) {
+    const filePath = path.join(repoDir, file)
+    if (!fs.existsSync(filePath)) continue
+    const content = fs.readFileSync(filePath, "utf-8")
+    if (content.length > 80_000) { console.warn(`  スキップ (ファイル大): ${file}`); continue }
+
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const message = await anthropic.messages.create({
+          model: "claude-sonnet-4-5",
+          max_tokens: 4096,
+          messages: [{
+            role: "user",
+            content: `Fix the TypeScript compiler errors listed below. Return ONLY the complete fixed file content — no explanation, no markdown fences.
+
+File: ${file}
+
+Errors:
+${errors.join("\n")}
+
+Current content:
+\`\`\`tsx
+${content}
+\`\`\``,
+          }],
+        })
+        const raw = message.content[0]?.type === "text" ? message.content[0].text : ""
+        const fixed = raw.replace(/^```[^\n]*\n?/, "").replace(/\n?```$/, "").trim()
+        if (fixed && fixed !== content) {
+          fs.writeFileSync(filePath, fixed, "utf-8")
+          console.log(`  ✓ TSC修正: ${file} (${errors.length}件)`)
+        }
+        break
+      } catch (e: any) {
+        if ((e?.status === 429) && attempt < 3) {
+          await new Promise(r => setTimeout(r, 60_000 * attempt))
+          continue
+        }
+        console.warn(`  TSC修正失敗 (${file}):`, String(e).slice(0, 100))
+        break
+      }
+    }
+  }
+}
+
+async function runLintAndFix(repoDir: string, anthropic: Anthropic): Promise<{ hasLintIssues: boolean }> {
   // deps install
   try {
     execSync("npm ci", { cwd: repoDir, stdio: "pipe", timeout: 300_000 })
@@ -354,22 +423,19 @@ async function runLintAndFix(repoDir: string): Promise<{ fixedCount: number; has
       `npx eslint . --ext .ts,.tsx --fix --ignore-pattern '.next' --ignore-pattern 'node_modules'`,
       { cwd: repoDir, stdio: "pipe", timeout: 120_000 }
     )
-  } catch {
-    hasLintIssues = true
-  }
+  } catch { hasLintIssues = true }
 
   // Prettier
   try {
-    execSync(
-      `npx prettier --write "**/*.{ts,tsx,js,json,css}"`,
-      { cwd: repoDir, stdio: "pipe", timeout: 60_000 }
-    )
+    execSync(`npx prettier --write "**/*.{ts,tsx,js,json,css}"`, { cwd: repoDir, stdio: "pipe", timeout: 60_000 })
   } catch {}
 
-  const changed = hasChanges(repoDir)
-  console.log(`  ESLint/Prettier: ${changed ? "修正あり" : "修正なし"}`)
+  // TSC エラーを Claude で修正
+  await fixTscErrors(repoDir, anthropic)
 
-  return { fixedCount: changed ? 1 : 0, hasLintIssues }
+  const changed = hasChanges(repoDir)
+  console.log(`  ESLint/Prettier/TSC: ${changed ? "修正あり" : "修正なし"}`)
+  return { hasLintIssues }
 }
 
 // ============================================================
@@ -388,8 +454,8 @@ async function processRepo(product: any, repo: string) {
     // 1. Claude による7軸評価（スコアの根拠）
     const evaluation = await evaluateCodeQuality(repoDir, product.display_name, anthropic)
 
-    // 2. ESLint/Prettier 自動修正（L1 PR用、スコアに影響しない）
-    const { fixedCount, hasLintIssues } = await runLintAndFix(repoDir)
+    // 2. ESLint/Prettier/TSC 自動修正（L1 PR用、スコアに影響しない）
+    const { hasLintIssues } = await runLintAndFix(repoDir, anthropic)
 
     // 3. 既存レコードを全削除してから新規挿入
     await supabase.schema("metago").from("quality_items").delete().eq("product_id", product.id)
@@ -444,7 +510,7 @@ async function processRepo(product: any, repo: string) {
       if (pushed) {
         await createAndMergePR(repo, {
           title: `🤖 [MetaGo L1] コード品質自動修正 — ${product.display_name}`,
-          body:  `MetaGo による ESLint 自動修正・Prettier 整形です。
+          body:  `MetaGo による ESLint 自動修正・Prettier 整形・TypeScript エラー修正です。
 
 > L1: 自動マージ対象。コードロジックへの変更はありません。`,
           head:   branch,
