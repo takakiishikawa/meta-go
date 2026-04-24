@@ -517,24 +517,24 @@ async function processRepo(product: any, repo: string) {
   try {
     repoDir = cloneRepo(repo);
 
-    // 1. Claude による7軸評価（スコアの根拠）
-    const evaluation = await evaluateCodeQuality(
-      repoDir,
-      product.display_name,
-      anthropic,
-    );
-
-    // 2. ESLint/Prettier/TSC 自動修正（L1 PR用、スコアに影響しない）
-    const { hasLintIssues } = await runLintAndFix(repoDir, anthropic);
-
-    // 3. 既存レコードを全削除してから新規挿入
+    // 1. 既存レコードを全削除（clone成功後すぐに実行し、古いデータを常にクリア）
     await supabase
       .schema("metago")
       .from("quality_items")
       .delete()
       .eq("product_id", product.id);
 
-    // 4. 評価軸ごとの問題をDBに保存
+    // 2. Claude による7軸評価（スコアの根拠）
+    const evaluation = await evaluateCodeQuality(
+      repoDir,
+      product.display_name,
+      anthropic,
+    );
+
+    // 3. ESLint/Prettier/TSC 自動修正（L1 PR用、スコアに影響しない）
+    const { hasLintIssues } = await runLintAndFix(repoDir, anthropic);
+
+    // 4. 評価軸ごとの問題をDBに保存（評価軸が空の場合は何も挿入しない）
     for (const axisResult of evaluation.axes) {
       const def = QUALITY_AXES.find((q) => q.id === axisResult.axisId);
       if (!def) continue;

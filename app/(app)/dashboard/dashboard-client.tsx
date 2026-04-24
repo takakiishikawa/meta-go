@@ -63,7 +63,9 @@ function getLatestScore(
   const found = scores.find(
     (s) => s.product_id === productId && s.category === category,
   );
-  return found ? found.score : null;
+  if (!found) return null;
+  // score=0 means data collection failed; treat as no data
+  return found.score === 0 ? null : found.score;
 }
 
 function overallScore(scores: ScoreRecord[], productId: string): number | null {

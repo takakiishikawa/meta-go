@@ -4,6 +4,7 @@ import { ScoreDonut } from "@/components/score/score-donut";
 import { ShieldAlert } from "lucide-react";
 import { SecurityVulnerabilityTable } from "@/components/security/security-vulnerability-table";
 import { ProductSecurityEvalButton } from "@/components/security/product-security-eval-button";
+import { SeverityCell } from "@/components/security/severity-cell";
 import { ScoreDelta } from "@/components/score/score-delta";
 
 const GO_COLORS: Record<string, string> = {
@@ -258,24 +259,30 @@ export default async function SecurityPage() {
                     </td>
                     <td className="px-4 py-3">
                       <ProductSecurityEvalButton
-                        items={productItems}
+                        items={productItems.map((i) => ({
+                          id: i.id,
+                          title: i.title,
+                          description: i.description ?? null,
+                          severity: i.severity,
+                          state: i.state,
+                        }))}
                         score={score}
                         productName={product.display_name}
                       />
                     </td>
                     {SEVERITY_ORDER.map((sev_key) => (
                       <td key={sev_key} className="px-4 py-3">
-                        <span
-                          className="text-sm font-medium"
-                          style={{
-                            color:
-                              (sev[sev_key] ?? 0) > 0
-                                ? SEVERITY_COLORS[sev_key]
-                                : "var(--color-text-secondary)",
-                          }}
-                        >
-                          {sev[sev_key] ?? 0}
-                        </span>
+                        <SeverityCell
+                          items={productItems.map((i) => ({
+                            id: i.id,
+                            title: i.title,
+                            description: i.description ?? null,
+                            severity: i.severity,
+                            state: i.state,
+                          }))}
+                          severity={sev_key}
+                          productName={product.display_name}
+                        />
                       </td>
                     ))}
                   </tr>

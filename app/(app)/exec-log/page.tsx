@@ -29,28 +29,6 @@ export default async function ExecLogPage() {
 
   const allLogs = logs ?? [];
 
-  // Summary by product x category
-  const summary: Record<
-    string,
-    { product: string; category: string; count: number }
-  > = allLogs.reduce(
-    (
-      acc: Record<string, { product: string; category: string; count: number }>,
-      log,
-    ) => {
-      const key = `${log.product_id}:${log.category}`;
-      if (!acc[key])
-        acc[key] = {
-          product: log.products?.display_name ?? "—",
-          category: log.category,
-          count: 0,
-        };
-      acc[key].count++;
-      return acc;
-    },
-    {},
-  );
-
   return (
     <>
       <PageHeader title="実行ログ" description="MetaGoの自動実行履歴" />
@@ -92,53 +70,6 @@ export default async function ExecLogPage() {
         />
       ) : (
         <>
-          {/* Summary table */}
-          {Object.keys(summary).length > 0 && (
-            <div>
-              <h2
-                className="mb-3 font-semibold text-foreground"
-                style={{ fontSize: "var(--text-base)" }}
-              >
-                プロダクト × カテゴリ別集計
-              </h2>
-              <div className="rounded-lg border border-border overflow-hidden">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-border bg-surface-subtle">
-                      {["プロダクト", "カテゴリ", "件数"].map((h) => (
-                        <th
-                          key={h}
-                          className="px-4 py-3 text-left text-xs font-medium"
-                          style={{ color: "var(--color-text-secondary)" }}
-                        >
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {Object.values(summary).map((row, i) => (
-                      <tr
-                        key={i}
-                        className="border-b border-border last:border-0"
-                      >
-                        <td className="px-4 py-3 text-sm text-foreground">
-                          {row.product}
-                        </td>
-                        <td className="px-4 py-3">
-                          <Badge variant="outline">{row.category}</Badge>
-                        </td>
-                        <td className="px-4 py-3 text-sm font-medium text-foreground">
-                          {row.count}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
           {/* Log list */}
           <div>
             <h2

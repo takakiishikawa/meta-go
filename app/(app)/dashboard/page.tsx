@@ -15,7 +15,7 @@ export default async function DashboardPage() {
     .from("scores_history")
     .select("*")
     .order("collected_at", { ascending: false })
-    .limit(100);
+    .limit(500);
 
   const { data: pendingApprovals } = await supabase
     .schema("metago")
