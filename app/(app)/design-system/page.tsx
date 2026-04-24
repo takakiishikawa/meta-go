@@ -1,156 +1,116 @@
-import { createClient } from "@/lib/supabase/server";
-import { Badge, EmptyState, PageHeader } from "@takaki/go-design-system";
-import { ScoreDonut } from "@/components/score/score-donut";
-import { Pagination } from "@/components/ui/pagination";
-import { Palette, ExternalLink } from "lucide-react";
+import { createClient } from "@/lib/supabase/server"
+import { Badge, EmptyState, PageHeader } from "@takaki/go-design-system"
+import { ScoreDonut } from "@/components/score/score-donut"
+import { Pagination } from "@/components/ui/pagination"
+import { ProductEvalButton } from "@/components/shared/product-eval-button"
+import { Palette } from "lucide-react"
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 20
 
 const GO_COLORS: Record<string, string> = {
-  nativego: "#0052CC",
-  carego: "#00875A",
-  kenyakugo: "#FF5630",
-  cookgo: "#FF991F",
+  nativego:   "#0052CC",
+  carego:     "#00875A",
+  kenyakugo:  "#FF5630",
+  cookgo:     "#FF991F",
   physicalgo: "#6554C0",
-  taskgo: "#00B8D9",
-};
+  taskgo:     "#00B8D9",
+}
 
 export default async function DesignSystemPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string }>;
+  searchParams: Promise<{ page?: string }>
 }) {
-  const { page: pageParam } = await searchParams;
-  const page = Math.max(1, parseInt(pageParam ?? "1", 10));
+  const { page: pageParam } = await searchParams
+  const page = Math.max(1, parseInt(pageParam ?? "1", 10))
 
-  const supabase = await createClient();
+  const supabase = await createClient()
 
-  const [{ data: items }, { data: scores }, { data: products }] =
-    await Promise.all([
-      supabase
-        .schema("metago")
-        .from("design_system_items")
-        .select(`*, products(name, display_name, primary_color)`)
-        .order("created_at", { ascending: false }),
-      supabase
-        .schema("metago")
-        .from("scores_history")
-        .select(`product_id, score, collected_at`)
-        .eq("category", "design_system")
-        .order("collected_at", { ascending: false }),
-      supabase
-        .schema("metago")
-        .from("products")
-        .select("id, name, display_name, primary_color")
-        .order("priority"),
-    ]);
+  const [{ data: items }, { data: scores }, { data: products }] = await Promise.all([
+    supabase
+      .schema("metago")
+      .from("design_system_items")
+      .select(`*, products(name, display_name, primary_color)`)
+      .order("created_at", { ascending: false }),
+    supabase
+      .schema("metago")
+      .from("scores_history")
+      .select(`product_id, score, collected_at`)
+      .eq("category", "design_system")
+      .order("collected_at", { ascending: false }),
+    supabase
+      .schema("metago")
+      .from("products")
+      .select("id, name, display_name, primary_color")
+      .order("priority"),
+  ])
 
-  const allItems = items ?? [];
-  const allScores = scores ?? [];
-  const allProducts = products ?? [];
+  const allItems    = items    ?? []
+  const allScores   = scores   ?? []
+  const allProducts = products ?? []
 
-  // Latest score per product
-  const latestScore: Record<string, number> = {};
+  const latestScore: Record<string, number> = {}
   for (const s of allScores) {
-    if (!(s.product_id in latestScore)) latestScore[s.product_id] = s.score;
+    if (!(s.product_id in latestScore)) latestScore[s.product_id] = s.score
   }
 
-  // Violation counts per product
-  const openCount: Record<string, number> = {};
-  const doneCount: Record<string, number> = {};
+  const openCount: Record<string, number> = {}
+  const doneCount: Record<string, number> = {}
   for (const item of allItems) {
-    if (item.state === "new")
-      openCount[item.product_id] = (openCount[item.product_id] ?? 0) + 1;
-    else doneCount[item.product_id] = (doneCount[item.product_id] ?? 0) + 1;
+    if (item.state === "new") openCount[item.product_id] = (openCount[item.product_id] ?? 0) + 1
+    else                      doneCount[item.product_id] = (doneCount[item.product_id] ?? 0) + 1
   }
 
-  const scoreValues = Object.values(latestScore);
-  const avgScore =
-    scoreValues.length > 0
-      ? Math.round(scoreValues.reduce((a, b) => a + b, 0) / scoreValues.length)
-      : null;
-
-  const openItems = allItems.filter((i) => i.state !== "done");
-
-  // Category breakdown
-  const byCategory: Record<string, number> = {};
+  const itemsByProduct: Record<string, typeof allItems> = {}
   for (const item of allItems) {
-    byCategory[item.category] = (byCategory[item.category] ?? 0) + 1;
+    if (!itemsByProduct[item.product_id]) itemsByProduct[item.product_id] = []
+    itemsByProduct[item.product_id].push(item)
+  }
+
+  const scoreValues = Object.values(latestScore)
+  const avgScore = scoreValues.length > 0
+    ? Math.round(scoreValues.reduce((a, b) => a + b, 0) / scoreValues.length)
+    : null
+
+  const openItems = allItems.filter(i => i.state !== "done")
+
+  const byCategory: Record<string, number> = {}
+  for (const item of allItems) {
+    byCategory[item.category] = (byCategory[item.category] ?? 0) + 1
   }
   const topCategories = Object.entries(byCategory)
     .sort((a, b) => b[1] - a[1])
-    .slice(0, 5);
+    .slice(0, 5)
 
-  const totalPages = Math.ceil(allItems.length / PAGE_SIZE);
-  const pagedItems = allItems.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const totalPages = Math.ceil(allItems.length / PAGE_SIZE)
+  const pagedItems = allItems.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   return (
     <>
-      <PageHeader
-        title="デザインシステム"
-        description="go-design-system準拠率と違反一覧"
-      />
+      <PageHeader title="デザインシステム" description="go-design-system準拠率と違反一覧" />
 
-      {/* Stats */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="flex items-center gap-4 rounded-lg border border-border bg-surface p-4">
           <ScoreDonut score={avgScore} size={72} />
           <div>
-            <div className="text-2xl font-semibold text-foreground">
-              {avgScore ?? "—"}
-            </div>
-            <div
-              style={{
-                fontSize: "var(--text-sm)",
-                color: "var(--color-text-secondary)",
-              }}
-            >
-              全go平均準拠率
-            </div>
+            <div className="text-2xl font-semibold text-foreground">{avgScore ?? "—"}</div>
+            <div style={{ fontSize: "var(--text-sm)", color: "var(--color-text-secondary)" }}>全go平均準拠率</div>
           </div>
         </div>
         <div className="rounded-lg border border-border bg-surface p-4">
-          <div className="text-2xl font-semibold text-foreground">
-            {openItems.length}
-          </div>
-          <div
-            style={{
-              fontSize: "var(--text-sm)",
-              color: "var(--color-text-secondary)",
-            }}
-          >
-            未修正の違反
-          </div>
+          <div className="text-2xl font-semibold text-foreground">{openItems.length}</div>
+          <div style={{ fontSize: "var(--text-sm)", color: "var(--color-text-secondary)" }}>未修正の違反</div>
         </div>
         <div className="rounded-lg border border-border bg-surface p-4">
-          <div className="text-sm font-semibold text-foreground mb-2">
-            違反カテゴリ Top
-          </div>
+          <div className="text-sm font-semibold text-foreground mb-2">違反カテゴリ Top</div>
           {topCategories.length === 0 ? (
-            <span
-              style={{
-                fontSize: "var(--text-sm)",
-                color: "var(--color-text-secondary)",
-              }}
-            >
-              —
-            </span>
+            <span style={{ fontSize: "var(--text-sm)", color: "var(--color-text-secondary)" }}>—</span>
           ) : (
             <div className="flex flex-col gap-1">
               {topCategories.map(([cat, count]) => (
-                <div
-                  key={cat}
-                  className="flex items-center justify-between gap-2"
-                >
-                  <span
-                    className="text-xs truncate"
-                    style={{ color: "var(--color-text-secondary)" }}
-                  >
-                    {cat}
-                  </span>
-                  <span className="text-xs font-semibold text-foreground shrink-0">
-                    {count}
-                  </span>
+                <div key={cat} className="flex items-center justify-between gap-2">
+                  <span className="text-xs truncate" style={{ color: "var(--color-text-secondary)" }}>{cat}</span>
+                  <span className="text-xs font-semibold text-foreground shrink-0">{count}</span>
                 </div>
               ))}
             </div>
@@ -158,79 +118,59 @@ export default async function DesignSystemPage({
         </div>
       </div>
 
-      {/* Per-product score table */}
       {allProducts.length > 0 && (
         <div className="rounded-lg border border-border overflow-hidden">
           <div className="px-4 py-3 border-b border-border bg-surface-subtle">
-            <span className="text-sm font-semibold text-foreground">
-              プロダクト別準拠率
-            </span>
+            <span className="text-sm font-semibold text-foreground">プロダクト別準拠率</span>
           </div>
           <table className="w-full">
             <thead>
               <tr className="border-b border-border">
-                {["プロダクト", "スコア", "未修正", "修正済み"].map((h) => (
-                  <th
-                    key={h}
-                    className="px-4 py-2.5 text-left text-xs font-medium"
-                    style={{ color: "var(--color-text-secondary)" }}
-                  >
-                    {h}
-                  </th>
+                {["プロダクト", "スコア", "評価", "未修正", "修正済み"].map(h => (
+                  <th key={h} className="px-4 py-2.5 text-left text-xs font-medium" style={{ color: "var(--color-text-secondary)" }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {allProducts.map((product) => {
-                const color =
-                  product.primary_color || GO_COLORS[product.name] || "#6B7280";
-                const score = latestScore[product.id] ?? null;
+              {allProducts.map(product => {
+                const color = product.primary_color || GO_COLORS[product.name] || "#6B7280"
+                const score = latestScore[product.id] ?? null
+                const productItems = itemsByProduct[product.id] ?? []
                 return (
-                  <tr
-                    key={product.id}
-                    className="border-b border-border last:border-0 hover:bg-surface-subtle"
-                  >
+                  <tr key={product.id} className="border-b border-border last:border-0 hover:bg-surface-subtle">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <div
-                          className="size-2.5 rounded-full shrink-0"
-                          style={{ backgroundColor: color }}
-                        />
-                        <span className="text-sm text-foreground">
-                          {product.display_name}
-                        </span>
+                        <div className="size-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
+                        <span className="text-sm text-foreground">{product.display_name}</span>
                       </div>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <ScoreDonut score={score} size={36} color={color} />
-                        <span className="text-sm font-semibold text-foreground">
-                          {score ?? "—"}
-                        </span>
+                        <span className="text-sm font-semibold text-foreground">{score ?? "—"}</span>
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <span className="text-sm text-foreground">
-                        {openCount[product.id] ?? 0}
-                      </span>
+                      <ProductEvalButton
+                        items={productItems}
+                        score={score}
+                        productName={product.display_name}
+                      />
                     </td>
                     <td className="px-4 py-3">
-                      <span
-                        className="text-sm"
-                        style={{ color: "var(--color-text-secondary)" }}
-                      >
-                        {doneCount[product.id] ?? 0}
-                      </span>
+                      <span className="text-sm text-foreground">{openCount[product.id] ?? 0}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="text-sm" style={{ color: "var(--color-text-secondary)" }}>{doneCount[product.id] ?? 0}</span>
                     </td>
                   </tr>
-                );
+                )
               })}
             </tbody>
           </table>
         </div>
       )}
 
-      {/* Violations list */}
       {allItems.length === 0 ? (
         <EmptyState
           icon={<Palette className="size-12" />}
@@ -240,99 +180,46 @@ export default async function DesignSystemPage({
       ) : (
         <div className="flex flex-col gap-3">
           <span className="text-sm font-semibold text-foreground">
-            違反一覧{" "}
-            <span
-              style={{ color: "var(--color-text-secondary)", fontWeight: 400 }}
-            >
-              ({allItems.length}件)
-            </span>
+            違反一覧 <span style={{ color: "var(--color-text-secondary)", fontWeight: 400 }}>({allItems.length}件)</span>
           </span>
           <div className="rounded-lg border border-border overflow-hidden">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-border bg-surface-subtle">
-                  {["プロダクト", "カテゴリ", "違反内容", "状態", "PR"].map(
-                    (h) => (
-                      <th
-                        key={h}
-                        className="px-4 py-3 text-left text-xs font-medium"
-                        style={{ color: "var(--color-text-secondary)" }}
-                      >
-                        {h}
-                      </th>
-                    ),
-                  )}
+                  {["プロダクト", "カテゴリ", "違反内容", "状態"].map(h => (
+                    <th key={h} className="px-4 py-3 text-left text-xs font-medium" style={{ color: "var(--color-text-secondary)" }}>{h}</th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
-                {pagedItems.map((item) => (
-                  <tr
-                    key={item.id}
-                    className="border-b border-border last:border-0 hover:bg-surface-subtle"
-                  >
+                {pagedItems.map(item => (
+                  <tr key={item.id} className="border-b border-border last:border-0 hover:bg-surface-subtle">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <div
-                          className="size-2 rounded-full shrink-0"
-                          style={{
-                            backgroundColor:
-                              item.products?.primary_color || "#6B7280",
-                          }}
-                        />
-                        <span className="text-sm text-foreground whitespace-nowrap">
-                          {item.products?.display_name ?? "—"}
-                        </span>
+                        <div className="size-2 rounded-full shrink-0" style={{ backgroundColor: item.products?.primary_color || "#6B7280" }} />
+                        <span className="text-sm text-foreground whitespace-nowrap">{item.products?.display_name ?? "—"}</span>
                       </div>
                     </td>
                     <td className="px-4 py-3">
                       <Badge variant="outline">{item.category}</Badge>
                     </td>
                     <td className="px-4 py-3 max-w-xs">
-                      <div className="text-sm font-medium text-foreground">
-                        {item.title}
-                      </div>
+                      <div className="text-sm font-medium text-foreground">{item.title}</div>
                       {item.description && (
-                        <div
-                          className="text-xs mt-0.5 line-clamp-2"
-                          style={{ color: "var(--color-text-secondary)" }}
-                        >
-                          {item.description}
-                        </div>
+                        <div className="text-xs mt-0.5 line-clamp-2" style={{ color: "var(--color-text-secondary)" }}>{item.description}</div>
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      <Badge
-                        variant={item.state === "done" ? "default" : "outline"}
-                      >
-                        {item.state}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3">
-                      {item.pr_url && (
-                        <a
-                          href={item.pr_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          <ExternalLink
-                            className="size-4"
-                            style={{ color: "var(--color-primary)" }}
-                          />
-                        </a>
-                      )}
+                      <Badge variant={item.state === "done" ? "default" : "outline"}>{item.state}</Badge>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <Pagination
-            page={page}
-            totalPages={totalPages}
-            basePath="/design-system"
-          />
+          <Pagination page={page} totalPages={totalPages} basePath="/design-system" />
         </div>
       )}
     </>
-  );
+  )
 }
