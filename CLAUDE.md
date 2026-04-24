@@ -61,11 +61,12 @@ MetaGoが中央でcloneして解析・修正PRを作成する。各goにself-hea
 
 | レベル | 対応 | 具体例 |
 |---|---|---|
-| **L1** | 自動マージ（承認不要） | ESLint auto-fix、未使用import、Prettier、any型修正、patch/minor依存更新、デザインシステム違反(Claude修正)、Lighthouse改善 |
-| **L2** | PR作成 + MetaGo承認待ち | **major依存更新のみ** |
+| **L1** | 自動マージ（承認不要） | ESLint auto-fix、未使用import、Prettier、any型修正、patch/minor依存更新、**major依存更新（Claude破壊的変更修正付き）**、デザインシステム違反(Claude修正)、Lighthouse改善 |
+| **L2** | PR作成 + MetaGo承認待ち | フレームワーク移行、DB・認証プロバイダ変更、アーキテクチャ刷新など**技術スタック自体の変更**（自動検出不可、手動判断が必要） |
 
-**L1の基準:** コードロジックへの変更なし。CI通過で即マージ。  
-**L2の基準:** 実質 major 依存更新のみ。承認待ちページで承認するとマージされる。
+**L1の基準:** CIが通ればマージ可能。major依存更新もClaudeがAPIの破壊的変更をコード修正して一括適用。  
+**L2の基準:** 技術選択・設計方針レベルの変更。Claudeでは自動修正できず、人間の判断が必要なもの。
+現状、自動フローからL2 PRは生成されない（手動で作成 or 将来的に検出ロジックを追加）。
 
 ## アーキテクチャ（中央集権型）
 
@@ -74,7 +75,7 @@ MetaGoが中央でcloneして解析・修正PRを作成する。各goにself-hea
 | API系 | `github-data.ts`, `vercel-data.ts`, `supabase-data.ts` | Daily | APIのみ、clone不要 |
 | clone系(並列) | `code-quality.ts`, `design-system.ts`, `performance.ts` | Daily | matrix strategy で6リポ並列 |
 | PR同期 | `pr-status.ts` | Daily | open PRをapproval_queueに同期 |
-| 依存更新 | `dependency-check.ts` | Weekly | patch/minor→L1, major→L2 |
+| 依存更新 | `dependency-check.ts` | Weekly | patch/minor→L1, major→L1(Claude破壊的変更修正付き) |
 | その他 | `supabase-data.ts --psf-snapshot`, `api-keys.ts` | Weekly | PSFスナップ、APIキースキャン |
 
 ## 環境変数
