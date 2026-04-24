@@ -18,11 +18,11 @@
  *   ANTHROPIC_API_KEY  — Claude API キー
  */
 
-import Anthropic from "@anthropic-ai/sdk"
-import { createClient } from "@supabase/supabase-js"
-import { execSync } from "child_process"
-import * as fs from "fs"
-import * as path from "path"
+import Anthropic from "@anthropic-ai/sdk";
+import { createClient } from "@supabase/supabase-js";
+import { execSync } from "child_process";
+import * as fs from "fs";
+import * as path from "path";
 import {
   REPO_TO_SLUG,
   cloneRepo,
@@ -30,32 +30,32 @@ import {
   createBranchAndCommit,
   createAndMergePR,
   cleanup,
-} from "../../lib/github/git-operations"
+} from "../../lib/github/git-operations";
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const GO_REPOS: Record<string, string> = {
-  nativego:   "native-go",
-  carego:     "care-go",
-  kenyakugo:  "kenyaku-go",
-  cookgo:     "cook-go",
+  nativego: "native-go",
+  carego: "care-go",
+  kenyakugo: "kenyaku-go",
+  cookgo: "cook-go",
   physicalgo: "physical-go",
-  taskgo:       "task-go",
+  taskgo: "task-go",
   designsystem: "go-design-system",
-  metago:       "meta-go",
-}
+  metago: "meta-go",
+};
 
 // ============================================================
 // 評価軸定義
 // ============================================================
 
 interface QualityAxis {
-  id: string
-  name: string        // 日本語名（DBのcategoryに使用）
-  weight: number      // スコア重み
-  criterion: string   // Claudeへの評価基準説明
+  id: string;
+  name: string; // 日本語名（DBのcategoryに使用）
+  weight: number; // スコア重み
+  criterion: string; // Claudeへの評価基準説明
 }
 
 const QUALITY_AXES: QualityAxis[] = [
@@ -135,85 +135,95 @@ const QUALITY_AXES: QualityAxis[] = [
 ・純粋関数（同じ入力→同じ出力）が多く、ロジックが独立しているか
 ・グローバルな状態への依存が最小か`.trim(),
   },
-]
+];
 
 // ============================================================
 // Claude による評価
 // ============================================================
 
 interface AxisEvaluation {
-  axisId: string
-  score: number   // 0-100
+  axisId: string;
+  score: number; // 0-100
   findings: Array<{
-    title: string
-    description: string
-    severity: "high" | "medium" | "low"
-    file?: string
-  }>
+    title: string;
+    description: string;
+    severity: "high" | "medium" | "low";
+    file?: string;
+  }>;
 }
 
 interface ClaudeEvaluationResult {
-  axes: AxisEvaluation[]
-  overallScore: number
+  axes: AxisEvaluation[];
+  overallScore: number;
 }
 
 function collectSourceFiles(repoDir: string): string {
-  let files: string[] = []
+  let files: string[] = [];
   try {
     // 重要度順: app/ > components/ > lib/ > hooks/、ファイルサイズ降順
     files = execSync(
       `find . -type f \\( -name "*.ts" -o -name "*.tsx" \\) ` +
-      `-not -path "./node_modules/*" -not -path "./.next/*" ` +
-      `-not -name "*.test.*" -not -name "*.spec.*" ` +
-      `\\( -path "./app/*" -o -path "./components/*" -o -path "./lib/*" -o -path "./hooks/*" \\) ` +
-      `| xargs ls -S 2>/dev/null | head -40`,
-      { cwd: repoDir, stdio: "pipe" }
-    ).toString().trim().split("\n").filter(Boolean)
+        `-not -path "./node_modules/*" -not -path "./.next/*" ` +
+        `-not -name "*.test.*" -not -name "*.spec.*" ` +
+        `\\( -path "./app/*" -o -path "./components/*" -o -path "./lib/*" -o -path "./hooks/*" \\) ` +
+        `| xargs ls -S 2>/dev/null | head -40`,
+      { cwd: repoDir, stdio: "pipe" },
+    )
+      .toString()
+      .trim()
+      .split("\n")
+      .filter(Boolean);
   } catch {
     try {
       files = execSync(
         `find . -type f \\( -name "*.ts" -o -name "*.tsx" \\) ` +
-        `-not -path "./node_modules/*" -not -path "./.next/*" | head -30`,
-        { cwd: repoDir, stdio: "pipe" }
-      ).toString().trim().split("\n").filter(Boolean)
+          `-not -path "./node_modules/*" -not -path "./.next/*" | head -30`,
+        { cwd: repoDir, stdio: "pipe" },
+      )
+        .toString()
+        .trim()
+        .split("\n")
+        .filter(Boolean);
     } catch {
-      return ""
+      return "";
     }
   }
 
-  const sections: string[] = []
-  let totalChars = 0
-  const MAX_CHARS = 70_000
+  const sections: string[] = [];
+  let totalChars = 0;
+  const MAX_CHARS = 70_000;
 
   for (const f of files) {
-    const filePath = path.isAbsolute(f) ? f : path.join(repoDir, f)
+    const filePath = path.isAbsolute(f) ? f : path.join(repoDir, f);
     try {
-      const content = fs.readFileSync(filePath, "utf-8")
-      if (totalChars + content.length > MAX_CHARS) break
-      const relPath = path.relative(repoDir, filePath)
-      sections.push(`=== ${relPath} ===\n${content}`)
-      totalChars += content.length
+      const content = fs.readFileSync(filePath, "utf-8");
+      if (totalChars + content.length > MAX_CHARS) break;
+      const relPath = path.relative(repoDir, filePath);
+      sections.push(`=== ${relPath} ===\n${content}`);
+      totalChars += content.length;
     } catch {}
   }
 
-  console.log(`  収集ファイル数: ${sections.length} (${Math.round(totalChars / 1000)}KB)`)
-  return sections.join("\n\n")
+  console.log(
+    `  収集ファイル数: ${sections.length} (${Math.round(totalChars / 1000)}KB)`,
+  );
+  return sections.join("\n\n");
 }
 
 async function evaluateCodeQuality(
   repoDir: string,
   productName: string,
-  anthropic: Anthropic
+  anthropic: Anthropic,
 ): Promise<ClaudeEvaluationResult> {
-  const sourceCode = collectSourceFiles(repoDir)
+  const sourceCode = collectSourceFiles(repoDir);
   if (!sourceCode) {
-    console.warn("  ソースコードが取得できませんでした")
-    return { axes: [], overallScore: 0 }
+    console.warn("  ソースコードが取得できませんでした");
+    return { axes: [], overallScore: 0 };
   }
 
-  const axesDescription = QUALITY_AXES.map(ax =>
-    `### ${ax.name} (id: ${ax.id})\n${ax.criterion}`
-  ).join("\n\n")
+  const axesDescription = QUALITY_AXES.map(
+    (ax) => `### ${ax.name} (id: ${ax.id})\n${ax.criterion}`,
+  ).join("\n\n");
 
   const prompt = `あなたはNext.js/TypeScriptアプリの経験豊富なシニアエンジニアです。
 「${productName}」のソースコードを以下の7つの評価軸で客観的に採点してください。
@@ -252,117 +262,148 @@ ${sourceCode}
       ]
     }
   ]
-}`
+}`;
 
-  const MAX_RETRIES = 3
+  const MAX_RETRIES = 3;
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      console.log(`  🤖 Claude評価実行中... (試行 ${attempt}/${MAX_RETRIES})`)
+      console.log(`  🤖 Claude評価実行中... (試行 ${attempt}/${MAX_RETRIES})`);
       const message = await anthropic.messages.create({
         model: "claude-sonnet-4-5",
         max_tokens: 4096,
         messages: [{ role: "user", content: prompt }],
-      })
+      });
 
-      const text = message.content[0]?.type === "text" ? message.content[0].text : ""
-      const cleaned = text.replace(/^```[^\n]*\n?/, "").replace(/\n?```$/, "").trim()
+      const text =
+        message.content[0]?.type === "text" ? message.content[0].text : "";
+      const cleaned = text
+        .replace(/^```[^\n]*\n?/, "")
+        .replace(/\n?```$/, "")
+        .trim();
 
-      let parsed: { axes: AxisEvaluation[] }
+      let parsed: { axes: AxisEvaluation[] };
       try {
-        parsed = JSON.parse(cleaned)
+        parsed = JSON.parse(cleaned);
       } catch {
         // JSON部分だけ抽出
-        const jsonMatch = cleaned.match(/\{[\s\S]*\}/)
-        if (!jsonMatch) throw new Error("JSONが見つかりません")
-        parsed = JSON.parse(jsonMatch[0])
+        const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) throw new Error("JSONが見つかりません");
+        parsed = JSON.parse(jsonMatch[0]);
       }
 
-      const axes = parsed.axes ?? []
+      const axes = parsed.axes ?? [];
 
       // 加重平均スコア計算
-      let totalWeight = 0
-      let weightedSum = 0
+      let totalWeight = 0;
+      let weightedSum = 0;
       for (const ax of axes) {
-        const def = QUALITY_AXES.find(q => q.id === ax.axisId)
-        if (!def) continue
-        weightedSum += ax.score * def.weight
-        totalWeight += def.weight
+        const def = QUALITY_AXES.find((q) => q.id === ax.axisId);
+        if (!def) continue;
+        weightedSum += ax.score * def.weight;
+        totalWeight += def.weight;
       }
-      const overallScore = totalWeight > 0
-        ? Math.round(weightedSum / totalWeight)
-        : 0
+      const overallScore =
+        totalWeight > 0 ? Math.round(weightedSum / totalWeight) : 0;
 
       // 評価結果をログ出力
-      console.log(`  📊 評価結果:`)
+      console.log(`  📊 評価結果:`);
       for (const ax of axes) {
-        const def = QUALITY_AXES.find(q => q.id === ax.axisId)
-        const label = def?.name ?? ax.axisId
-        const bar = "█".repeat(Math.round(ax.score / 10)) + "░".repeat(10 - Math.round(ax.score / 10))
-        console.log(`     ${label.padEnd(14)}: ${String(ax.score).padStart(3)}点 ${bar} (${ax.findings.length}件の問題)`)
+        const def = QUALITY_AXES.find((q) => q.id === ax.axisId);
+        const label = def?.name ?? ax.axisId;
+        const bar =
+          "█".repeat(Math.round(ax.score / 10)) +
+          "░".repeat(10 - Math.round(ax.score / 10));
+        console.log(
+          `     ${label.padEnd(14)}: ${String(ax.score).padStart(3)}点 ${bar} (${ax.findings.length}件の問題)`,
+        );
       }
-      console.log(`  🏆 総合スコア: ${overallScore}点`)
+      console.log(`  🏆 総合スコア: ${overallScore}点`);
 
-      return { axes, overallScore }
+      return { axes, overallScore };
     } catch (e: any) {
-      const isRateLimit = e?.status === 429 || e?.error?.error?.type === "rate_limit_error"
+      const isRateLimit =
+        e?.status === 429 || e?.error?.error?.type === "rate_limit_error";
       if (isRateLimit && attempt < MAX_RETRIES) {
-        const wait = 60_000 * attempt
-        console.warn(`  レート制限 (${attempt}/${MAX_RETRIES}回目)、${wait / 1000}秒待機...`)
-        await new Promise(r => setTimeout(r, wait))
-        continue
+        const wait = 60_000 * attempt;
+        console.warn(
+          `  レート制限 (${attempt}/${MAX_RETRIES}回目)、${wait / 1000}秒待機...`,
+        );
+        await new Promise((r) => setTimeout(r, wait));
+        continue;
       }
-      console.warn("  Claude評価失敗:", String(e).slice(0, 300))
-      return { axes: [], overallScore: 0 }
+      console.warn("  Claude評価失敗:", String(e).slice(0, 300));
+      return { axes: [], overallScore: 0 };
     }
   }
-  return { axes: [], overallScore: 0 }
+  return { axes: [], overallScore: 0 };
 }
 
 // ============================================================
 // ESLint / Prettier / TSC 自動修正（スコアには影響しない）
 // ============================================================
 
-interface LintMessage { ruleId: string | null; message: string; line: number; severity: number }
-interface LintResult { filePath: string; messages: LintMessage[] }
+interface LintMessage {
+  ruleId: string | null;
+  message: string;
+  line: number;
+  severity: number;
+}
+interface LintResult {
+  filePath: string;
+  messages: LintMessage[];
+}
 
-async function fixTscErrors(repoDir: string, anthropic: Anthropic): Promise<void> {
-  let tscOutput = ""
+async function fixTscErrors(
+  repoDir: string,
+  anthropic: Anthropic,
+): Promise<void> {
+  let tscOutput = "";
   try {
-    execSync("npx tsc --noEmit", { cwd: repoDir, stdio: "pipe", timeout: 120_000 })
-    console.log("  TSC: エラーなし")
-    return
+    execSync("npx tsc --noEmit", {
+      cwd: repoDir,
+      stdio: "pipe",
+      timeout: 120_000,
+    });
+    console.log("  TSC: エラーなし");
+    return;
   } catch (e: any) {
-    tscOutput = e.stdout?.toString() ?? ""
+    tscOutput = e.stdout?.toString() ?? "";
   }
 
-  const errorLines = tscOutput.split("\n").filter(l => l.includes(": error TS"))
-  if (errorLines.length === 0) return
-  console.log(`  TSC: ${errorLines.length}件のエラーを検出 → Claude修正開始`)
+  const errorLines = tscOutput
+    .split("\n")
+    .filter((l) => l.includes(": error TS"));
+  if (errorLines.length === 0) return;
+  console.log(`  TSC: ${errorLines.length}件のエラーを検出 → Claude修正開始`);
 
   // エラーをファイルごとにグループ化
-  const fileErrors = new Map<string, string[]>()
+  const fileErrors = new Map<string, string[]>();
   for (const line of errorLines) {
-    const m = line.match(/^(.+?)\(\d+,\d+\): error /)
-    if (!m) continue
-    const file = m[1].trim()
-    if (!fileErrors.has(file)) fileErrors.set(file, [])
-    fileErrors.get(file)!.push(line)
+    const m = line.match(/^(.+?)\(\d+,\d+\): error /);
+    if (!m) continue;
+    const file = m[1].trim();
+    if (!fileErrors.has(file)) fileErrors.set(file, []);
+    fileErrors.get(file)!.push(line);
   }
 
   for (const [file, errors] of fileErrors) {
-    const filePath = path.join(repoDir, file)
-    if (!fs.existsSync(filePath)) continue
-    const content = fs.readFileSync(filePath, "utf-8")
-    if (content.length > 80_000) { console.warn(`  スキップ (ファイル大): ${file}`); continue }
+    const filePath = path.join(repoDir, file);
+    if (!fs.existsSync(filePath)) continue;
+    const content = fs.readFileSync(filePath, "utf-8");
+    if (content.length > 80_000) {
+      console.warn(`  スキップ (ファイル大): ${file}`);
+      continue;
+    }
 
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
         const message = await anthropic.messages.create({
           model: "claude-sonnet-4-5",
           max_tokens: 4096,
-          messages: [{
-            role: "user",
-            content: `Fix the TypeScript compiler errors listed below. Return ONLY the complete fixed file content — no explanation, no markdown fences.
+          messages: [
+            {
+              role: "user",
+              content: `Fix the TypeScript compiler errors listed below. Return ONLY the complete fixed file content — no explanation, no markdown fences.
 
 File: ${file}
 
@@ -373,38 +414,53 @@ Current content:
 \`\`\`tsx
 ${content}
 \`\`\``,
-          }],
-        })
-        const raw = message.content[0]?.type === "text" ? message.content[0].text : ""
-        const fixed = raw.replace(/^```[^\n]*\n?/, "").replace(/\n?```$/, "").trim()
+            },
+          ],
+        });
+        const raw =
+          message.content[0]?.type === "text" ? message.content[0].text : "";
+        const fixed = raw
+          .replace(/^```[^\n]*\n?/, "")
+          .replace(/\n?```$/, "")
+          .trim();
         if (fixed && fixed !== content) {
-          fs.writeFileSync(filePath, fixed, "utf-8")
-          console.log(`  ✓ TSC修正: ${file} (${errors.length}件)`)
+          fs.writeFileSync(filePath, fixed, "utf-8");
+          console.log(`  ✓ TSC修正: ${file} (${errors.length}件)`);
         }
-        break
+        break;
       } catch (e: any) {
-        if ((e?.status === 429) && attempt < 3) {
-          await new Promise(r => setTimeout(r, 60_000 * attempt))
-          continue
+        if (e?.status === 429 && attempt < 3) {
+          await new Promise((r) => setTimeout(r, 60_000 * attempt));
+          continue;
         }
-        console.warn(`  TSC修正失敗 (${file}):`, String(e).slice(0, 100))
-        break
+        console.warn(`  TSC修正失敗 (${file}):`, String(e).slice(0, 100));
+        break;
       }
     }
   }
 }
 
-async function runLintAndFix(repoDir: string, anthropic: Anthropic): Promise<{ hasLintIssues: boolean }> {
+async function runLintAndFix(
+  repoDir: string,
+  anthropic: Anthropic,
+): Promise<{ hasLintIssues: boolean }> {
   // deps install
   try {
-    execSync("npm ci", { cwd: repoDir, stdio: "pipe", timeout: 300_000 })
-    console.log("  npm ci: OK")
+    execSync("npm ci", { cwd: repoDir, stdio: "pipe", timeout: 300_000 });
+    console.log("  npm ci: OK");
   } catch {
     try {
-      execSync("npm install --legacy-peer-deps", { cwd: repoDir, stdio: "pipe", timeout: 300_000 })
-      console.log("  npm install: OK")
+      execSync("npm install --legacy-peer-deps", {
+        cwd: repoDir,
+        stdio: "pipe",
+        timeout: 300_000,
+      });
+      console.log("  npm install: OK");
     } catch (e: any) {
-      console.warn("  deps install failed:", e.stderr?.toString().slice(0, 100))
+      console.warn(
+        "  deps install failed:",
+        e.stderr?.toString().slice(0, 100),
+      );
     }
   }
 
@@ -412,32 +468,40 @@ async function runLintAndFix(repoDir: string, anthropic: Anthropic): Promise<{ h
   try {
     const count = execSync(
       `find . -type f \\( -name "*.ts" -o -name "*.tsx" \\) -not -path "./node_modules/*" -not -path "./.next/*" | wc -l`,
-      { cwd: repoDir, stdio: "pipe" }
-    ).toString().trim()
-    console.log(`  TS/TSXファイル数: ${count}`)
+      { cwd: repoDir, stdio: "pipe" },
+    )
+      .toString()
+      .trim();
+    console.log(`  TS/TSXファイル数: ${count}`);
   } catch {}
 
-  let hasLintIssues = false
+  let hasLintIssues = false;
 
   // ESLint --fix
   try {
     execSync(
       `npx eslint . --ext .ts,.tsx --fix --ignore-pattern '.next' --ignore-pattern 'node_modules'`,
-      { cwd: repoDir, stdio: "pipe", timeout: 120_000 }
-    )
-  } catch { hasLintIssues = true }
+      { cwd: repoDir, stdio: "pipe", timeout: 120_000 },
+    );
+  } catch {
+    hasLintIssues = true;
+  }
 
   // Prettier
   try {
-    execSync(`npx prettier --write "**/*.{ts,tsx,js,json,css}"`, { cwd: repoDir, stdio: "pipe", timeout: 60_000 })
+    execSync(`npx prettier --write "**/*.{ts,tsx,js,json,css}"`, {
+      cwd: repoDir,
+      stdio: "pipe",
+      timeout: 60_000,
+    });
   } catch {}
 
   // TSC エラーを Claude で修正
-  await fixTscErrors(repoDir, anthropic)
+  await fixTscErrors(repoDir, anthropic);
 
-  const changed = hasChanges(repoDir)
-  console.log(`  ESLint/Prettier/TSC: ${changed ? "修正あり" : "修正なし"}`)
-  return { hasLintIssues }
+  const changed = hasChanges(repoDir);
+  console.log(`  ESLint/Prettier/TSC: ${changed ? "修正あり" : "修正なし"}`);
+  return { hasLintIssues };
 }
 
 // ============================================================
@@ -445,120 +509,142 @@ async function runLintAndFix(repoDir: string, anthropic: Anthropic): Promise<{ h
 // ============================================================
 
 async function processRepo(product: any, repo: string) {
-  console.log(`\n🔍 コード品質評価: ${product.display_name} (${repo})`)
-  let repoDir: string | null = null
+  console.log(`\n🔍 コード品質評価: ${product.display_name} (${repo})`);
+  let repoDir: string | null = null;
 
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
   try {
-    repoDir = cloneRepo(repo)
+    repoDir = cloneRepo(repo);
 
     // 1. Claude による7軸評価（スコアの根拠）
-    const evaluation = await evaluateCodeQuality(repoDir, product.display_name, anthropic)
+    const evaluation = await evaluateCodeQuality(
+      repoDir,
+      product.display_name,
+      anthropic,
+    );
 
     // 2. ESLint/Prettier/TSC 自動修正（L1 PR用、スコアに影響しない）
-    const { hasLintIssues } = await runLintAndFix(repoDir, anthropic)
+    const { hasLintIssues } = await runLintAndFix(repoDir, anthropic);
 
     // 3. 既存レコードを全削除してから新規挿入
-    await supabase.schema("metago").from("quality_items").delete().eq("product_id", product.id)
+    await supabase
+      .schema("metago")
+      .from("quality_items")
+      .delete()
+      .eq("product_id", product.id);
 
     // 4. 評価軸ごとの問題をDBに保存
     for (const axisResult of evaluation.axes) {
-      const def = QUALITY_AXES.find(q => q.id === axisResult.axisId)
-      if (!def) continue
+      const def = QUALITY_AXES.find((q) => q.id === axisResult.axisId);
+      if (!def) continue;
 
       for (const finding of axisResult.findings) {
-        await supabase.schema("metago").from("quality_items").insert({
-          product_id:  product.id,
-          category:    def.name,
-          title:       finding.title.substring(0, 200),
-          description: finding.file
-            ? `[${finding.file}] ${finding.description}`.substring(0, 500)
-            : finding.description.substring(0, 500),
-          state: "new",
-          level: finding.severity === "high" ? "L1" : "L2",
-        })
+        await supabase
+          .schema("metago")
+          .from("quality_items")
+          .insert({
+            product_id: product.id,
+            category: def.name,
+            title: finding.title.substring(0, 200),
+            description: finding.file
+              ? `[${finding.file}] ${finding.description}`.substring(0, 500)
+              : finding.description.substring(0, 500),
+            state: "new",
+            level: finding.severity === "high" ? "L1" : "L2",
+          });
       }
 
       // 軸スコアが低い場合はサマリーも追加
       if (axisResult.score < 60) {
-        await supabase.schema("metago").from("quality_items").insert({
-          product_id:  product.id,
-          category:    def.name,
-          title:       `[${def.name}] スコア低下: ${axisResult.score}点`,
-          description: `${def.name}の評価が${axisResult.score}点と基準(60点)を下回っています。${def.criterion.split("\n")[0]}`,
-          state: "new",
-          level: axisResult.score < 40 ? "L1" : "L2",
-        })
+        await supabase
+          .schema("metago")
+          .from("quality_items")
+          .insert({
+            product_id: product.id,
+            category: def.name,
+            title: `[${def.name}] スコア低下: ${axisResult.score}点`,
+            description: `${def.name}の評価が${axisResult.score}点と基準(60点)を下回っています。${def.criterion.split("\n")[0]}`,
+            state: "new",
+            level: axisResult.score < 40 ? "L1" : "L2",
+          });
       }
     }
 
     // 5. スコア保存（Claudeの加重平均 — API失敗時はスキップ）
-    const score = evaluation.overallScore
+    const score = evaluation.overallScore;
     if (evaluation.axes.length > 0) {
       await supabase.schema("metago").from("scores_history").insert({
         product_id: product.id,
-        category:   "quality",
+        category: "quality",
         score,
-      })
+      });
     } else {
-      console.warn("  スコア保存スキップ: 評価軸が空（API失敗の可能性）")
+      console.warn("  スコア保存スキップ: 評価軸が空（API失敗の可能性）");
     }
 
     // 6. L1 自動修正 PR (ESLint/Prettier のみ)
     if (hasChanges(repoDir)) {
-      const branch = `metago/code-quality-${new Date().toISOString().slice(0, 10)}`
+      const branch = `metago/code-quality-${new Date().toISOString().slice(0, 10)}`;
       const pushed = createBranchAndCommit(
         repoDir,
         branch,
-        `fix(code-quality): ESLint auto-fix / Prettier [L1 MetaGo]`
-      )
+        `fix(code-quality): ESLint auto-fix / Prettier [L1 MetaGo]`,
+      );
       if (pushed) {
         await createAndMergePR(repo, {
           title: `🤖 [MetaGo L1] コード品質自動修正 — ${product.display_name}`,
-          body:  `MetaGo による ESLint 自動修正・Prettier 整形・TypeScript エラー修正です。
+          body: `MetaGo による ESLint 自動修正・Prettier 整形・TypeScript エラー修正です。
 
 > L1: 自動マージ対象。コードロジックへの変更はありません。`,
-          head:   branch,
+          head: branch,
           labels: ["metago-auto-merge"],
-        })
+        });
       }
     }
 
-    console.log(`  ✅ 完了: 総合スコア ${score}点、問題 ${evaluation.axes.reduce((s, a) => s + a.findings.length, 0)}件`)
+    console.log(
+      `  ✅ 完了: 総合スコア ${score}点、問題 ${evaluation.axes.reduce((s, a) => s + a.findings.length, 0)}件`,
+    );
   } catch (e) {
-    console.error(`  ❌ Failed: ${repo}`, e)
-    await supabase.schema("metago").from("execution_logs").insert({
-      product_id:  product.id,
-      category:    "code-quality",
-      title:       `コード品質チェック失敗: ${repo}`,
-      description: String(e),
-      state:       "failed",
-    })
+    console.error(`  ❌ Failed: ${repo}`, e);
+    await supabase
+      .schema("metago")
+      .from("execution_logs")
+      .insert({
+        product_id: product.id,
+        category: "code-quality",
+        title: `コード品質チェック失敗: ${repo}`,
+        description: String(e),
+        state: "failed",
+      });
   } finally {
-    if (repoDir) cleanup(repoDir)
+    if (repoDir) cleanup(repoDir);
   }
 }
 
 async function main() {
-  console.log("🚀 コード品質評価開始（7軸 Claude分析）...")
+  console.log("🚀 コード品質評価開始（7軸 Claude分析）...");
 
-  const { data: products } = await supabase.schema("metago").from("products").select("*")
-  if (!products?.length) return
+  const { data: products } = await supabase
+    .schema("metago")
+    .from("products")
+    .select("*");
+  if (!products?.length) return;
 
-  const targetRepo = process.env.TARGET_REPO
+  const targetRepo = process.env.TARGET_REPO;
 
   for (const product of products) {
-    const repo = GO_REPOS[product.name]
-    if (!repo) continue
-    if (targetRepo && repo !== targetRepo) continue
-    await processRepo(product, repo)
+    const repo = GO_REPOS[product.name];
+    if (!repo) continue;
+    if (targetRepo && repo !== targetRepo) continue;
+    await processRepo(product, repo);
   }
 
-  console.log("\n✅ コード品質評価完了")
+  console.log("\n✅ コード品質評価完了");
 }
 
 main().catch((e) => {
-  console.error(e)
-  process.exit(1)
-})
+  console.error(e);
+  process.exit(1);
+});

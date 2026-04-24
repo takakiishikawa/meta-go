@@ -192,7 +192,7 @@ function ProductCard({
   ] as const;
   return (
     <Link href={`/products/${product.name}`}>
-      <div className="group rounded-lg border border-border bg-surface p-4 transition-shadow hover:shadow-md cursor-pointer">
+      <div className="group rounded-lg border border-border bg-surface p-4 transition-shadow hover:border border-border cursor-pointer">
         {/* Product Header */}
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -221,7 +221,7 @@ function ProductCard({
           <ScoreDonut score={score} size={64} color={color} />
           <div>
             <div
-              className="font-bold text-foreground"
+              className="font-semibold text-foreground"
               style={{
                 fontSize: "var(--text-2xl)",
                 fontWeight: "var(--font-weight-bold)",
