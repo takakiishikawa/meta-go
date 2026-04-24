@@ -301,6 +301,14 @@ const LAYER1_PACKAGES_TO_REMOVE = [
 async function fixLayer1Violations(
   repoDir: string,
 ): Promise<{ changed: boolean; details: string[] }> {
+  // go-design-system は DS自身なので Layer 1パッケージを直接使うのが正しい
+  if (TARGET_REPO === "go-design-system") {
+    console.log(
+      `  ⏭  go-design-system: Layer 1 パッケージはDS自身の実装のため除外`,
+    );
+    return { changed: false, details: [] };
+  }
+
   const details: string[] = [];
   let changed = false;
 
