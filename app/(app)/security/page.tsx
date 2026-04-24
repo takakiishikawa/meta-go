@@ -1,137 +1,233 @@
-import { createClient } from "@/lib/supabase/server"
-import { EmptyState, PageHeader } from "@takaki/go-design-system"
-import { ScoreDonut } from "@/components/score/score-donut"
-import { ShieldAlert } from "lucide-react"
-import { SecurityVulnerabilityTable } from "@/components/security/security-vulnerability-table"
-import { ProductSecurityEvalButton } from "@/components/security/product-security-eval-button"
+import { createClient } from "@/lib/supabase/server";
+import { EmptyState, PageHeader } from "@takaki/go-design-system";
+import { ScoreDonut } from "@/components/score/score-donut";
+import { ShieldAlert } from "lucide-react";
+import { SecurityVulnerabilityTable } from "@/components/security/security-vulnerability-table";
+import { ProductSecurityEvalButton } from "@/components/security/product-security-eval-button";
 
 const GO_COLORS: Record<string, string> = {
-  nativego:   "#0052CC",
-  carego:     "#00875A",
-  kenyakugo:  "#FF5630",
-  cookgo:     "#FF991F",
+  nativego: "#0052CC",
+  carego: "#00875A",
+  kenyakugo: "#FF5630",
+  cookgo: "#FF991F",
   physicalgo: "#6554C0",
-  taskgo:     "#00B8D9",
-}
+  taskgo: "#00B8D9",
+};
 
 const SEVERITY_COLORS: Record<string, string> = {
   critical: "#FF5630",
-  high:     "#FF8B00",
-  medium:   "#FF991F",
-  low:      "#36B37E",
-}
+  high: "#FF8B00",
+  medium: "#FF991F",
+  low: "#36B37E",
+};
 
-const SEVERITY_ORDER = ["critical", "high", "medium", "low"]
+const SEVERITY_ORDER = ["critical", "high", "medium", "low"];
 
 export default async function SecurityPage() {
-  const supabase = await createClient()
+  const supabase = await createClient();
 
-  const [{ data: items }, { data: scores }, { data: products }] = await Promise.all([
-    supabase
-      .schema("metago")
-      .from("security_items")
-      .select(`*, products(name, display_name, primary_color)`)
-      .order("created_at", { ascending: false }),
-    supabase
-      .schema("metago")
-      .from("scores_history")
-      .select(`product_id, score, collected_at`)
-      .eq("category", "security")
-      .order("collected_at", { ascending: false }),
-    supabase
-      .schema("metago")
-      .from("products")
-      .select("id, name, display_name, primary_color")
-      .order("priority"),
-  ])
+  const [{ data: items }, { data: scores }, { data: products }] =
+    await Promise.all([
+      supabase
+        .schema("metago")
+        .from("security_items")
+        .select(`*, products(name, display_name, primary_color)`)
+        .order("created_at", { ascending: false }),
+      supabase
+        .schema("metago")
+        .from("scores_history")
+        .select(`product_id, score, collected_at`)
+        .eq("category", "security")
+        .order("collected_at", { ascending: false }),
+      supabase
+        .schema("metago")
+        .from("products")
+        .select("id, name, display_name, primary_color")
+        .order("priority"),
+    ]);
 
-  const allItems    = items    ?? []
-  const allScores   = scores   ?? []
-  const allProducts = products ?? []
+  const allItems = items ?? [];
+  const allScores = scores ?? [];
+  const allProducts = products ?? [];
 
-  const latestScore: Record<string, number> = {}
+  const latestScore: Record<string, number> = {};
   for (const s of allScores) {
-    if (!(s.product_id in latestScore)) latestScore[s.product_id] = s.score
+    if (!(s.product_id in latestScore)) latestScore[s.product_id] = s.score;
   }
 
-  const sevCount: Record<string, Record<string, number>> = {}
+  const sevCount: Record<string, Record<string, number>> = {};
   for (const item of allItems) {
-    if (!sevCount[item.product_id]) sevCount[item.product_id] = {}
-    sevCount[item.product_id][item.severity] = (sevCount[item.product_id][item.severity] ?? 0) + 1
+    if (!sevCount[item.product_id]) sevCount[item.product_id] = {};
+    sevCount[item.product_id][item.severity] =
+      (sevCount[item.product_id][item.severity] ?? 0) + 1;
   }
 
-  const itemsByProduct: Record<string, typeof allItems> = {}
+  const itemsByProduct: Record<string, typeof allItems> = {};
   for (const item of allItems) {
-    if (!itemsByProduct[item.product_id]) itemsByProduct[item.product_id] = []
-    itemsByProduct[item.product_id].push(item)
+    if (!itemsByProduct[item.product_id]) itemsByProduct[item.product_id] = [];
+    itemsByProduct[item.product_id].push(item);
   }
 
-  const scoreValues = Object.values(latestScore)
-  const avgScore = scoreValues.length > 0
-    ? Math.round(scoreValues.reduce((a, b) => a + b, 0) / scoreValues.length)
-    : null
+  const scoreValues = Object.values(latestScore);
+  const avgScore =
+    scoreValues.length > 0
+      ? Math.round(scoreValues.reduce((a, b) => a + b, 0) / scoreValues.length)
+      : null;
 
-  const openItems      = allItems.filter(i => i.state !== "done")
-  const criticalCount  = openItems.filter(i => i.severity === "critical").length
-  const highCount      = openItems.filter(i => i.severity === "high").length
+  const openItems = allItems.filter((i) => i.state !== "done");
+  const criticalCount = openItems.filter(
+    (i) => i.severity === "critical",
+  ).length;
+  const highCount = openItems.filter((i) => i.severity === "high").length;
 
   return (
     <>
-      <PageHeader title="セキュリティ" description="脆弱性と依存関係のセキュリティ問題" />
+      <PageHeader
+        title="セキュリティ"
+        description="脆弱性と依存関係のセキュリティ問題"
+      />
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <div className="flex items-center gap-4 rounded-lg border border-border bg-surface p-4">
           <ScoreDonut score={avgScore} size={64} />
           <div>
-            <div className="text-2xl font-semibold text-foreground">{avgScore ?? "—"}</div>
-            <div style={{ fontSize: "var(--text-sm)", color: "var(--color-text-secondary)" }}>平均スコア</div>
+            <div className="text-2xl font-semibold text-foreground">
+              {avgScore ?? "—"}
+            </div>
+            <div
+              style={{
+                fontSize: "var(--text-sm)",
+                color: "var(--color-text-secondary)",
+              }}
+            >
+              平均スコア
+            </div>
           </div>
         </div>
-        <div className="rounded-lg border border-border p-4" style={{ borderColor: criticalCount > 0 ? "#FF563033" : undefined, backgroundColor: criticalCount > 0 ? "#FF563008" : "var(--color-surface)" }}>
-          <div className="text-2xl font-semibold" style={{ color: criticalCount > 0 ? "#FF5630" : "var(--color-foreground)" }}>{criticalCount}</div>
-          <div className="text-sm" style={{ color: criticalCount > 0 ? "#FF5630" : "var(--color-text-secondary)" }}>Critical</div>
+        <div
+          className="rounded-lg border border-border p-4"
+          style={{
+            borderColor: criticalCount > 0 ? "#FF563033" : undefined,
+            backgroundColor:
+              criticalCount > 0 ? "#FF563008" : "var(--color-surface)",
+          }}
+        >
+          <div
+            className="text-2xl font-semibold"
+            style={{
+              color: criticalCount > 0 ? "#FF5630" : "var(--color-foreground)",
+            }}
+          >
+            {criticalCount}
+          </div>
+          <div
+            className="text-sm"
+            style={{
+              color:
+                criticalCount > 0 ? "#FF5630" : "var(--color-text-secondary)",
+            }}
+          >
+            Critical
+          </div>
         </div>
-        <div className="rounded-lg border border-border p-4" style={{ borderColor: highCount > 0 ? "#FF8B0033" : undefined, backgroundColor: highCount > 0 ? "#FF8B0008" : "var(--color-surface)" }}>
-          <div className="text-2xl font-semibold" style={{ color: highCount > 0 ? "#FF8B00" : "var(--color-foreground)" }}>{highCount}</div>
-          <div className="text-sm" style={{ color: highCount > 0 ? "#FF8B00" : "var(--color-text-secondary)" }}>High</div>
+        <div
+          className="rounded-lg border border-border p-4"
+          style={{
+            borderColor: highCount > 0 ? "#FF8B0033" : undefined,
+            backgroundColor:
+              highCount > 0 ? "#FF8B0008" : "var(--color-surface)",
+          }}
+        >
+          <div
+            className="text-2xl font-semibold"
+            style={{
+              color: highCount > 0 ? "#FF8B00" : "var(--color-foreground)",
+            }}
+          >
+            {highCount}
+          </div>
+          <div
+            className="text-sm"
+            style={{
+              color: highCount > 0 ? "#FF8B00" : "var(--color-text-secondary)",
+            }}
+          >
+            High
+          </div>
         </div>
         <div className="rounded-lg border border-border bg-surface p-4">
-          <div className="text-2xl font-semibold text-foreground">{openItems.length}</div>
-          <div style={{ fontSize: "var(--text-sm)", color: "var(--color-text-secondary)" }}>未対応</div>
+          <div className="text-2xl font-semibold text-foreground">
+            {openItems.length}
+          </div>
+          <div
+            style={{
+              fontSize: "var(--text-sm)",
+              color: "var(--color-text-secondary)",
+            }}
+          >
+            未対応
+          </div>
         </div>
       </div>
 
       {allProducts.length > 0 && (
         <div className="rounded-lg border border-border overflow-hidden">
           <div className="px-4 py-3 border-b border-border bg-surface-subtle">
-            <span className="text-sm font-semibold text-foreground">プロダクト別スコア</span>
+            <span className="text-sm font-semibold text-foreground">
+              プロダクト別スコア
+            </span>
           </div>
           <table className="w-full">
             <thead>
               <tr className="border-b border-border">
-                {["プロダクト", "スコア", "評価", "Critical", "High", "Medium", "Low"].map(h => (
-                  <th key={h} className="px-4 py-2.5 text-left text-xs font-medium" style={{ color: "var(--color-text-secondary)" }}>{h}</th>
+                {[
+                  "プロダクト",
+                  "スコア",
+                  "評価",
+                  "Critical",
+                  "High",
+                  "Medium",
+                  "Low",
+                ].map((h) => (
+                  <th
+                    key={h}
+                    className="px-4 py-2.5 text-left text-xs font-medium"
+                    style={{ color: "var(--color-text-secondary)" }}
+                  >
+                    {h}
+                  </th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {allProducts.map(product => {
-                const color = product.primary_color || GO_COLORS[product.name] || "#6B7280"
-                const score = latestScore[product.id] ?? null
-                const sev = sevCount[product.id] ?? {}
-                const productItems = itemsByProduct[product.id] ?? []
+              {allProducts.map((product) => {
+                const color =
+                  product.primary_color || GO_COLORS[product.name] || "#6B7280";
+                const score = latestScore[product.id] ?? null;
+                const sev = sevCount[product.id] ?? {};
+                const productItems = itemsByProduct[product.id] ?? [];
                 return (
-                  <tr key={product.id} className="border-b border-border last:border-0 hover:bg-surface-subtle">
+                  <tr
+                    key={product.id}
+                    className="border-b border-border last:border-0 hover:bg-surface-subtle"
+                  >
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <div className="size-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
-                        <span className="text-sm text-foreground">{product.display_name}</span>
+                        <div
+                          className="size-2.5 rounded-full shrink-0"
+                          style={{ backgroundColor: color }}
+                        />
+                        <span className="text-sm text-foreground">
+                          {product.display_name}
+                        </span>
                       </div>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <ScoreDonut score={score} size={36} color={color} />
-                        <span className="text-sm font-semibold text-foreground">{score ?? "—"}</span>
+                        <span className="text-sm font-semibold text-foreground">
+                          {score ?? "—"}
+                        </span>
                       </div>
                     </td>
                     <td className="px-4 py-3">
@@ -141,18 +237,23 @@ export default async function SecurityPage() {
                         productName={product.display_name}
                       />
                     </td>
-                    {SEVERITY_ORDER.map(sev_key => (
+                    {SEVERITY_ORDER.map((sev_key) => (
                       <td key={sev_key} className="px-4 py-3">
                         <span
                           className="text-sm font-medium"
-                          style={{ color: (sev[sev_key] ?? 0) > 0 ? SEVERITY_COLORS[sev_key] : "var(--color-text-secondary)" }}
+                          style={{
+                            color:
+                              (sev[sev_key] ?? 0) > 0
+                                ? SEVERITY_COLORS[sev_key]
+                                : "var(--color-text-secondary)",
+                          }}
                         >
                           {sev[sev_key] ?? 0}
                         </span>
                       </td>
                     ))}
                   </tr>
-                )
+                );
               })}
             </tbody>
           </table>
@@ -168,11 +269,16 @@ export default async function SecurityPage() {
       ) : (
         <div className="flex flex-col gap-3">
           <span className="text-sm font-semibold text-foreground">
-            脆弱性一覧 <span style={{ color: "var(--color-text-secondary)", fontWeight: 400 }}>({allItems.length}件)</span>
+            脆弱性一覧{" "}
+            <span
+              style={{ color: "var(--color-text-secondary)", fontWeight: 400 }}
+            >
+              ({allItems.length}件)
+            </span>
           </span>
           <SecurityVulnerabilityTable items={allItems} />
         </div>
       )}
     </>
-  )
+  );
 }
