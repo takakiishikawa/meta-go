@@ -5,6 +5,7 @@ import { ScoreDonut } from "@/components/score/score-donut";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { SimpleDialog } from "@/components/ui/simple-dialog";
 import { BarChart3 } from "lucide-react";
+import { ScoreDelta } from "@/components/score/score-delta";
 
 export interface PerformanceMetric {
   id: string;
@@ -217,8 +218,10 @@ function EvalButton({
 
 export function PerformanceTable({
   metrics,
+  deltas = {},
 }: {
   metrics: PerformanceMetric[];
+  deltas?: Record<string, number | null>;
 }) {
   return (
     <div className="rounded-lg border border-border overflow-hidden">
@@ -295,6 +298,7 @@ export function PerformanceTable({
             const productName = m.products?.name ?? "";
             const color =
               m.products?.primary_color || GO_COLORS[productName] || "#6B7280";
+            const delta = (m as any).product_id != null ? (deltas[(m as any).product_id] ?? null) : null;
             return (
               <tr
                 key={m.id}
@@ -312,7 +316,10 @@ export function PerformanceTable({
                   </div>
                 </td>
                 <td className="px-4 py-3">
-                  <ScoreDonut score={m.score} size={40} color={color} />
+                  <div className="flex flex-col items-start gap-0.5">
+                    <ScoreDonut score={m.score} size={40} color={color} />
+                    <ScoreDelta delta={delta} />
+                  </div>
                 </td>
                 <td className="px-4 py-3 text-sm">{m.lcp ?? "—"}</td>
                 <td className="px-4 py-3 text-sm">{m.fid ?? "—"}</td>

@@ -4,6 +4,7 @@ import { ScoreDonut } from "@/components/score/score-donut";
 import { ShieldAlert } from "lucide-react";
 import { SecurityVulnerabilityTable } from "@/components/security/security-vulnerability-table";
 import { ProductSecurityEvalButton } from "@/components/security/product-security-eval-button";
+import { ScoreDelta } from "@/components/score/score-delta";
 
 const GO_COLORS: Record<string, string> = {
   nativego: "#0052CC",
@@ -25,8 +26,9 @@ const SEVERITY_ORDER = ["critical", "high", "medium", "low"];
 
 export default async function SecurityPage() {
   const supabase = await createClient();
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-  const [{ data: items }, { data: scores }, { data: products }] =
+  const [{ data: items }, { data: scores }, { data: products }, { data: weekAgoScores }] =
     await Promise.all([
       supabase
         .schema("metago")
@@ -44,6 +46,13 @@ export default async function SecurityPage() {
         .from("products")
         .select("id, name, display_name, primary_color")
         .order("priority"),
+      supabase
+        .schema("metago")
+        .from("scores_history")
+        .select("product_id, score")
+        .eq("category", "security")
+        .lte("collected_at", sevenDaysAgo)
+        .order("collected_at", { ascending: false }),
     ]);
 
   const allItems = items ?? [];
@@ -53,6 +62,11 @@ export default async function SecurityPage() {
   const latestScore: Record<string, number> = {};
   for (const s of allScores) {
     if (!(s.product_id in latestScore)) latestScore[s.product_id] = s.score;
+  }
+
+  const weekAgoScore: Record<string, number> = {};
+  for (const s of weekAgoScores ?? []) {
+    if (!(s.product_id in weekAgoScore)) weekAgoScore[s.product_id] = s.score;
   }
 
   const sevCount: Record<string, Record<string, number>> = {};
@@ -204,6 +218,8 @@ export default async function SecurityPage() {
                 const color =
                   product.primary_color || GO_COLORS[product.name] || "#6B7280";
                 const score = latestScore[product.id] ?? null;
+                const prev = weekAgoScore[product.id] ?? null;
+                const delta = score !== null && prev !== null ? score - prev : null;
                 const sev = sevCount[product.id] ?? {};
                 const productItems = itemsByProduct[product.id] ?? [];
                 return (
@@ -223,11 +239,14 @@ export default async function SecurityPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-3">
                         <ScoreDonut score={score} size={36} color={color} />
-                        <span className="text-sm font-semibold text-foreground">
-                          {score ?? "—"}
-                        </span>
+                        <div className="flex flex-col">
+                          <span className="text-sm font-semibold text-foreground">
+                            {score ?? "—"}
+                          </span>
+                          <ScoreDelta delta={delta} />
+                        </div>
                       </div>
                     </td>
                     <td className="px-4 py-3">

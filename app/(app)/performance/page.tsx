@@ -6,12 +6,21 @@ import { Gauge } from "lucide-react";
 
 export default async function PerformancePage() {
   const supabase = await createClient();
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-  const { data: metrics } = await supabase
-    .schema("metago")
-    .from("performance_metrics")
-    .select(`*, products(name, display_name, primary_color)`)
-    .order("measured_at", { ascending: false });
+  const [{ data: metrics }, { data: weekAgoMetrics }] = await Promise.all([
+    supabase
+      .schema("metago")
+      .from("performance_metrics")
+      .select(`*, products(name, display_name, primary_color)`)
+      .order("measured_at", { ascending: false }),
+    supabase
+      .schema("metago")
+      .from("performance_metrics")
+      .select("product_id, score")
+      .lte("measured_at", sevenDaysAgo)
+      .order("measured_at", { ascending: false }),
+  ]);
 
   const allMetrics = metrics ?? [];
   const latestPerProduct = allMetrics.reduce(
@@ -22,7 +31,19 @@ export default async function PerformancePage() {
     },
     {} as Record<string, (typeof allMetrics)[0]>,
   );
-  const latest = Object.values(latestPerProduct);
+  const latest = Object.values(latestPerProduct) as (typeof allMetrics)[0][];
+
+  const weekAgoScore: Record<string, number> = {};
+  for (const m of weekAgoMetrics ?? []) {
+    if (!(m.product_id in weekAgoScore)) weekAgoScore[m.product_id] = m.score;
+  }
+
+  const deltas: Record<string, number | null> = {};
+  for (const m of latest) {
+    const prev = weekAgoScore[m.product_id] ?? null;
+    deltas[m.product_id] = m.score !== null && prev !== null ? m.score - prev : null;
+  }
+
   const avgScore =
     latest.length > 0
       ? Math.round(
@@ -62,7 +83,7 @@ export default async function PerformancePage() {
           description="GitHub Actions cronが実行されるとデータが表示されます"
         />
       ) : (
-        <PerformanceTable metrics={latest as any[]} />
+        <PerformanceTable metrics={latest as any[]} deltas={deltas} />
       )}
     </>
   );
