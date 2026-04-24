@@ -29,14 +29,14 @@ const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const GO_REPOS: Record<string, string> = {
-  nativego:     "native-go",
-  carego:       "care-go",
-  kenyakugo:    "kenyaku-go",
-  cookgo:       "cook-go",
-  physicalgo:   "physical-go",
-  taskgo:       "task-go",
+  nativego: "native-go",
+  carego: "care-go",
+  kenyakugo: "kenyaku-go",
+  cookgo: "cook-go",
+  physicalgo: "physical-go",
+  taskgo: "task-go",
   designsystem: "go-design-system",
-  metago:       "meta-go",
+  metago: "meta-go",
 };
 
 interface OutdatedPackage {
@@ -52,7 +52,10 @@ interface OutdatedPackage {
 async function getOutdated(repoDir: string): Promise<OutdatedPackage[]> {
   let raw = "";
   try {
-    raw = execSync("npm outdated --json", { cwd: repoDir, stdio: "pipe" }).toString();
+    raw = execSync("npm outdated --json", {
+      cwd: repoDir,
+      stdio: "pipe",
+    }).toString();
   } catch (e: any) {
     raw = e.stdout?.toString() ?? "{}";
   }
@@ -63,15 +66,27 @@ async function getOutdated(repoDir: string): Promise<OutdatedPackage[]> {
   for (const [name, info] of Object.entries(data)) {
     if (!info.current || !info.latest) continue;
 
-    const cur = info.current.replace(/[^0-9.]/g, "").split(".").map(Number);
-    const lat = info.latest.replace(/[^0-9.]/g, "").split(".").map(Number);
+    const cur = info.current
+      .replace(/[^0-9.]/g, "")
+      .split(".")
+      .map(Number);
+    const lat = info.latest
+      .replace(/[^0-9.]/g, "")
+      .split(".")
+      .map(Number);
 
     let updateType: "patch" | "minor" | "major";
-    if (lat[0] > cur[0])      updateType = "major";
+    if (lat[0] > cur[0]) updateType = "major";
     else if (lat[1] > cur[1]) updateType = "minor";
-    else                      updateType = "patch";
+    else updateType = "patch";
 
-    results.push({ name, current: info.current, wanted: info.wanted ?? info.current, latest: info.latest, updateType });
+    results.push({
+      name,
+      current: info.current,
+      wanted: info.wanted ?? info.current,
+      latest: info.latest,
+      updateType,
+    });
   }
 
   return results;
@@ -98,7 +113,11 @@ async function fixBreakingChanges(
   for (let round = 1; round <= 2; round++) {
     let tscOutput = "";
     try {
-      execSync("npx tsc --noEmit", { cwd: repoDir, stdio: "pipe", timeout: 120_000 });
+      execSync("npx tsc --noEmit", {
+        cwd: repoDir,
+        stdio: "pipe",
+        timeout: 120_000,
+      });
       console.log(`  TSC (round ${round}): エラーなし`);
       return report;
     } catch (e: any) {
@@ -115,24 +134,24 @@ async function fixBreakingChanges(
       const [, rawPath, , message] = match;
       const relPath = rawPath.trim();
       // node_modules / .next は除外
-      if (relPath.includes("node_modules") || relPath.includes(".next")) continue;
+      if (relPath.includes("node_modules") || relPath.includes(".next"))
+        continue;
       if (!errorsByFile[relPath]) errorsByFile[relPath] = [];
       errorsByFile[relPath].push(message);
     }
 
     const fileCount = Object.keys(errorsByFile).length;
     const totalErrors = Object.values(errorsByFile).flat().length;
-    console.log(`  TSC (round ${round}): ${totalErrors}件のエラー (${fileCount}ファイル)`);
+    console.log(
+      `  TSC (round ${round}): ${totalErrors}件のエラー (${fileCount}ファイル)`,
+    );
 
     if (fileCount === 0) break;
 
     // ファイルごとに Claude で修正
     for (const [relPath, errors] of Object.entries(errorsByFile)) {
       // 絶対パス解決（TSCは実行時のcwdからの相対パスを返す）
-      const candidates = [
-        path.join(repoDir, relPath),
-        path.resolve(relPath),
-      ];
+      const candidates = [path.join(repoDir, relPath), path.resolve(relPath)];
       const fullPath = candidates.find((p) => fs.existsSync(p));
       if (!fullPath) {
         console.warn(`  ファイル未発見: ${relPath}`);
@@ -190,10 +209,13 @@ Fix all TypeScript errors by updating the code to match the new API of the updat
           console.log(`  ✓ 修正完了: ${relPath}`);
           break;
         } catch (e: any) {
-          const isRateLimit = e?.status === 429 || e?.error?.error?.type === "rate_limit_error";
+          const isRateLimit =
+            e?.status === 429 || e?.error?.error?.type === "rate_limit_error";
           if (isRateLimit && attempt < MAX_RETRIES) {
             const wait = 60_000 * attempt;
-            console.warn(`  レート制限 (${attempt}/${MAX_RETRIES}回目)、${wait / 1000}秒待機...`);
+            console.warn(
+              `  レート制限 (${attempt}/${MAX_RETRIES}回目)、${wait / 1000}秒待機...`,
+            );
             await new Promise((r) => setTimeout(r, wait));
             continue;
           }
@@ -208,13 +230,20 @@ Fix all TypeScript errors by updating the code to match the new API of the updat
     if (round === 2) {
       // 2ラウンド後も残っているエラー数をカウント
       try {
-        execSync("npx tsc --noEmit", { cwd: repoDir, stdio: "pipe", timeout: 120_000 });
+        execSync("npx tsc --noEmit", {
+          cwd: repoDir,
+          stdio: "pipe",
+          timeout: 120_000,
+        });
       } catch (e: any) {
-        const remaining = (e.stdout?.toString() ?? "").split("\n")
+        const remaining = (e.stdout?.toString() ?? "")
+          .split("\n")
           .filter((l: string) => l.includes(": error TS")).length;
         report.remainingErrors = remaining;
         if (remaining > 0) {
-          console.warn(`  ⚠️ ${remaining}件のTSエラーが残っています（PRに記載）`);
+          console.warn(
+            `  ⚠️ ${remaining}件のTSエラーが残っています（PRに記載）`,
+          );
         }
       }
     }
@@ -237,7 +266,10 @@ async function processRepo(product: any, repo: string) {
     try {
       execSync("npm ci --prefer-offline", { cwd: repoDir, stdio: "pipe" });
     } catch {
-      execSync("npm install --legacy-peer-deps", { cwd: repoDir, stdio: "pipe" });
+      execSync("npm install --legacy-peer-deps", {
+        cwd: repoDir,
+        stdio: "pipe",
+      });
     }
 
     const outdated = await getOutdated(repoDir);
@@ -246,25 +278,30 @@ async function processRepo(product: any, repo: string) {
     for (const pkg of outdated) {
       await supabase.schema("metago").from("dependency_items").upsert(
         {
-          product_id:      product.id,
-          package_name:    pkg.name,
+          product_id: product.id,
+          package_name: pkg.name,
           current_version: pkg.current,
-          latest_version:  pkg.latest,
-          update_type:     pkg.updateType,
-          state:           "new",
+          latest_version: pkg.latest,
+          update_type: pkg.updateType,
+          state: "new",
         },
         { onConflict: "product_id,package_name", ignoreDuplicates: false },
       );
     }
 
-    const patchMinor   = outdated.filter((p) => p.updateType === "patch" || p.updateType === "minor");
+    const patchMinor = outdated.filter(
+      (p) => p.updateType === "patch" || p.updateType === "minor",
+    );
     const majorUpdates = outdated.filter((p) => p.updateType === "major");
 
     // ── L1: patch/minor 自動更新 ──────────────────────────
     if (patchMinor.length > 0) {
       const packages = patchMinor.map((p) => `${p.name}@${p.latest}`).join(" ");
       try {
-        execSync(`npm install ${packages} --save`, { cwd: repoDir, stdio: "pipe" });
+        execSync(`npm install ${packages} --save`, {
+          cwd: repoDir,
+          stdio: "pipe",
+        });
       } catch (e) {
         console.warn(`  npm install failed for patch/minor:`, e);
       }
@@ -285,12 +322,14 @@ async function processRepo(product: any, repo: string) {
 ${patchMinor.map((p) => `- \`${p.name}\`: ${p.current} → ${p.latest} (${p.updateType})`).join("\n")}
 
 > L1: 自動マージ対象。コードロジックへの変更はありません。`,
-            head:   branch,
+            head: branch,
             labels: ["metago-auto-merge"],
           });
 
           for (const pkg of patchMinor) {
-            await supabase.schema("metago").from("dependency_items")
+            await supabase
+              .schema("metago")
+              .from("dependency_items")
               .update({ state: "done" })
               .eq("product_id", product.id)
               .eq("package_name", pkg.name);
@@ -308,19 +347,31 @@ ${patchMinor.map((p) => `- \`${p.name}\`: ${p.current} → ${p.latest} (${p.upda
         try {
           execSync("npm ci --prefer-offline", { cwd: majorDir, stdio: "pipe" });
         } catch {
-          execSync("npm install --legacy-peer-deps", { cwd: majorDir, stdio: "pipe" });
+          execSync("npm install --legacy-peer-deps", {
+            cwd: majorDir,
+            stdio: "pipe",
+          });
         }
 
-        const packages = majorUpdates.map((p) => `${p.name}@${p.latest}`).join(" ");
+        const packages = majorUpdates
+          .map((p) => `${p.name}@${p.latest}`)
+          .join(" ");
         console.log(`  major 更新インストール: ${packages}`);
         try {
-          execSync(`npm install ${packages} --save`, { cwd: majorDir, stdio: "pipe" });
+          execSync(`npm install ${packages} --save`, {
+            cwd: majorDir,
+            stdio: "pipe",
+          });
         } catch (e) {
           console.warn(`  npm install failed for major:`, e);
         }
 
         // Claude で破壊的変更を修正
-        const fixReport = await fixBreakingChanges(majorDir, majorUpdates, anthropic);
+        const fixReport = await fixBreakingChanges(
+          majorDir,
+          majorUpdates,
+          anthropic,
+        );
 
         // ESLint + Prettier で仕上げ
         try {
@@ -330,7 +381,11 @@ ${patchMinor.map((p) => `- \`${p.name}\`: ${p.current} → ${p.latest} (${p.upda
           );
         } catch {}
         try {
-          execSync(`npx prettier --write "**/*.{ts,tsx,js,json,css}"`, { cwd: majorDir, stdio: "pipe", timeout: 60_000 });
+          execSync(`npx prettier --write "**/*.{ts,tsx,js,json,css}"`, {
+            cwd: majorDir,
+            stdio: "pipe",
+            timeout: 60_000,
+          });
         } catch {}
 
         if (hasChanges(majorDir)) {
@@ -342,13 +397,15 @@ ${patchMinor.map((p) => `- \`${p.name}\`: ${p.current} → ${p.latest} (${p.upda
           );
 
           if (pushed) {
-            const fixedSection = fixReport.filesFixed.length > 0
-              ? `\n**Claude による自動修正ファイル (${fixReport.filesFixed.length}件)**\n${fixReport.filesFixed.map((f) => `- \`${f}\``).join("\n")}`
-              : "";
+            const fixedSection =
+              fixReport.filesFixed.length > 0
+                ? `\n**Claude による自動修正ファイル (${fixReport.filesFixed.length}件)**\n${fixReport.filesFixed.map((f) => `- \`${f}\``).join("\n")}`
+                : "";
 
-            const warningSection = fixReport.remainingErrors > 0
-              ? `\n\n> ⚠️ ${fixReport.remainingErrors}件のTypeScriptエラーが残っています。CIで確認してください。`
-              : "";
+            const warningSection =
+              fixReport.remainingErrors > 0
+                ? `\n\n> ⚠️ ${fixReport.remainingErrors}件のTypeScriptエラーが残っています。CIで確認してください。`
+                : "";
 
             await createAndMergePR(repo, {
               title: `🤖 [MetaGo L1] major 依存更新 + コード修正 — ${product.display_name}`,
@@ -359,12 +416,14 @@ ${majorUpdates.map((p) => `- \`${p.name}\`: ${p.current} → ${p.latest} ⬆️ 
 ${fixedSection}${warningSection}
 
 > L1: 自動マージ対象。破壊的変更をコード修正込みで適用しています。`,
-              head:   branch,
+              head: branch,
               labels: ["metago-auto-merge"],
             });
 
             for (const pkg of majorUpdates) {
-              await supabase.schema("metago").from("dependency_items")
+              await supabase
+                .schema("metago")
+                .from("dependency_items")
                 .update({ state: "done" })
                 .eq("product_id", product.id)
                 .eq("package_name", pkg.name);
@@ -378,16 +437,21 @@ ${fixedSection}${warningSection}
       }
     }
 
-    console.log(`  ✓ patch/minor: ${patchMinor.length}, major: ${majorUpdates.length}`);
+    console.log(
+      `  ✓ patch/minor: ${patchMinor.length}, major: ${majorUpdates.length}`,
+    );
   } catch (e) {
     console.error(`  ❌ Failed: ${repo}`, e);
-    await supabase.schema("metago").from("execution_logs").insert({
-      product_id:  product.id,
-      category:    "dependency",
-      title:       `依存チェック失敗: ${repo}`,
-      description: String(e),
-      state:       "failed",
-    });
+    await supabase
+      .schema("metago")
+      .from("execution_logs")
+      .insert({
+        product_id: product.id,
+        category: "dependency",
+        title: `依存チェック失敗: ${repo}`,
+        description: String(e),
+        state: "failed",
+      });
   } finally {
     if (repoDir) cleanup(repoDir);
   }

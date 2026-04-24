@@ -6,7 +6,9 @@ import { Gauge } from "lucide-react";
 
 export default async function PerformancePage() {
   const supabase = await createClient();
-  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const sevenDaysAgo = new Date(
+    Date.now() - 7 * 24 * 60 * 60 * 1000,
+  ).toISOString();
 
   const [{ data: metrics }, { data: weekAgoMetrics }] = await Promise.all([
     supabase
@@ -41,7 +43,8 @@ export default async function PerformancePage() {
   const deltas: Record<string, number | null> = {};
   for (const m of latest) {
     const prev = weekAgoScore[m.product_id] ?? null;
-    deltas[m.product_id] = m.score !== null && prev !== null ? m.score - prev : null;
+    deltas[m.product_id] =
+      m.score !== null && prev !== null ? m.score - prev : null;
   }
 
   const avgScore =

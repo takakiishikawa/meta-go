@@ -26,34 +26,40 @@ const SEVERITY_ORDER = ["critical", "high", "medium", "low"];
 
 export default async function SecurityPage() {
   const supabase = await createClient();
-  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const sevenDaysAgo = new Date(
+    Date.now() - 7 * 24 * 60 * 60 * 1000,
+  ).toISOString();
 
-  const [{ data: items }, { data: scores }, { data: products }, { data: weekAgoScores }] =
-    await Promise.all([
-      supabase
-        .schema("metago")
-        .from("security_items")
-        .select(`*, products(name, display_name, primary_color)`)
-        .order("created_at", { ascending: false }),
-      supabase
-        .schema("metago")
-        .from("scores_history")
-        .select(`product_id, score, collected_at`)
-        .eq("category", "security")
-        .order("collected_at", { ascending: false }),
-      supabase
-        .schema("metago")
-        .from("products")
-        .select("id, name, display_name, primary_color")
-        .order("priority"),
-      supabase
-        .schema("metago")
-        .from("scores_history")
-        .select("product_id, score")
-        .eq("category", "security")
-        .lte("collected_at", sevenDaysAgo)
-        .order("collected_at", { ascending: false }),
-    ]);
+  const [
+    { data: items },
+    { data: scores },
+    { data: products },
+    { data: weekAgoScores },
+  ] = await Promise.all([
+    supabase
+      .schema("metago")
+      .from("security_items")
+      .select(`*, products(name, display_name, primary_color)`)
+      .order("created_at", { ascending: false }),
+    supabase
+      .schema("metago")
+      .from("scores_history")
+      .select(`product_id, score, collected_at`)
+      .eq("category", "security")
+      .order("collected_at", { ascending: false }),
+    supabase
+      .schema("metago")
+      .from("products")
+      .select("id, name, display_name, primary_color")
+      .order("priority"),
+    supabase
+      .schema("metago")
+      .from("scores_history")
+      .select("product_id, score")
+      .eq("category", "security")
+      .lte("collected_at", sevenDaysAgo)
+      .order("collected_at", { ascending: false }),
+  ]);
 
   const allItems = items ?? [];
   const allScores = scores ?? [];
@@ -219,7 +225,8 @@ export default async function SecurityPage() {
                   product.primary_color || GO_COLORS[product.name] || "#6B7280";
                 const score = latestScore[product.id] ?? null;
                 const prev = weekAgoScore[product.id] ?? null;
-                const delta = score !== null && prev !== null ? score - prev : null;
+                const delta =
+                  score !== null && prev !== null ? score - prev : null;
                 const sev = sevCount[product.id] ?? {};
                 const productItems = itemsByProduct[product.id] ?? [];
                 return (
