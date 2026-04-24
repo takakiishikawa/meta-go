@@ -27,7 +27,7 @@ function LoginContent() {
           className="flex items-center justify-center rounded-md p-2"
           style={{ backgroundColor: "var(--color-primary)" }}
         >
-          <span className="text-sm font-bold text-white">M</span>
+          <span className="text-sm font-semibold text-white">M</span>
         </div>
       }
       tagline="PSF Product Manager — goシリーズの自律管理プラットフォーム"

@@ -58,7 +58,7 @@ export default async function ExecLogPage() {
       {/* Stats */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="rounded-lg border border-border bg-surface p-4">
-          <div className="text-2xl font-bold text-foreground">
+          <div className="text-2xl font-semibold text-foreground">
             {allLogs.length}
           </div>
           <div
@@ -71,13 +71,13 @@ export default async function ExecLogPage() {
           </div>
         </div>
         <div className="rounded-lg border border-green-200 bg-green-50 p-4 dark:border-green-800 dark:bg-green-950">
-          <div className="text-2xl font-bold text-green-600">
+          <div className="text-2xl font-semibold text-green-600">
             {allLogs.filter((l) => l.state === "merged").length}
           </div>
           <div className="text-sm text-green-600">マージ済み</div>
         </div>
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950">
-          <div className="text-2xl font-bold text-amber-600">
+          <div className="text-2xl font-semibold text-amber-600">
             {allLogs.filter((l) => l.state === "pending").length}
           </div>
           <div className="text-sm text-amber-600">承認待ち</div>

@@ -30,7 +30,7 @@ export function SimpleDialog({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-2xl rounded-xl border border-border bg-surface shadow-2xl flex flex-col max-h-[85vh]">
+      <div className="relative z-10 w-full max-w-2xl rounded-lg border border-border bg-surface border border-border flex flex-col max-h-[85vh]">
         <div className="flex items-start justify-between gap-4 px-6 py-4 border-b border-border shrink-0">
           <h2 className="text-base font-semibold text-foreground">{title}</h2>
           <button

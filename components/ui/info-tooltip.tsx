@@ -15,7 +15,7 @@ export function InfoTooltip({ text }: { text: string }) {
       />
       {show && (
         <span
-          className="absolute bottom-5 left-1/2 -translate-x-1/2 z-50 w-56 rounded-lg border border-border bg-surface p-2.5 text-xs leading-relaxed shadow-lg whitespace-normal"
+          className="absolute bottom-5 left-1/2 -translate-x-1/2 z-50 w-56 rounded-lg border border-border bg-surface p-2.5 text-xs leading-relaxed border border-border whitespace-normal"
           style={{ color: "var(--color-text-secondary)" }}
         >
           {text}
