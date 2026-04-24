@@ -28,37 +28,43 @@ export default async function QualityPage({
   const page = Math.max(1, parseInt(pageParam ?? "1", 10));
 
   const supabase = await createClient();
-  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const sevenDaysAgo = new Date(
+    Date.now() - 7 * 24 * 60 * 60 * 1000,
+  ).toISOString();
 
-  const [{ data: items }, { data: scores }, { data: products }, { data: weekAgoScores }] =
-    await Promise.all([
-      supabase
-        .schema("metago")
-        .from("quality_items")
-        .select(`*, products(name, display_name, primary_color)`)
-        .not("category", "in", '("Performance","パフォーマンス")')
-        .order("created_at", { ascending: false }),
-      supabase
-        .schema("metago")
-        .from("scores_history")
-        .select(
-          `product_id, score, collected_at, products(name, display_name, primary_color)`,
-        )
-        .eq("category", "quality")
-        .order("collected_at", { ascending: false }),
-      supabase
-        .schema("metago")
-        .from("products")
-        .select("id, name, display_name, primary_color")
-        .order("priority"),
-      supabase
-        .schema("metago")
-        .from("scores_history")
-        .select("product_id, score")
-        .eq("category", "quality")
-        .lte("collected_at", sevenDaysAgo)
-        .order("collected_at", { ascending: false }),
-    ]);
+  const [
+    { data: items },
+    { data: scores },
+    { data: products },
+    { data: weekAgoScores },
+  ] = await Promise.all([
+    supabase
+      .schema("metago")
+      .from("quality_items")
+      .select(`*, products(name, display_name, primary_color)`)
+      .not("category", "in", '("Performance","パフォーマンス")')
+      .order("created_at", { ascending: false }),
+    supabase
+      .schema("metago")
+      .from("scores_history")
+      .select(
+        `product_id, score, collected_at, products(name, display_name, primary_color)`,
+      )
+      .eq("category", "quality")
+      .order("collected_at", { ascending: false }),
+    supabase
+      .schema("metago")
+      .from("products")
+      .select("id, name, display_name, primary_color")
+      .order("priority"),
+    supabase
+      .schema("metago")
+      .from("scores_history")
+      .select("product_id, score")
+      .eq("category", "quality")
+      .lte("collected_at", sevenDaysAgo)
+      .order("collected_at", { ascending: false }),
+  ]);
 
   const allItems = items ?? [];
   const allScores = scores ?? [];
@@ -178,7 +184,8 @@ export default async function QualityPage({
                   product.primary_color || GO_COLORS[product.name] || "#6B7280";
                 const score = latestScore[product.id] ?? null;
                 const prev = weekAgoScore[product.id] ?? null;
-                const delta = score !== null && prev !== null ? score - prev : null;
+                const delta =
+                  score !== null && prev !== null ? score - prev : null;
                 const productItems = itemsByProduct[product.id] ?? [];
                 return (
                   <tr
