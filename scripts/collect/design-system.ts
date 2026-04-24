@@ -4,10 +4,10 @@
  * 判定基準: takakiishikawa/go-design-system の仕様に基づく
  *   - カラー: --color-* CSS変数を使用 (Tailwindパレット直書き禁止)
  *   - テキスト: --text-* CSS変数を使用 (px直書き禁止)
- *   - 角丸: rounded-xl 以上禁止 (--radius-lg = 6px が上限)
+ *   - 角丸: rounded-lg 以上禁止 (--radius-lg = 6px が上限)
  *   - Shadow: shadow-* 系禁止 (border + --color-border-* を使う)
  *   - コンポーネント: DSコンポーネントを使用 (<button>/<input>等の素HTML禁止)
- *   - フォント: font-bold 禁止 (font-semibold を使う)
+ *   - フォント: font-semibold 禁止 (font-semibold を使う)
  *   - DesignTokens: app/layout.tsx での使用を推奨
  *
  * 環境変数:
@@ -178,17 +178,17 @@ const VIOLATION_RULES: ViolationRule[] = [
   {
     category: "スタイル/角丸超過",
     severity: "medium",
-    // rounded-xl, rounded-2xl, rounded-3xl (DS上限はrounded-lg=6px)
+    // rounded-lg, rounded-lg, rounded-lg (DS上限はrounded-lg=6px)
     pattern: /rounded-(?:xl|2xl|3xl)\b/g,
     description:
-      "go-design-system の角丸上限(--radius-lg=6px)を超えている。rounded-xl以上は禁止",
-    rule: "rounded-xl以上はrounded-md(4px)またはrounded-lg(6px)に変更してください",
+      "go-design-system の角丸上限(--radius-lg=6px)を超えている。rounded-lg以上は禁止",
+    rule: "rounded-lg以上はrounded-md(4px)またはrounded-lg(6px)に変更してください",
     penaltyPerHit: 2,
   },
   {
     category: "スタイル/shadow使用",
     severity: "medium",
-    // shadow-sm, shadow-md, shadow-lg, shadow-xl, shadow-2xl
+    // border border-border, border border-border, border border-border, border border-border, border border-border
     pattern: /\bshadow-(?:sm|md|lg|xl|2xl)\b/g,
     description: "DSの設計指針では shadowより border+borderColor を優先する",
     rule: "shadow-*はborder + var(--color-border)に置き換えることを検討してください",
@@ -217,13 +217,13 @@ const VIOLATION_RULES: ViolationRule[] = [
 
   // ── 低優先度: フォント ────────────────────────────────
   {
-    category: "スタイル/font-bold使用",
+    category: "スタイル/font-semibold使用",
     severity: "low",
-    // font-bold (DS設計指針: semibold優先)
+    // font-semibold (DS設計指針: semibold優先)
     pattern: /\bfont-bold\b/g,
     description:
-      "go-design-systemの設計指針ではfont-bold(700)よりfont-semibold(600)を優先",
-    rule: "font-bold→font-semiboldに変更することを検討してください",
+      "go-design-systemの設計指針ではfont-semibold(700)よりfont-semibold(600)を優先",
+    rule: "font-semibold→font-semiboldに変更することを検討してください",
     penaltyPerHit: 1,
   },
 ];
@@ -478,11 +478,11 @@ async function analyzeRepo(product: any, repo: string) {
         "1. Tailwindパレットカラー(text-blue-500等) → go-design-systemのCSS変数(var(--color-*))に変換",
         "2. style属性の#xxxxxx → var(--color-*)に変換",
         "3. <button>/<input>/<select>/<textarea> → go-design-systemの<Button>/<Input>/<Select>/<Textarea>に変換 (import追加も)",
-        "4. rounded-xl/2xl/3xl → rounded-lg に変換",
-        "5. shadow-sm/md/lg/xl/2xl → border border-border クラスに変換",
+        "4. rounded-lg/2xl/3xl → rounded-lg に変換",
+        "5. border border-border/md/lg/xl/2xl → border border-border クラスに変換",
         "6. text-[12px]等の任意フォントサイズ → var(--text-xs)/var(--text-sm)等のDS変数に変換",
         "7. style属性のfontSize px/rem → var(--text-*)に変換",
-        "8. font-bold → font-semibold に変換",
+        "8. font-semibold → font-semibold に変換",
         "import元: @takaki/go-design-system",
       ].join("\n");
 
@@ -517,10 +517,10 @@ ${categorySummary.map((s) => `- ${s}`).join("\n") || "- 違反なし"}
 - Tailwindパレットカラー → var(--color-*) CSS変数
 - style属性ハードコードカラー → var(--color-*)
 - 素のHTML要素(<button>/<input>/<select>/<textarea>) → DSコンポーネント
-- rounded-xl/2xl/3xl → rounded-lg
+- rounded-lg/2xl/3xl → rounded-lg
 - shadow-* → border border-border
 - text-[Xpx] → var(--text-*)
-- font-bold → font-semibold
+- font-semibold → font-semibold
 
 修正ファイル数: ${patches.length} 件
 

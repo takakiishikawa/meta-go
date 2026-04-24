@@ -41,7 +41,7 @@ export default async function PerformancePage() {
       <div className="flex items-center gap-4 rounded-lg border border-border bg-surface p-4 w-fit">
         <ScoreDonut score={avgScore} size={72} />
         <div>
-          <div className="text-2xl font-bold text-foreground">
+          <div className="text-2xl font-semibold text-foreground">
             {avgScore ?? "—"}
           </div>
           <div
