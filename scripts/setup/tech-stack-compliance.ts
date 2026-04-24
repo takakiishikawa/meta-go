@@ -325,6 +325,27 @@ function updatePackageLock(repoDir: string) {
   }
 }
 
+// ── GitHub: 既存PR取得 ────────────────────────────────────────
+
+async function findExistingPR(repo: string, branch: string): Promise<{ url: string; number: number; nodeId: string } | null> {
+  const GH_PAT = process.env.GH_PAT || process.env.GITHUB_TOKEN!
+  const res = await fetch(
+    `https://api.github.com/repos/${GITHUB_OWNER}/${repo}/pulls?head=${GITHUB_OWNER}:${branch}&state=open`,
+    {
+      headers: {
+        Authorization: `Bearer ${GH_PAT}`,
+        Accept: "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+      },
+    }
+  )
+  if (!res.ok) return null
+  const prs = await res.json()
+  if (!Array.isArray(prs) || prs.length === 0) return null
+  const pr = prs[0]
+  return { url: pr.html_url, number: pr.number, nodeId: pr.node_id }
+}
+
 // ── GitHub: auto-merge 有効化 ─────────────────────────────────
 
 async function enableAutoMerge(prNodeId: string) {
@@ -461,9 +482,11 @@ async function run() {
       return `- [${done ? "x" : " "}] ${label}`
     }).join("\n")
 
-    const pr = await createPR(TARGET_REPO, {
-      title: "chore: Tech stack compliance to v2.0 policy",
-      body: `## MetaGoが自動生成した技術スタック刷新PRです。
+    let pr: { url: string; number: number; nodeId: string }
+    try {
+      pr = await createPR(TARGET_REPO, {
+        title: "chore: Tech stack compliance to v2.0 policy",
+        body: `## MetaGoが自動生成した技術スタック刷新PRです。
 
 ## 実施した修正
 ${fixesChecklist}
@@ -477,11 +500,23 @@ ${appliedFixes.map((f) => `- ${f}`).join("\n")}
 
 ---
 *このPRはMetaGoが自動作成しました*`,
-      head: branch,
-      labels: ["tech-stack-compliance", "metago-auto"],
-    })
-
-    console.log(`  📋 PR作成: ${pr.url}`)
+        head: branch,
+        labels: ["tech-stack-compliance", "metago-auto"],
+      })
+      console.log(`  📋 PR作成: ${pr.url}`)
+    } catch (e: any) {
+      if (e?.message?.includes("already exists")) {
+        const existing = await findExistingPR(TARGET_REPO, branch)
+        if (existing) {
+          pr = existing
+          console.log(`  📋 既存PR使用: ${pr.url}`)
+        } else {
+          throw e
+        }
+      } else {
+        throw e
+      }
+    }
 
     if (AUTO_MERGE) {
       await enableAutoMerge(pr.nodeId)
