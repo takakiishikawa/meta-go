@@ -219,8 +219,12 @@ CREATE TABLE IF NOT EXISTS metago.api_keys (
   notes         TEXT,                   -- 備考（手動編集可）
   auto_detected BOOLEAN NOT NULL DEFAULT true,
   last_seen_at  TIMESTAMPTZ,            -- 最後にソースコードで検出された日時
+  cost_usd      NUMERIC,               -- 今月の利用コスト（自動収集、取得不可の場合はNULL）
+  cost_period   TEXT,                   -- コスト対象月 'YYYY-MM'
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+-- Migration: ALTER TABLE metago.api_keys ADD COLUMN IF NOT EXISTS cost_usd NUMERIC;
+-- Migration: ALTER TABLE metago.api_keys ADD COLUMN IF NOT EXISTS cost_period TEXT;
 
 -- ============================================================
 -- Indexes

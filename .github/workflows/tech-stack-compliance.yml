@@ -1,0 +1,63 @@
+name: Tech Stack Compliance v2.0
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_repos:
+        description: 'Target repos (comma-separated or "all")'
+        required: false
+        default: 'all'
+      target_fixes:
+        description: 'Fixes to apply: recharts-dynamic, vercel-analytics, remove-unused, layer2-missing, remove-openai, all'
+        required: false
+        default: 'all'
+      dry_run:
+        description: 'Dry run — show changes only, no PR creation'
+        type: boolean
+        default: true
+      auto_merge:
+        description: 'Enable auto-merge on created PRs (use only after dry_run review)'
+        type: boolean
+        default: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  compliance:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        repo:
+          - native-go
+          - care-go
+          - kenyaku-go
+          - cook-go
+          - physical-go
+          - task-go
+          - go-design-system
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Tech stack compliance (${{ matrix.repo }})
+        run: npx tsx scripts/setup/tech-stack-compliance.ts
+        env:
+          TARGET_REPO: ${{ matrix.repo }}
+          TARGET_REPOS: ${{ inputs.target_repos }}
+          TARGET_FIXES: ${{ inputs.target_fixes }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          AUTO_MERGE: ${{ inputs.auto_merge }}
+          GH_PAT: ${{ secrets.GH_PAT }}
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+          GITHUB_OWNER: ${{ secrets.GITHUB_OWNER }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
