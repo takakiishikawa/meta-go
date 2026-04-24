@@ -7,10 +7,11 @@
  *   TARGET_FIXES   — "all" または カンマ区切り (recharts-dynamic, vercel-analytics, remove-unused, layer2-missing, remove-openai)
  *   DRY_RUN        — "true" の場合、PR を作成せずログのみ
  *   AUTO_MERGE     — "true" の場合、PR に auto-merge を設定
+ *
+ * 認証: CLAUDE_CODE_OAUTH_TOKEN (Max プラン内、Anthropic API 課金なし)
  */
 
-import Anthropic from "@anthropic-ai/sdk"
-import { execSync } from "child_process"
+import { execSync, spawnSync } from "child_process"
 import * as fs from "fs"
 import * as path from "path"
 import {
@@ -27,8 +28,6 @@ const DRY_RUN = process.env.DRY_RUN === "true"
 const AUTO_MERGE = process.env.AUTO_MERGE === "true"
 const GITHUB_OWNER = process.env.GITHUB_OWNER || "takakiishikawa"
 const GITHUB_RUN_ID = process.env.GITHUB_RUN_ID || ""
-
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
 // ── ユーティリティ ────────────────────────────────────────────
 
@@ -55,7 +54,7 @@ function findFiles(dir: string, exts: string[]): string[] {
   const walk = (d: string) => {
     const entries = fs.readdirSync(d, { withFileTypes: true })
     for (const e of entries) {
-      if (e.name === "node_modules" || e.name === ".git" || e.name === ".next") continue
+      if (["node_modules", ".git", ".next", "dist", "out"].includes(e.name)) continue
       const full = path.join(d, e.name)
       if (e.isDirectory()) walk(full)
       else if (exts.some((ext) => e.name.endsWith(ext))) results.push(full)
@@ -66,102 +65,91 @@ function findFiles(dir: string, exts: string[]): string[] {
 }
 
 function hasImport(content: string, pkg: string): boolean {
-  return new RegExp(`from\\s+['"]${pkg.replace("/", "\\/")}['"]`).test(content) ||
-    new RegExp(`require\\s*\\(\\s*['"]${pkg.replace("/", "\\/")}['"]`).test(content)
+  const escaped = pkg.replace(/\//g, "\\/").replace(/@/g, "\\@")
+  return (
+    new RegExp(`from\\s+['"]${escaped}['"]`).test(content) ||
+    new RegExp(`require\\s*\\(\\s*['"]${escaped}['"]`).test(content)
+  )
 }
 
-async function fixWithClaude(
-  fileName: string,
-  content: string,
-  instruction: string,
-): Promise<string | null> {
-  if (content.length > 80_000) {
-    console.warn(`  ${fileName} が大きすぎるためスキップ (${content.length} chars)`)
-    return null
-  }
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    try {
-      const msg = await anthropic.messages.create({
-        model: "claude-sonnet-4-6",
-        max_tokens: 8096,
-        messages: [{
-          role: "user",
-          content: `${instruction}
+// ── Claude CLI 呼び出し ────────────────────────────────────────
 
-ファイル名: ${fileName}
-
-現在のファイル内容:
-\`\`\`tsx
-${content}
-\`\`\`
-
-修正後のファイル内容のみを返してください（説明なし、マークダウンのコードフェンスなし）。`,
-        }],
-      })
-      const text = msg.content[0]
-      if (text.type !== "text") return null
-      return text.text.replace(/^```[^\n]*\n/, "").replace(/\n```$/, "").trim()
-    } catch (e: any) {
-      if ((e?.status === 429) && attempt < 3) {
-        const wait = 60_000 * attempt
-        console.warn(`  Rate limit (attempt ${attempt}/3), ${wait / 1000}s 待機...`)
-        await new Promise((r) => setTimeout(r, wait))
-        continue
-      }
-      console.warn(`  Claude API エラー (${fileName}):`, e?.message)
-      return null
+function runClaude(repoDir: string, prompt: string): boolean {
+  console.log(`  🤖 Claude CLI を実行中...`)
+  const result = spawnSync(
+    "claude",
+    ["--dangerously-skip-permissions", "-p", prompt],
+    {
+      cwd: repoDir,
+      env: { ...process.env },
+      stdio: "inherit",
+      timeout: 180_000,
     }
+  )
+  if (result.status !== 0) {
+    console.warn(`  ⚠️  Claude CLI 終了コード: ${result.status}`)
+    return false
   }
-  return null
+  return true
 }
 
 // ── Fix 1: recharts dynamic import化 ──────────────────────────
 
-async function fixRechartsImports(repoDir: string): Promise<{ changed: boolean; files: string[] }> {
+function detectRechartsFiles(repoDir: string): string[] {
   const tsFiles = findFiles(repoDir, [".tsx", ".ts"])
-  const changedFiles: string[] = []
+  return tsFiles.filter((f) => {
+    const content = fs.readFileSync(f, "utf-8")
+    if (!hasImport(content, "recharts")) return false
+    // 既にdynamic import済みか確認
+    const lines = content.split("\n")
+    return lines.some((l) => /^import\s+\{[^}]+\}\s+from\s+['"]recharts['"]/.test(l))
+  })
+}
 
-  for (const file of tsFiles) {
-    const content = fs.readFileSync(file, "utf-8")
-    if (!hasImport(content, "recharts")) continue
+async function fixRechartsImports(repoDir: string): Promise<{ changed: boolean; files: string[] }> {
+  const staticImportFiles = detectRechartsFiles(repoDir)
+  if (staticImportFiles.length === 0) return { changed: false, files: [] }
 
-    // 既にdynamic importされていれば skip
-    if (content.includes("from 'next/dynamic'") || content.includes('from "next/dynamic"')) {
-      const lines = content.split("\n")
-      const hasStaticRecharts = lines.some(
-        (l) => /^import\s+\{[^}]+\}\s+from\s+['"]recharts['"]/.test(l)
-      )
-      if (!hasStaticRecharts) {
-        console.log(`  ⏭  ${path.relative(repoDir, file)}: 既にdynamic import済み`)
-        continue
-      }
-    }
+  const relFiles = staticImportFiles.map((f) => path.relative(repoDir, f))
+  console.log(`  🔍 recharts static import 発見: ${relFiles.join(", ")}`)
 
-    console.log(`  🔧 recharts dynamic import: ${path.relative(repoDir, file)}`)
-    const fixed = await fixWithClaude(
-      path.relative(repoDir, file),
-      content,
-      `rechartsのstatic importをnext/dynamicのdynamic importに変換してください。
-
-変換ルール:
-- \`import { ComponentA, ComponentB } from "recharts"\` のような行をすべてdynamic importに変換
-- 各コンポーネントを個別のdynamic importにする
-- ssr: false を必ず設定
-- LoadingフォールバックはChartコンポーネント（LineChart, BarChart, AreaChart等）のみに付ける
-  例: loading: () => <div className="animate-pulse h-40 bg-muted rounded" />
-- XAxis, YAxis, CartesianGrid, Tooltip等のヘルパーコンポーネントはloading不要
-- 'use client' ディレクティブがなければ先頭に追加（rechartsはCSR専用のため必須）
-- TypeScriptの型エラーが出ないように変換する
-- ファイルの他の部分は変更しない`
-    )
-    if (fixed) {
-      fs.writeFileSync(file, fixed, "utf-8")
-      changedFiles.push(path.relative(repoDir, file))
-    }
-    await new Promise((r) => setTimeout(r, 2000))
+  if (DRY_RUN) {
+    console.log(`  [DRY RUN] recharts dynamic import 変換予定: ${relFiles.join(", ")}`)
+    return { changed: true, files: relFiles }
   }
 
-  return { changed: changedFiles.length > 0, files: changedFiles }
+  const prompt = `以下のファイルの recharts の static import を next/dynamic を使った dynamic import に変換してください。
+
+対象ファイル:
+${relFiles.map((f) => `- ${f}`).join("\n")}
+
+変換ルール:
+1. \`import { ComponentA, ComponentB } from "recharts"\` のような static import 行を削除
+2. 各コンポーネントを個別の dynamic import に変換:
+   \`\`\`tsx
+   import dynamic from 'next/dynamic'
+   const LineChart = dynamic(
+     () => import("recharts").then(m => ({ default: m.LineChart })),
+     { ssr: false, loading: () => <div className="animate-pulse h-40 bg-muted rounded" /> }
+   )
+   \`\`\`
+3. XAxis / YAxis / CartesianGrid / Tooltip / Legend / ResponsiveContainer 等のヘルパーは loading 不要:
+   \`\`\`tsx
+   const XAxis = dynamic(() => import("recharts").then(m => ({ default: m.XAxis })), { ssr: false })
+   \`\`\`
+4. ファイルの先頭に 'use client' がなければ追加（recharts は CSR 専用）
+5. TypeScript の型エラーが出ないようにする
+6. ファイルの他の部分は変更しない
+
+各ファイルをすべて変換してください。`
+
+  const ok = runClaude(repoDir, prompt)
+  if (!ok) return { changed: false, files: [] }
+
+  // 変換後に static import が残っていないか確認
+  const stillStatic = detectRechartsFiles(repoDir)
+  const converted = relFiles.filter((f) => !stillStatic.map((s) => path.relative(repoDir, s)).includes(f))
+  return { changed: converted.length > 0, files: converted }
 }
 
 // ── Fix 2: @vercel/analytics 導入 ─────────────────────────────
@@ -172,7 +160,6 @@ async function addVercelAnalytics(repoDir: string): Promise<boolean> {
 
   const pkg = readJson(pkgPath)
   const deps = { ...pkg.dependencies, ...pkg.devDependencies }
-
   if (deps["@vercel/analytics"]) {
     console.log(`  ⏭  @vercel/analytics: 既に追加済み`)
     return false
@@ -183,33 +170,34 @@ async function addVercelAnalytics(repoDir: string): Promise<boolean> {
   pkg.dependencies["@vercel/analytics"] = "^1.5.0"
   writeJson(pkgPath, pkg)
 
-  // layout.tsx に Analytics を追加
+  // layout.tsx に Analytics コンポーネントを追加
   const layoutPath = path.join(repoDir, "app", "layout.tsx")
   if (!fs.existsSync(layoutPath)) {
-    console.log(`  ⚠️  app/layout.tsx が見つからないため Analytics コンポーネント追加をスキップ`)
+    console.log(`  ⚠️  app/layout.tsx が見つからないため Analytics 追加をスキップ`)
     return true
   }
 
   const layoutContent = fs.readFileSync(layoutPath, "utf-8")
   if (layoutContent.includes("@vercel/analytics")) {
-    console.log(`  ⏭  app/layout.tsx: Analytics既に追加済み`)
+    console.log(`  ⏭  app/layout.tsx: Analytics 既に追加済み`)
     return true
   }
 
-  const fixed = await fixWithClaude(
-    "app/layout.tsx",
-    layoutContent,
-    `app/layout.tsx に @vercel/analytics の Analytics コンポーネントを追加してください。
-
-実施内容:
-1. \`import { Analytics } from '@vercel/analytics/react'\` をインポートに追加
-2. RootLayout の return の </body> の直前に <Analytics /> を追加
-3. 既存のコードは一切変更しない（追加のみ）`
-  )
-  if (fixed) {
-    fs.writeFileSync(layoutPath, fixed, "utf-8")
+  if (DRY_RUN) {
+    console.log(`  [DRY RUN] app/layout.tsx に Analytics を追加予定`)
+    return true
   }
 
+  const prompt = `app/layout.tsx に @vercel/analytics の Analytics コンポーネントを追加してください。
+
+実施内容:
+1. ファイル先頭のインポート群に \`import { Analytics } from '@vercel/analytics/react'\` を追加
+2. RootLayout の return 内の </body> 直前に <Analytics /> を追加
+3. 既存のコードは変更しない（追加のみ）
+
+ファイルパス: app/layout.tsx`
+
+  runClaude(repoDir, prompt)
   return true
 }
 
@@ -228,7 +216,6 @@ function removeUnusedRecharts(repoDir: string): boolean {
 
   const tsFiles = findFiles(repoDir, [".tsx", ".ts"])
   const isUsed = tsFiles.some((f) => hasImport(fs.readFileSync(f, "utf-8"), "recharts"))
-
   if (isUsed) {
     console.log(`  ⏭  recharts: コードで使用されているため削除しない`)
     return false
@@ -291,30 +278,34 @@ async function removeOpenAI(repoDir: string): Promise<boolean> {
 
   // openai を使っているファイルを @anthropic-ai/sdk に書き換え
   const tsFiles = findFiles(repoDir, [".tsx", ".ts"])
-  for (const file of tsFiles) {
-    const content = fs.readFileSync(file, "utf-8")
-    if (!hasImport(content, "openai")) continue
+  const openaiFiles = tsFiles.filter((f) => hasImport(fs.readFileSync(f, "utf-8"), "openai"))
 
-    console.log(`  🔧 openai → @anthropic-ai/sdk: ${path.relative(repoDir, file)}`)
-    const fixed = await fixWithClaude(
-      path.relative(repoDir, file),
-      content,
-      `このファイルの openai SDK を @anthropic-ai/sdk に書き換えてください。
+  if (openaiFiles.length === 0) return true
 
-変換ルール:
-- \`import OpenAI from 'openai'\` → \`import Anthropic from '@anthropic-ai/sdk'\`
-- \`new OpenAI({ apiKey: ... })\` → \`new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })\`
-- \`openai.chat.completions.create(...)\` → \`anthropic.messages.create(...)\`
-- モデル名は claude-sonnet-4-6 を使用
-- メッセージ構造をAnthropicのフォーマット（messages配列、role/content）に変換
-- 書き換えが困難な場合はコメント /* TODO: openai → anthropic 移行が必要 */ を残して import だけ削除`
-    )
-    if (fixed) {
-      fs.writeFileSync(file, fixed, "utf-8")
-    }
-    await new Promise((r) => setTimeout(r, 2000))
+  const relFiles = openaiFiles.map((f) => path.relative(repoDir, f))
+  console.log(`  🔧 openai → @anthropic-ai/sdk: ${relFiles.join(", ")}`)
+
+  if (DRY_RUN) {
+    console.log(`  [DRY RUN] openai コード書き換え予定: ${relFiles.join(", ")}`)
+    return true
   }
 
+  const prompt = `以下のファイルの openai SDK の使用を @anthropic-ai/sdk に書き換えてください。
+
+対象ファイル:
+${relFiles.map((f) => `- ${f}`).join("\n")}
+
+変換ルール:
+1. \`import OpenAI from 'openai'\` → \`import Anthropic from '@anthropic-ai/sdk'\`
+2. \`new OpenAI({ apiKey: ... })\` → \`new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })\`
+3. \`openai.chat.completions.create(...)\` → \`anthropic.messages.create(...)\`
+4. モデル名は claude-sonnet-4-6 を使用
+5. messages 構造を Anthropic のフォーマット（role/content の配列）に変換
+6. 書き換えが困難な箇所は \`// TODO: openai → anthropic 移行が必要\` コメントを残して import のみ削除
+
+各ファイルをすべて変換してください。`
+
+  runClaude(repoDir, prompt)
   return true
 }
 
@@ -385,13 +376,13 @@ async function run() {
     const appliedFixes: string[] = []
     let packageJsonChanged = false
 
-    // Fix 1: recharts dynamic import
+    // Fix 1: recharts dynamic import (Claude CLI)
     if (shouldFix("recharts-dynamic")) {
       const result = await fixRechartsImports(tmpDir)
       if (result.changed) appliedFixes.push(`✅ rechartsのdynamic import化 (${result.files.join(", ")})`)
     }
 
-    // Fix 2: @vercel/analytics
+    // Fix 2: @vercel/analytics (package.json + Claude CLI for layout.tsx)
     if (shouldFix("vercel-analytics")) {
       const changed = await addVercelAnalytics(tmpDir)
       if (changed) {
@@ -400,7 +391,7 @@ async function run() {
       }
     }
 
-    // Fix 3: 未使用recharts削除
+    // Fix 3: 未使用recharts削除 (TypeScript)
     if (shouldFix("remove-unused")) {
       const changed = removeUnusedRecharts(tmpDir)
       if (changed) {
@@ -409,7 +400,7 @@ async function run() {
       }
     }
 
-    // Fix 4: Layer 2 欠損補充
+    // Fix 4: Layer 2 欠損補充 (TypeScript)
     if (shouldFix("layer2-missing")) {
       const result = addLayer2Missing(tmpDir)
       if (result.changed) {
@@ -418,7 +409,7 @@ async function run() {
       }
     }
 
-    // Fix 5: openai 削除
+    // Fix 5: openai 削除 (TypeScript + Claude CLI for code rewrite)
     if (shouldFix("remove-openai")) {
       const changed = await removeOpenAI(tmpDir)
       if (changed) {
@@ -435,15 +426,13 @@ async function run() {
     console.log(`\n  📋 適用した修正:`)
     appliedFixes.forEach((f) => console.log(`     ${f}`))
 
-    // package-lock.json 更新
-    if (packageJsonChanged) {
-      updatePackageLock(tmpDir)
-    }
-
     if (DRY_RUN) {
       console.log(`\n  [DRY RUN] 以上の変更を適用予定。コミット・PR作成はしません。`)
       return
     }
+
+    // package-lock.json 更新
+    if (packageJsonChanged) updatePackageLock(tmpDir)
 
     const branch = "metago/tech-stack-compliance-v2"
     const committed = createBranchAndCommit(
@@ -467,7 +456,7 @@ async function run() {
       ["remove-unused", "未使用依存削除"],
       ["layer2-missing", "Layer 2 欠損補充"],
       ["remove-openai", "openai 削除"],
-    ].map(([key, label]) => {
+    ].map(([, label]) => {
       const done = appliedFixes.some((f) => f.includes(label.split(" ")[0]))
       return `- [${done ? "x" : " "}] ${label}`
     }).join("\n")

@@ -47,6 +47,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Install Claude CLI
+        run: npm install -g @anthropic-ai/claude-code
+
       - name: Tech stack compliance (${{ matrix.repo }})
         run: npx tsx scripts/setup/tech-stack-compliance.ts
         env:
@@ -55,9 +58,9 @@ jobs:
           TARGET_FIXES: ${{ inputs.target_fixes }}
           DRY_RUN: ${{ inputs.dry_run }}
           AUTO_MERGE: ${{ inputs.auto_merge }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           GH_PAT: ${{ secrets.GH_PAT }}
           GITHUB_TOKEN: ${{ secrets.GH_PAT }}
           GITHUB_OWNER: ${{ secrets.GITHUB_OWNER }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
