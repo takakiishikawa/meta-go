@@ -4,7 +4,9 @@
  * 環境変数:
  *   TARGET_REPO    — 対象リポジトリ名 (matrix で注入)
  *   TARGET_REPOS   — "all" または カンマ区切り (例: "native-go,care-go")
- *   TARGET_FIXES   — "all" または カンマ区切り (recharts-dynamic, vercel-analytics, remove-unused, layer2-missing, remove-openai)
+ *   TARGET_FIXES   — "all" または カンマ区切り
+ *                    Phase 1: recharts-dynamic, vercel-analytics, remove-unused, layer2-missing, remove-openai
+ *                    Phase 2a: layer1-violations
  *   DRY_RUN        — "true" の場合、PR を作成せずログのみ
  *   AUTO_MERGE     — "true" の場合、PR に auto-merge を設定
  *
@@ -279,7 +281,119 @@ function addLayer2Missing(repoDir: string): {
   return { changed: added.length > 0, added };
 }
 
-// ── Fix 5: openai 削除 ────────────────────────────────────────
+// ── Fix 5 (Phase 2a): Layer 1 違反解消 ───────────────────────
+
+const LAYER1_PACKAGES_TO_REMOVE = [
+  "clsx",
+  "tailwind-merge",
+  "class-variance-authority",
+  "sonner",
+  "next-themes",
+  "react-day-picker",
+  "@radix-ui/react-label",
+  "@radix-ui/react-select",
+  "@radix-ui/react-separator",
+  "@radix-ui/react-slider",
+  "@radix-ui/react-slot",
+  "@radix-ui/react-tabs",
+];
+
+async function fixLayer1Violations(
+  repoDir: string,
+): Promise<{ changed: boolean; details: string[] }> {
+  const details: string[] = [];
+  let changed = false;
+
+  const pkgPath = path.join(repoDir, "package.json");
+  const pkg = readJson(pkgPath);
+
+  // A. lib/utils.ts の cn() → go-design-system re-export
+  for (const relPath of ["lib/utils.ts", "src/lib/utils.ts"]) {
+    const utilsPath = path.join(repoDir, relPath);
+    if (!fs.existsSync(utilsPath)) continue;
+    const content = fs.readFileSync(utilsPath, "utf-8");
+    if (!hasImport(content, "clsx")) continue;
+
+    const newContent = `export { cn } from "@takaki/go-design-system";\n`;
+    if (!DRY_RUN) {
+      fs.writeFileSync(utilsPath, newContent, "utf-8");
+      console.log(`  🔧 ${relPath}: cn() を DS re-export に置き換え`);
+    } else {
+      console.log(`  [DRY RUN] ${relPath}: cn() を DS re-export に置き換え予定`);
+    }
+    details.push(`\`${relPath}\` を go-design-system の cn() re-export に置き換え`);
+    changed = true;
+  }
+
+  // B. toast/Toaster import: sonner → @takaki/go-design-system
+  const allTsFiles = findFiles(repoDir, [".tsx", ".ts"]);
+  const sonnerFiles = allTsFiles.filter((f) =>
+    hasImport(fs.readFileSync(f, "utf-8"), "sonner"),
+  );
+
+  if (sonnerFiles.length > 0) {
+    const relFiles = sonnerFiles.map((f) => path.relative(repoDir, f));
+    console.log(`  🔍 sonner 直接 import 発見: ${relFiles.join(", ")}`);
+    details.push(
+      `toast/Toaster import を sonner → @takaki/go-design-system に変更 (${relFiles.length}ファイル)`,
+    );
+    changed = true;
+
+    if (!DRY_RUN) {
+      const prompt = `以下のファイルで sonner パッケージからの import を @takaki/go-design-system に書き換えてください。
+
+対象ファイル:
+${relFiles.map((f) => `- ${f}`).join("\n")}
+
+変換ルール:
+- \`import { toast } from "sonner"\` → \`import { toast } from "@takaki/go-design-system"\`
+- \`import { Toaster } from "sonner"\` → \`import { Toaster } from "@takaki/go-design-system"\`
+- \`import { toast, Toaster } from "sonner"\` → \`import { toast, Toaster } from "@takaki/go-design-system"\`
+- import 元の文字列だけを変更する（他のコードは一切変更しない）
+- TypeScript エラーが出ないことを確認する`;
+
+      runClaude(repoDir, prompt);
+    }
+  }
+
+  // C. Layer 1 パッケージを package.json から削除（コードで使用されていないもの）
+  const removedPkgs: string[] = [];
+  for (const l1pkg of LAYER1_PACKAGES_TO_REMOVE) {
+    const inDeps =
+      pkg.dependencies?.[l1pkg] || pkg.devDependencies?.[l1pkg];
+    if (!inDeps) continue;
+
+    // Claude 実行後にファイルを再スキャン
+    const stillUsed = findFiles(repoDir, [".tsx", ".ts"]).some((f) =>
+      hasImport(fs.readFileSync(f, "utf-8"), l1pkg),
+    );
+
+    if (!stillUsed) {
+      if (!DRY_RUN) {
+        if (pkg.dependencies?.[l1pkg]) delete pkg.dependencies[l1pkg];
+        if (pkg.devDependencies?.[l1pkg]) delete pkg.devDependencies[l1pkg];
+      }
+      removedPkgs.push(l1pkg);
+      changed = true;
+    } else {
+      console.log(`  ⚠️  ${l1pkg}: コードで使用中のため削除せず残す`);
+    }
+  }
+
+  if (removedPkgs.length > 0) {
+    if (!DRY_RUN) writeJson(pkgPath, pkg);
+    details.push(`Layer 1パッケージ削除: ${removedPkgs.join(", ")}`);
+    console.log(`  🔧 package.json から削除: ${removedPkgs.join(", ")}`);
+  }
+
+  if (details.length === 0) {
+    console.log(`  ⏭  Layer 1違反なし`);
+  }
+
+  return { changed, details };
+}
+
+// ── Fix 6: openai 削除 ────────────────────────────────────────
 
 async function removeOpenAI(repoDir: string): Promise<boolean> {
   const pkgPath = path.join(repoDir, "package.json");
@@ -478,6 +592,15 @@ async function run() {
       }
     }
 
+    // Fix 6 (Phase 2a): Layer 1 違反解消 (TypeScript + Claude CLI)
+    if (shouldFix("layer1-violations")) {
+      const result = await fixLayer1Violations(tmpDir);
+      if (result.changed) {
+        result.details.forEach((d) => appliedFixes.push(`✅ ${d}`));
+        packageJsonChanged = true;
+      }
+    }
+
     if (appliedFixes.length === 0) {
       console.log(`  ℹ️  ${TARGET_REPO}: 修正対象なし — PRは作成しません`);
       return;
@@ -496,12 +619,24 @@ async function run() {
     // package-lock.json 更新
     if (packageJsonChanged) updatePackageLock(tmpDir);
 
-    const branch = "metago/tech-stack-compliance-v2";
-    const committed = createBranchAndCommit(
-      tmpDir,
-      branch,
-      `chore: Tech stack compliance to v2.0 policy (MetaGo自動修正)`,
-    );
+    const isLayer1Only =
+      shouldFix("layer1-violations") &&
+      !shouldFix("recharts-dynamic") &&
+      !shouldFix("vercel-analytics") &&
+      !shouldFix("remove-unused") &&
+      !shouldFix("layer2-missing") &&
+      !shouldFix("remove-openai") &&
+      TARGET_FIXES !== "all";
+
+    const branch = isLayer1Only
+      ? "metago/layer1-violations"
+      : "metago/tech-stack-compliance-v2";
+
+    const commitMsg = isLayer1Only
+      ? `refactor: Eliminate Layer 1 direct imports (Phase 2a MetaGo)`
+      : `chore: Tech stack compliance to v2.0 policy (MetaGo自動修正)`;
+
+    const committed = createBranchAndCommit(tmpDir, branch, commitMsg);
 
     if (!committed) {
       console.log(`  ℹ️  変更なし（git diff が空）— PRは作成しません`);
@@ -518,6 +653,7 @@ async function run() {
       ["remove-unused", "未使用依存削除"],
       ["layer2-missing", "Layer 2 欠損補充"],
       ["remove-openai", "openai 削除"],
+      ["layer1-violations", "Layer 1直接importの解消"],
     ]
       .map(([, label]) => {
         const done = appliedFixes.some((f) => f.includes(label.split(" ")[0]));
@@ -525,10 +661,14 @@ async function run() {
       })
       .join("\n");
 
+    const prTitle = isLayer1Only
+      ? "refactor: Phase 2a — Eliminate Layer 1 direct imports"
+      : "chore: Tech stack compliance to v2.0 policy";
+
     let pr: { url: string; number: number; nodeId: string };
     try {
       pr = await createPR(TARGET_REPO, {
-        title: "chore: Tech stack compliance to v2.0 policy",
+        title: prTitle,
         body: `## MetaGoが自動生成した技術スタック刷新PRです。
 
 ## 実施した修正

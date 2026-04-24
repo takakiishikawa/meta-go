@@ -8,7 +8,7 @@ on:
         required: false
         default: 'all'
       target_fixes:
-        description: 'Fixes to apply: recharts-dynamic, vercel-analytics, remove-unused, layer2-missing, remove-openai, all'
+        description: 'Fixes to apply: recharts-dynamic, vercel-analytics, remove-unused, layer2-missing, remove-openai, layer1-violations, all'
         required: false
         default: 'all'
       dry_run:
