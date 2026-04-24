@@ -327,9 +327,13 @@ async function fixLayer1Violations(
       fs.writeFileSync(utilsPath, newContent, "utf-8");
       console.log(`  🔧 ${relPath}: cn() を DS re-export に置き換え`);
     } else {
-      console.log(`  [DRY RUN] ${relPath}: cn() を DS re-export に置き換え予定`);
+      console.log(
+        `  [DRY RUN] ${relPath}: cn() を DS re-export に置き換え予定`,
+      );
     }
-    details.push(`\`${relPath}\` を go-design-system の cn() re-export に置き換え`);
+    details.push(
+      `\`${relPath}\` を go-design-system の cn() re-export に置き換え`,
+    );
     changed = true;
   }
 
@@ -367,8 +371,7 @@ ${relFiles.map((f) => `- ${f}`).join("\n")}
   // C. Layer 1 パッケージを package.json から削除（コードで使用されていないもの）
   const removedPkgs: string[] = [];
   for (const l1pkg of LAYER1_PACKAGES_TO_REMOVE) {
-    const inDeps =
-      pkg.dependencies?.[l1pkg] || pkg.devDependencies?.[l1pkg];
+    const inDeps = pkg.dependencies?.[l1pkg] || pkg.devDependencies?.[l1pkg];
     if (!inDeps) continue;
 
     // Claude 実行後にファイルを再スキャン

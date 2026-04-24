@@ -40,7 +40,10 @@ export function SeverityCell({
 
   if (count === 0) {
     return (
-      <span className="text-sm font-medium" style={{ color: "var(--color-text-secondary)" }}>
+      <span
+        className="text-sm font-medium"
+        style={{ color: "var(--color-text-secondary)" }}
+      >
         0
       </span>
     );

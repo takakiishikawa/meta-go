@@ -80,7 +80,8 @@ export function ProductSecurityEvalButton({
                         className="rounded px-1.5 py-0.5 text-xs font-medium shrink-0"
                         style={{
                           backgroundColor:
-                            (SEVERITY_COLORS[item.severity] ?? "#6B7280") + "22",
+                            (SEVERITY_COLORS[item.severity] ?? "#6B7280") +
+                            "22",
                           color: SEVERITY_COLORS[item.severity] ?? "#6B7280",
                         }}
                       >
