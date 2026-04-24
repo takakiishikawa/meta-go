@@ -298,7 +298,10 @@ export function PerformanceTable({
             const productName = m.products?.name ?? "";
             const color =
               m.products?.primary_color || GO_COLORS[productName] || "#6B7280";
-            const delta = (m as any).product_id != null ? (deltas[(m as any).product_id] ?? null) : null;
+            const delta =
+              (m as any).product_id != null
+                ? (deltas[(m as any).product_id] ?? null)
+                : null;
             return (
               <tr
                 key={m.id}

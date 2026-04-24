@@ -342,7 +342,9 @@ export default async function DependencyPage() {
             </div>
           </div>
           <div className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-950">
-            <div className="text-2xl font-semibold text-red-600">{majorCount}</div>
+            <div className="text-2xl font-semibold text-red-600">
+              {majorCount}
+            </div>
             <div className="text-sm text-red-600">Major 更新あり</div>
           </div>
           <div className="rounded-lg border border-orange-200 bg-orange-50 p-4 dark:border-orange-800 dark:bg-orange-950">
