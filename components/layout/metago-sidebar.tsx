@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   LayoutDashboard,
@@ -17,7 +17,6 @@ import {
   Lightbulb,
   Layers,
   Key,
-  LogOut,
   Sun,
   Moon,
 } from "lucide-react";
@@ -34,9 +33,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
+  UserMenu,
 } from "@takaki/go-design-system";
 import { createClient } from "@/lib/supabase/client";
 
@@ -104,14 +101,11 @@ const navGroups = [
   },
 ];
 
-const footerNavItems = [
-  { title: "コンセプト", href: "/concept", icon: Layers },
-  { title: "API管理", href: "/apis", icon: Key },
-];
-
 export function MetaGoSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const [displayName, setDisplayName] = React.useState("");
+  const [email, setEmail] = React.useState("");
   const [avatarUrl, setAvatarUrl] = React.useState("");
   const [isDark, setIsDark] = React.useState(false);
 
@@ -122,6 +116,7 @@ export function MetaGoSidebar() {
       setDisplayName(
         user.user_metadata?.display_name || user.email?.split("@")[0] || "User",
       );
+      setEmail(user.email || "");
       setAvatarUrl(user.user_metadata?.avatar_url || "");
     });
     const update = () =>
@@ -146,8 +141,6 @@ export function MetaGoSidebar() {
     await supabase.auth.signOut();
     window.location.href = "/login";
   }
-
-  const initials = (displayName || "M").charAt(0).toUpperCase();
 
   return (
     <Sidebar>
@@ -181,51 +174,31 @@ export function MetaGoSidebar() {
       </SidebarContent>
 
       <SidebarFooter>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton className="cursor-default">
-              <Avatar className="h-5 w-5 shrink-0">
-                {avatarUrl && <AvatarImage src={avatarUrl} alt={displayName} />}
-                <AvatarFallback className="text-xs">{initials}</AvatarFallback>
-              </Avatar>
-              <span className="truncate flex-1 min-w-0">
-                {displayName || "—"}
-              </span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-
-          {footerNavItems.map(({ title, href, icon: Icon }) => (
-            <SidebarMenuItem key={href}>
-              <SidebarMenuButton asChild isActive={pathname === href}>
-                <Link href={href}>
-                  <Icon className="h-4 w-4 shrink-0" />
-                  {title}
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          ))}
-
-          <SidebarMenuItem>
-            <SidebarMenuButton onClick={toggleTheme} className="cursor-pointer">
-              {isDark ? (
-                <Moon className="h-4 w-4 shrink-0" />
-              ) : (
-                <Sun className="h-4 w-4 shrink-0" />
-              )}
-              {isDark ? "ダーク" : "ライト"}
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              onClick={handleSignOut}
-              className="cursor-pointer"
-            >
-              <LogOut className="h-4 w-4 shrink-0" />
-              ログアウト
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
+        <UserMenu
+          displayName={displayName || "—"}
+          email={email}
+          avatarUrl={avatarUrl}
+          items={[
+            {
+              title: "コンセプト",
+              icon: Layers,
+              onSelect: () => router.push("/concept"),
+              isActive: pathname === "/concept",
+            },
+            {
+              title: "API管理",
+              icon: Key,
+              onSelect: () => router.push("/apis"),
+              isActive: pathname === "/apis",
+            },
+            {
+              title: isDark ? "ダーク" : "ライト",
+              icon: isDark ? Moon : Sun,
+              onSelect: toggleTheme,
+            },
+          ]}
+          signOut={{ onSelect: handleSignOut }}
+        />
       </SidebarFooter>
 
       <SidebarRail />
