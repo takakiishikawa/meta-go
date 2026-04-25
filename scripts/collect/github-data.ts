@@ -200,8 +200,24 @@ async function collectTechStack(product: any, pkg: any) {
       isDev: true,
     }),
   );
+  // go-design-system のようなライブラリは peerDependencies に runtime deps を
+  // 置く慣習なので、それも runtime 扱い (is_dev=false) で取り込む。
+  // 他リポは通常 peerDeps を持たないので影響なし。
+  const peerDeps = Object.entries(pkg.peerDependencies ?? {}).map(
+    ([name, ver]) => ({
+      name,
+      ver: String(ver),
+      isDev: false,
+    }),
+  );
 
-  const items = [...deps, ...devDeps].map(({ name, ver, isDev }) => ({
+  // 同名が複数経路で来た場合は dependencies > peer > dev の優先で1件に丸める
+  const merged = new Map<string, { name: string; ver: string; isDev: boolean }>();
+  for (const e of [...devDeps, ...peerDeps, ...deps]) {
+    merged.set(e.name, e);
+  }
+
+  const items = [...merged.values()].map(({ name, ver, isDev }) => ({
     product_id: product.id,
     package_name: name,
     version: ver.replace(/^[\^~>=<]+/, ""),
@@ -210,18 +226,34 @@ async function collectTechStack(product: any, pkg: any) {
     collected_at: new Date().toISOString(),
   }));
 
-  if (!items.length) return;
+  // package.json から削除されたパッケージを DB に残し続けないため、
+  // 当該プロダクトの古い行を全削除してから今回分を insert する。
+  const { error: delError } = await supabase
+    .schema("metago")
+    .from("tech_stack_items")
+    .delete()
+    .eq("product_id", product.id);
+
+  if (delError) {
+    console.error(
+      `tech_stack_items cleanup error for ${product.name}:`,
+      delError,
+    );
+    return;
+  }
+
+  if (!items.length) {
+    console.log(`✓ ${product.name}: 0 packages (cleared)`);
+    return;
+  }
 
   const { error } = await supabase
     .schema("metago")
     .from("tech_stack_items")
-    .upsert(items, {
-      onConflict: "product_id,package_name",
-      ignoreDuplicates: false,
-    });
+    .insert(items);
 
   if (error)
-    console.error(`tech_stack_items upsert error for ${product.name}:`, error);
+    console.error(`tech_stack_items insert error for ${product.name}:`, error);
   else
     console.log(
       `✓ ${product.name}: ${items.length} packages collected to tech_stack`,

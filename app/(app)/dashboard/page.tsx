@@ -6,7 +6,6 @@ export default async function DashboardPage() {
 
   const now = Date.now();
   const sevenDaysAgo = new Date(now - 7 * 24 * 60 * 60 * 1000).toISOString();
-  const thirtyDaysAgo = new Date(now - 30 * 24 * 60 * 60 * 1000).toISOString();
 
   const [
     { data: products },
@@ -27,7 +26,6 @@ export default async function DashboardPage() {
       .schema("metago")
       .from("scores_history")
       .select("product_id, category, score, collected_at")
-      .gte("collected_at", thirtyDaysAgo)
       .order("collected_at", { ascending: true }),
     supabase
       .schema("metago")

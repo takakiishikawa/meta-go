@@ -25,8 +25,6 @@ import {
   type TrendPoint as MultiTrendPoint,
 } from "@/components/charts/multi-product-trend";
 
-const TREND_DAYS = 30;
-
 interface Product {
   id: string;
   name: string;
@@ -111,24 +109,34 @@ export function DashboardClient({
   const hasData = products.length > 0;
   const [trendOpen, setTrendOpen] = useState<Product | null>(null);
 
-  // 全プロダクトの overall (4カテゴリ平均) スコア × 30日 を組み立て
+  // 全プロダクトの overall (4カテゴリ平均) スコアの全期間トレンドを組み立て
+  // 範囲は trendByProduct 内に存在する最古〜最新の日付。空き日は null で埋める
   const overviewTrend = useMemo<MultiTrendPoint[]>(() => {
-    const fmtKey = new Intl.DateTimeFormat("en-CA", {
-      timeZone: "Asia/Tokyo",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    });
+    // page.tsx 側で collected_at.slice(0,10) を date key にしているのでそれをそのまま使う
+    const allDateKeys = new Set<string>();
+    for (const productId of Object.keys(trendByProduct)) {
+      for (const dateKey of Object.keys(trendByProduct[productId])) {
+        allDateKeys.add(dateKey);
+      }
+    }
+    if (allDateKeys.size === 0) return [];
+
+    const sorted = [...allDateKeys].sort();
+    const minKey = sorted[0];
+    const maxKey = sorted[sorted.length - 1];
+
     const fmtLabel = new Intl.DateTimeFormat("ja-JP", {
-      timeZone: "Asia/Tokyo",
+      timeZone: "UTC",
       month: "2-digit",
       day: "2-digit",
     });
+
     const points: MultiTrendPoint[] = [];
-    const now = new Date();
-    for (let i = TREND_DAYS - 1; i >= 0; i--) {
-      const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
-      const key = fmtKey.format(d);
+    const start = new Date(`${minKey}T00:00:00Z`);
+    const end = new Date(`${maxKey}T00:00:00Z`);
+    for (let t = start.getTime(); t <= end.getTime(); t += 24 * 60 * 60 * 1000) {
+      const d = new Date(t);
+      const key = d.toISOString().slice(0, 10);
       const point: MultiTrendPoint = { date: fmtLabel.format(d) };
       for (const product of products) {
         const cats = trendByProduct[product.id]?.[key];
@@ -217,7 +225,7 @@ export function DashboardClient({
                 総合スコア推移
               </span>
               <span className="text-xs text-muted-foreground">
-                直近 {TREND_DAYS} 日 / 4カテゴリの平均
+                全期間 / 4カテゴリの平均 ({overviewTrend.length}日分)
               </span>
             </div>
             <MultiProductTrendChart

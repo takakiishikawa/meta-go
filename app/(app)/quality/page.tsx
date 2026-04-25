@@ -9,7 +9,6 @@ import { buildTrend } from "@/lib/metago/score-trend";
 import { Code2 } from "lucide-react";
 
 const PAGE_SIZE = 20;
-const TREND_DAYS = 30;
 
 const GO_COLORS: Record<string, string> = {
   nativego: "#0052CC",
@@ -33,9 +32,6 @@ export default async function QualityPage({
   const supabase = await createClient();
   const sevenDaysAgo = new Date(
     Date.now() - 7 * 24 * 60 * 60 * 1000,
-  ).toISOString();
-  const trendSince = new Date(
-    Date.now() - TREND_DAYS * 24 * 60 * 60 * 1000,
   ).toISOString();
 
   const [
@@ -76,7 +72,6 @@ export default async function QualityPage({
       .from("scores_history")
       .select("product_id, score, collected_at")
       .eq("category", "quality")
-      .gte("collected_at", trendSince)
       .order("collected_at", { ascending: true }),
   ]);
 
@@ -125,7 +120,6 @@ export default async function QualityPage({
   const trendData = buildTrend(
     trendScores ?? [],
     allProducts.map((p) => p.id),
-    TREND_DAYS,
   );
 
   return (
@@ -187,7 +181,7 @@ export default async function QualityPage({
               スコア推移
             </span>
             <span className="text-xs text-muted-foreground">
-              直近 {TREND_DAYS} 日 / プロダクト別
+              全期間 / プロダクト別 ({trendData.length}日分)
             </span>
           </div>
           <MultiProductTrendChart data={trendData} products={trendSeries} />

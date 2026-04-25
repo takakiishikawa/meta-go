@@ -6,15 +6,10 @@ import { MultiProductTrendChart } from "@/components/charts/multi-product-trend"
 import { buildTrend } from "@/lib/metago/score-trend";
 import { Gauge } from "lucide-react";
 
-const TREND_DAYS = 30;
-
 export default async function PerformancePage() {
   const supabase = await createClient();
   const sevenDaysAgo = new Date(
     Date.now() - 7 * 24 * 60 * 60 * 1000,
-  ).toISOString();
-  const trendSince = new Date(
-    Date.now() - TREND_DAYS * 24 * 60 * 60 * 1000,
   ).toISOString();
 
   const [
@@ -43,7 +38,6 @@ export default async function PerformancePage() {
       .schema("metago")
       .from("performance_metrics")
       .select("product_id, score, measured_at")
-      .gte("measured_at", trendSince)
       .order("measured_at", { ascending: true }),
   ]);
 
@@ -62,7 +56,6 @@ export default async function PerformancePage() {
   const trendData = buildTrend(
     trendRows,
     allProducts.map((p) => p.id),
-    TREND_DAYS,
   );
 
   const allMetrics = metrics ?? [];
@@ -127,7 +120,7 @@ export default async function PerformancePage() {
               スコア推移
             </span>
             <span className="text-xs text-muted-foreground">
-              直近 {TREND_DAYS} 日 / プロダクト別
+              全期間 / プロダクト別 ({trendData.length}日分)
             </span>
           </div>
           <MultiProductTrendChart data={trendData} products={trendSeries} />

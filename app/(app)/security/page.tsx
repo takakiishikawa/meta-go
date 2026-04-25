@@ -8,8 +8,6 @@ import { ScoreDelta } from "@/components/score/score-delta";
 import { MultiProductTrendChart } from "@/components/charts/multi-product-trend";
 import { buildTrend } from "@/lib/metago/score-trend";
 
-const TREND_DAYS = 30;
-
 const GO_COLORS: Record<string, string> = {
   nativego: "#0052CC",
   carego: "#00875A",
@@ -25,9 +23,6 @@ export default async function SecurityPage() {
   const supabase = await createClient();
   const sevenDaysAgo = new Date(
     Date.now() - 7 * 24 * 60 * 60 * 1000,
-  ).toISOString();
-  const trendSince = new Date(
-    Date.now() - TREND_DAYS * 24 * 60 * 60 * 1000,
   ).toISOString();
 
   const [
@@ -65,7 +60,6 @@ export default async function SecurityPage() {
       .from("scores_history")
       .select("product_id, score, collected_at")
       .eq("category", "security")
-      .gte("collected_at", trendSince)
       .order("collected_at", { ascending: true }),
   ]);
 
@@ -116,7 +110,6 @@ export default async function SecurityPage() {
   const trendData = buildTrend(
     trendScores ?? [],
     allProducts.map((p) => p.id),
-    TREND_DAYS,
   );
 
   return (
@@ -216,7 +209,7 @@ export default async function SecurityPage() {
               スコア推移
             </span>
             <span className="text-xs text-muted-foreground">
-              直近 {TREND_DAYS} 日 / プロダクト別
+              全期間 / プロダクト別 ({trendData.length}日分)
             </span>
           </div>
           <MultiProductTrendChart data={trendData} products={trendSeries} />
