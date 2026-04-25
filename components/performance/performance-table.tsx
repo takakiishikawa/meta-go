@@ -40,17 +40,19 @@ const TOOLTIP_TEXTS = {
 
 type Verdict = "good" | "warn" | "bad" | "neutral";
 
-const VERDICT_STYLE: Record<Verdict, { bg: string; fg: string; border: string }> =
-  {
-    good: { bg: "#DCFCE7", fg: "#166534", border: "#BBF7D0" },
-    warn: { bg: "#FEF3C7", fg: "#92400E", border: "#FDE68A" },
-    bad: { bg: "#FEE2E2", fg: "#991B1B", border: "#FECACA" },
-    neutral: {
-      bg: "transparent",
-      fg: "var(--color-text-secondary)",
-      border: "var(--color-border)",
-    },
-  };
+const VERDICT_STYLE: Record<
+  Verdict,
+  { bg: string; fg: string; border: string }
+> = {
+  good: { bg: "#DCFCE7", fg: "#166534", border: "#BBF7D0" },
+  warn: { bg: "#FEF3C7", fg: "#92400E", border: "#FDE68A" },
+  bad: { bg: "#FEE2E2", fg: "#991B1B", border: "#FECACA" },
+  neutral: {
+    bg: "transparent",
+    fg: "var(--color-text-secondary)",
+    border: "var(--color-border)",
+  },
+};
 
 function lcpVerdict(v: number | null): Verdict {
   if (v == null) return "neutral";
@@ -173,7 +175,8 @@ export function PerformanceTable({
               m.products?.primary_color || GO_COLORS[productName] || "#6B7280";
             const productId = (m as unknown as { product_id?: string })
               .product_id;
-            const delta = productId != null ? (deltas[productId] ?? null) : null;
+            const delta =
+              productId != null ? (deltas[productId] ?? null) : null;
             return (
               <tr
                 key={m.id}

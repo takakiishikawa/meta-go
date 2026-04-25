@@ -30,7 +30,12 @@ const SKIP_PRODUCTS = new Set(["designsystem"]);
 
 // ── policy 定義 ─────────────────────────────────────
 
-const FORBIDDEN_PACKAGES = ["openai", "ai", "@ai-sdk/anthropic", "@ai-sdk/openai"];
+const FORBIDDEN_PACKAGES = [
+  "openai",
+  "ai",
+  "@ai-sdk/anthropic",
+  "@ai-sdk/openai",
+];
 
 const LAYER1_DIRECT_IMPORT_FORBIDDEN = [
   "@radix-ui/",
@@ -42,7 +47,11 @@ const LAYER1_DIRECT_IMPORT_FORBIDDEN = [
 
 // ── helpers ─────────────────────────────────────────
 
-function findFiles(dir: string, exts: string[], skip = new Set<string>()): string[] {
+function findFiles(
+  dir: string,
+  exts: string[],
+  skip = new Set<string>(),
+): string[] {
   const result: string[] = [];
   try {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {

@@ -134,7 +134,11 @@ export function DashboardClient({
     const points: MultiTrendPoint[] = [];
     const start = new Date(`${minKey}T00:00:00Z`);
     const end = new Date(`${maxKey}T00:00:00Z`);
-    for (let t = start.getTime(); t <= end.getTime(); t += 24 * 60 * 60 * 1000) {
+    for (
+      let t = start.getTime();
+      t <= end.getTime();
+      t += 24 * 60 * 60 * 1000
+    ) {
       const d = new Date(t);
       const key = d.toISOString().slice(0, 10);
       const point: MultiTrendPoint = { date: fmtLabel.format(d) };
@@ -367,8 +371,7 @@ function DeltaBadge({ delta }: { delta: number | null }) {
   if (delta === null) {
     return (
       <span className="inline-flex items-center gap-0.5 rounded-full border border-border bg-muted/40 px-1.5 py-0.5 text-[11px] text-muted-foreground">
-        <Minus className="size-3" />
-        —
+        <Minus className="size-3" />—
       </span>
     );
   }

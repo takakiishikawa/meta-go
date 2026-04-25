@@ -260,10 +260,7 @@ async function scanRepo(product: any, repo: string) {
   try {
     repoDir = cloneRepo(repo);
 
-    const evaluation = await evaluateCodeQuality(
-      repoDir,
-      product.display_name,
-    );
+    const evaluation = await evaluateCodeQuality(repoDir, product.display_name);
 
     if (evaluation.axes.length === 0) {
       console.warn("  評価失敗のためスキップ（既存スコア・itemsは保持）");

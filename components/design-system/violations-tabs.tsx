@@ -43,7 +43,10 @@ export function DesignSystemViolationsTabs({
     active === "all" ? items : items.filter((i) => i.category === active);
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
-  const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const paged = filtered.slice(
+    (safePage - 1) * PAGE_SIZE,
+    safePage * PAGE_SIZE,
+  );
 
   return (
     <div className="flex flex-col gap-3">
@@ -57,37 +60,38 @@ export function DesignSystemViolationsTabs({
       </div>
 
       <div className="flex flex-wrap gap-1 border-b border-border">
-        {[{ key: "all", label: "All" }, ...categories.map((c) => ({ key: c, label: c }))].map(
-          (tab) => {
-            const isActive = active === tab.key;
-            const count = counts[tab.key] ?? 0;
-            return (
-              <button
-                key={tab.key}
-                onClick={() => {
-                  setActive(tab.key);
-                  setPage(1);
-                }}
-                className={`relative -mb-px flex items-center gap-1.5 border-b-2 px-3 pb-2 pt-1 text-sm font-medium transition-colors ${
+        {[
+          { key: "all", label: "All" },
+          ...categories.map((c) => ({ key: c, label: c })),
+        ].map((tab) => {
+          const isActive = active === tab.key;
+          const count = counts[tab.key] ?? 0;
+          return (
+            <button
+              key={tab.key}
+              onClick={() => {
+                setActive(tab.key);
+                setPage(1);
+              }}
+              className={`relative -mb-px flex items-center gap-1.5 border-b-2 px-3 pb-2 pt-1 text-sm font-medium transition-colors ${
+                isActive
+                  ? "border-primary text-foreground"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {tab.label}
+              <span
+                className={`inline-flex min-w-[1.25rem] items-center justify-center rounded-full px-1.5 text-[10px] font-semibold ${
                   isActive
-                    ? "border-primary text-foreground"
-                    : "border-transparent text-muted-foreground hover:text-foreground"
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground"
                 }`}
               >
-                {tab.label}
-                <span
-                  className={`inline-flex min-w-[1.25rem] items-center justify-center rounded-full px-1.5 text-[10px] font-semibold ${
-                    isActive
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted text-muted-foreground"
-                  }`}
-                >
-                  {count}
-                </span>
-              </button>
-            );
-          },
-        )}
+                {count}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       <div className="rounded-lg border border-border overflow-hidden">

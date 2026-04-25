@@ -58,10 +58,7 @@ const HEADERS = {
   "X-GitHub-Api-Version": "2022-11-28",
 };
 
-function classify(
-  state: string,
-  description: string,
-): DeploymentState {
+function classify(state: string, description: string): DeploymentState {
   if (/rate limited/i.test(description)) return "rate_limited";
   switch (state) {
     case "success":
@@ -104,7 +101,11 @@ async function fetchAllDeploymentsForRepo(
 
 async function fetchLatestStatus(
   d: GhDeployment,
-): Promise<{ state: DeploymentState; description: string; targetUrl: string | null }> {
+): Promise<{
+  state: DeploymentState;
+  description: string;
+  targetUrl: string | null;
+}> {
   const sres = await fetch(`${d.statuses_url}?per_page=1`, {
     headers: HEADERS,
     cache: "no-store",

@@ -132,10 +132,7 @@ export default async function DeploymentsPage() {
           }
         />
 
-        <StatCard
-          label="直近24h 結果"
-          accent="#059669"
-        >
+        <StatCard label="直近24h 結果" accent="#059669">
           <div className="mt-1 flex items-end gap-4">
             <div>
               <div className="text-2xl font-semibold text-emerald-600">
