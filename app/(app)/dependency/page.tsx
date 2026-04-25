@@ -3,7 +3,6 @@ import {
   Badge,
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
   EmptyState,
@@ -15,54 +14,13 @@ import {
   TableHeader,
   TableRow,
 } from "@takaki/go-design-system";
+import { ExternalLink, Layers, Package } from "lucide-react";
+import { PACKAGE_DESCRIPTIONS } from "@/lib/package-descriptions";
 import {
-  ExternalLink,
-  Layers,
-  Package,
-  Anchor,
-  Palette,
-  Wrench,
-  Boxes,
-  Sparkles,
-  ShieldAlert,
-} from "lucide-react";
-import {
-  PACKAGE_DESCRIPTIONS,
-  LAYER_CONFIG,
-  LAYER_ORDER,
-  type PackageLayer,
-} from "@/lib/package-descriptions";
-
-// ---------------------------------------------------------
-// Layer presentation
-// ---------------------------------------------------------
-const LAYER_ICON: Record<PackageLayer, typeof Anchor> = {
-  foundation: Anchor,
-  "layer1-ds": Palette,
-  "layer2-standard": Wrench,
-  "layer3-feature": Boxes,
-  "layer4-specific": Sparkles,
-  forbidden: ShieldAlert,
-};
-
-const LAYER_SHORT: Record<PackageLayer, string> = {
-  foundation: "Foundation",
-  "layer1-ds": "Layer 1 — Design System",
-  "layer2-standard": "Layer 2 — Standard",
-  "layer3-feature": "Layer 3 — Feature",
-  "layer4-specific": "Layer 4 — Product-specific",
-  forbidden: "方針違反",
-};
-
-const UNCLASSIFIED_LAYER: PackageLayer = "layer4-specific";
-
-function getLayer(name: string): PackageLayer {
-  return PACKAGE_DESCRIPTIONS[name]?.layer ?? UNCLASSIFIED_LAYER;
-}
-
-function getDescription(name: string): string | undefined {
-  return PACKAGE_DESCRIPTIONS[name]?.description;
-}
+  DependencyTables,
+  type PackageRow,
+  type ProductSummary,
+} from "./dependency-tables";
 
 const STATE_LABELS: Record<string, string> = {
   new: "未対応",
@@ -70,29 +28,13 @@ const STATE_LABELS: Record<string, string> = {
   done: "完了",
 };
 
-// Lozenge style update_type — Atlassian-flavored soft-fill pills
 const UPDATE_TYPE_STYLE: Record<
   string,
   { label: string; bg: string; fg: string; border: string }
 > = {
-  patch: {
-    label: "patch",
-    bg: "#DCFCE7",
-    fg: "#166534",
-    border: "#BBF7D0",
-  },
-  minor: {
-    label: "minor",
-    bg: "#FEF3C7",
-    fg: "#92400E",
-    border: "#FDE68A",
-  },
-  major: {
-    label: "major",
-    bg: "#FEE2E2",
-    fg: "#991B1B",
-    border: "#FECACA",
-  },
+  patch: { label: "patch", bg: "#DCFCE7", fg: "#166534", border: "#BBF7D0" },
+  minor: { label: "minor", bg: "#FEF3C7", fg: "#92400E", border: "#FDE68A" },
+  major: { label: "major", bg: "#FEE2E2", fg: "#991B1B", border: "#FECACA" },
   framework: {
     label: "framework",
     bg: "#EDE9FE",
@@ -100,74 +42,6 @@ const UPDATE_TYPE_STYLE: Record<
     border: "#DDD6FE",
   },
 };
-
-// ---------------------------------------------------------
-// Subcomponents
-// ---------------------------------------------------------
-
-function PackageChip({ name }: { name: string }) {
-  const display = name
-    .replace("@takaki/", "")
-    .replace("@supabase/", "supabase/")
-    .replace("@ai-sdk/", "ai-sdk/")
-    .replace("@anthropic-ai/", "anthropic/")
-    .replace("@hookform/", "hookform/");
-
-  const desc = getDescription(name);
-  const layer = getLayer(name);
-  const cfg = LAYER_CONFIG[layer];
-
-  return (
-    <span
-      title={desc ? `${name}\n${desc}` : name}
-      className="inline-flex items-center rounded-full border px-2 py-0.5 font-mono text-[11px] leading-tight"
-      style={{
-        backgroundColor: cfg.bg,
-        color: cfg.color,
-        borderColor: cfg.border,
-      }}
-    >
-      {display}
-    </span>
-  );
-}
-
-function LayerGroup({
-  layer,
-  packages,
-}: {
-  layer: PackageLayer;
-  packages: string[];
-}) {
-  const cfg = LAYER_CONFIG[layer];
-  const Icon = LAYER_ICON[layer];
-  return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-center gap-2">
-        <span
-          className="inline-flex size-5 items-center justify-center rounded"
-          style={{ backgroundColor: cfg.bg, color: cfg.color }}
-        >
-          <Icon className="size-3" />
-        </span>
-        <span
-          className="text-[11px] font-semibold uppercase tracking-wider"
-          style={{ color: cfg.color }}
-        >
-          {LAYER_SHORT[layer]}
-        </span>
-        <span className="text-[11px] text-muted-foreground">
-          · {packages.length}
-        </span>
-      </div>
-      <div className="flex flex-wrap gap-1.5">
-        {packages.map((name) => (
-          <PackageChip key={name} name={name} />
-        ))}
-      </div>
-    </div>
-  );
-}
 
 function StatCard({
   label,
@@ -198,86 +72,90 @@ function StatCard({
   );
 }
 
-// ---------------------------------------------------------
-// Page
-// ---------------------------------------------------------
-
 export default async function DependencyPage() {
   const supabase = await createClient();
 
-  const [
-    { data: products },
-    { data: techStackRaw },
-    { data: dependencyItems },
-  ] = await Promise.all([
-    supabase
-      .schema("metago")
-      .from("products")
-      .select("id, name, display_name, primary_color")
-      .order("priority"),
-    supabase
-      .schema("metago")
-      .from("tech_stack_items")
-      .select("product_id, package_name, category, is_dev")
-      .eq("is_dev", false)
-      .order("package_name"),
-    supabase
-      .schema("metago")
-      .from("dependency_items")
-      .select("*, products(display_name, primary_color)")
-      .order("created_at", { ascending: false }),
-  ]);
+  const [{ data: products }, { data: techStackRaw }, { data: dependencyItems }] =
+    await Promise.all([
+      supabase
+        .schema("metago")
+        .from("products")
+        .select("id, name, display_name, primary_color")
+        .order("priority"),
+      supabase
+        .schema("metago")
+        .from("tech_stack_items")
+        .select("product_id, package_name, version, category, is_dev")
+        .eq("is_dev", false)
+        .order("package_name"),
+      supabase
+        .schema("metago")
+        .from("dependency_items")
+        .select("*, products(display_name, primary_color)")
+        .order("created_at", { ascending: false }),
+    ]);
 
-  const allProducts = products ?? [];
+  const allProducts: ProductSummary[] = products ?? [];
   const techStack = techStackRaw ?? [];
   const allItems = dependencyItems ?? [];
 
-  // ── 共通パッケージ（全プロダクト共通）
-  const productCount = allProducts.length;
-  const pkgCount = new Map<string, number>();
+  // パッケージ毎に { product_id → version } を集約
+  const packageInfo = new Map<
+    string,
+    {
+      category: string;
+      versions: Record<string, string>;
+    }
+  >();
   for (const item of techStack) {
-    pkgCount.set(item.package_name, (pkgCount.get(item.package_name) ?? 0) + 1);
+    if (!packageInfo.has(item.package_name)) {
+      packageInfo.set(item.package_name, {
+        category: item.category,
+        versions: {},
+      });
+    }
+    const info = packageInfo.get(item.package_name)!;
+    info.versions[item.product_id] = item.version ?? "—";
   }
-  const sharedPkgs = new Set(
-    productCount > 0
-      ? [...pkgCount.entries()]
-          .filter(([, c]) => c === productCount)
-          .map(([n]) => n)
-      : [],
-  );
 
-  // ── Layerごとに共通パッケージを分類
-  const sharedByLayer = new Map<PackageLayer, string[]>();
-  const seenShared = new Set<string>();
-  for (const item of techStack) {
-    if (!sharedPkgs.has(item.package_name)) continue;
-    if (seenShared.has(item.package_name)) continue;
-    seenShared.add(item.package_name);
-    const layer = getLayer(item.package_name);
-    if (!sharedByLayer.has(layer)) sharedByLayer.set(layer, []);
-    sharedByLayer.get(layer)!.push(item.package_name);
-  }
-  for (const arr of sharedByLayer.values()) arr.sort();
+  const total = allProducts.length;
+  const shared: PackageRow[] = [];
+  const partial: PackageRow[] = [];
+  const perProduct: Record<string, PackageRow[]> = {};
+  for (const p of allProducts) perProduct[p.id] = [];
 
-  // ── プロダクトごとの固有パッケージ（共通除外）をLayerで分類
-  const uniqueByProduct = new Map<string, Map<PackageLayer, string[]>>();
-  for (const item of techStack) {
-    if (sharedPkgs.has(item.package_name)) continue;
-    if (!uniqueByProduct.has(item.product_id))
-      uniqueByProduct.set(item.product_id, new Map());
-    const layerMap = uniqueByProduct.get(item.product_id)!;
-    const layer = getLayer(item.package_name);
-    if (!layerMap.has(layer)) layerMap.set(layer, []);
-    layerMap.get(layer)!.push(item.package_name);
+  for (const [name, info] of packageInfo) {
+    const usingIds = Object.keys(info.versions);
+    const row: PackageRow = {
+      package_name: name,
+      category: info.category,
+      description: PACKAGE_DESCRIPTIONS[name]?.description,
+      versions: info.versions,
+    };
+    if (usingIds.length === total && total > 0) {
+      shared.push(row);
+    } else if (usingIds.length === 1) {
+      perProduct[usingIds[0]].push(row);
+    } else {
+      partial.push(row);
+    }
   }
-  for (const layerMap of uniqueByProduct.values()) {
-    for (const arr of layerMap.values()) arr.sort();
-  }
+
+  const sortByName = (a: PackageRow, b: PackageRow) =>
+    a.package_name.localeCompare(b.package_name);
+  shared.sort(sortByName);
+  partial.sort((a, b) => {
+    // 多い順 → 名前
+    const aN = Object.keys(a.versions).length;
+    const bN = Object.keys(b.versions).length;
+    if (aN !== bN) return bN - aN;
+    return a.package_name.localeCompare(b.package_name);
+  });
+  for (const id of Object.keys(perProduct)) perProduct[id].sort(sortByName);
 
   const hasTechStack = techStack.length > 0;
-  const sharedTotal = seenShared.size;
-  const uniqueTotal = [...uniqueByProduct.values()].reduce(
-    (sum, m) => sum + [...m.values()].reduce((s, a) => s + a.length, 0),
+  const totalUnique = Object.values(perProduct).reduce(
+    (s, a) => s + a.length,
     0,
   );
   const majorCount = allItems.filter(
@@ -295,24 +173,23 @@ export default async function DependencyPage() {
         description="各プロダクトの技術スタックとパッケージ更新状況"
       />
 
-      {/* ─── Stat row ─────────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard
           label="プロダクト"
-          value={allProducts.length}
+          value={total}
           sublabel="登録済み"
           accent="#1E3A8A"
         />
         <StatCard
           label="共通スタック"
-          value={sharedTotal}
+          value={shared.length}
           sublabel="全プロダクト共通"
           accent="#059669"
         />
         <StatCard
-          label="プロダクト固有"
-          value={uniqueTotal}
-          sublabel="合計（重複あり）"
+          label="部分共通 / 個別"
+          value={`${partial.length} / ${totalUnique}`}
+          sublabel="部分共通 packages / 個別固有 packages"
           accent="#D97706"
         />
         <StatCard
@@ -323,7 +200,6 @@ export default async function DependencyPage() {
         />
       </div>
 
-      {/* ─── Section 1: 技術スタック ─────────────────────── */}
       {!hasTechStack ? (
         <EmptyState
           icon={<Layers className="size-12" />}
@@ -331,116 +207,19 @@ export default async function DependencyPage() {
           description="GitHub Actions の週次ワークフローが実行されるか、手動トリガーすると自動収集されます"
         />
       ) : (
-        <>
-          {/* 共通スタック */}
-          {sharedByLayer.size > 0 && (
-            <Card>
-              <CardHeader className="flex-row items-baseline justify-between gap-3 space-y-0 border-b border-border bg-muted/40 px-5 py-3">
-                <div className="flex items-baseline gap-2">
-                  <CardTitle className="text-sm">共通スタック</CardTitle>
-                  <CardDescription className="text-xs">
-                    全プロダクトが採用しているパッケージ
-                  </CardDescription>
-                </div>
-                <Badge variant="outline" className="font-mono">
-                  {sharedTotal} packages
-                </Badge>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-5 p-5">
-                {LAYER_ORDER.filter((l) => sharedByLayer.has(l)).map((l) => (
-                  <LayerGroup
-                    key={l}
-                    layer={l}
-                    packages={sharedByLayer.get(l)!}
-                  />
-                ))}
-              </CardContent>
-            </Card>
-          )}
-
-          {/* プロダクト別固有スタック */}
-          <section className="flex flex-col gap-3">
-            <div className="flex items-baseline justify-between">
-              <h2 className="text-sm font-semibold text-foreground">
-                プロダクト固有スタック
-              </h2>
-              <span className="text-xs text-muted-foreground">
-                共通スタックを除いた、各プロダクト独自のパッケージ
-              </span>
-            </div>
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              {allProducts.map((product) => {
-                const layerMap = uniqueByProduct.get(product.id);
-                const hasUnique = layerMap && layerMap.size > 0;
-                const uniqueCount = hasUnique
-                  ? [...layerMap!.values()].reduce((s, a) => s + a.length, 0)
-                  : 0;
-                const accent = product.primary_color ?? "#6B7280";
-
-                return (
-                  <Card
-                    key={product.id}
-                    className="overflow-hidden"
-                    style={{ borderLeft: `3px solid ${accent}` }}
-                  >
-                    <CardHeader className="flex-row items-center justify-between gap-3 space-y-0 border-b border-border bg-muted/40 px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <span
-                          className="size-2 shrink-0 rounded-full"
-                          style={{ backgroundColor: accent }}
-                        />
-                        <CardTitle className="text-sm">
-                          {product.display_name}
-                        </CardTitle>
-                      </div>
-                      {hasUnique ? (
-                        <Badge
-                          variant="outline"
-                          className="font-mono text-[11px]"
-                        >
-                          固有 {uniqueCount}
-                        </Badge>
-                      ) : (
-                        <span className="text-[11px] text-muted-foreground">
-                          共通のみ
-                        </span>
-                      )}
-                    </CardHeader>
-                    <CardContent className="p-4">
-                      {hasUnique ? (
-                        <div className="flex flex-col gap-4">
-                          {LAYER_ORDER.filter((l) => layerMap!.has(l)).map(
-                            (l) => (
-                              <LayerGroup
-                                key={l}
-                                layer={l}
-                                packages={layerMap!.get(l)!}
-                              />
-                            ),
-                          )}
-                        </div>
-                      ) : (
-                        <p className="text-xs text-muted-foreground">
-                          共通スタックのみで構成。固有のパッケージはありません。
-                        </p>
-                      )}
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          </section>
-        </>
+        <DependencyTables
+          products={allProducts}
+          shared={shared}
+          partial={partial}
+          perProduct={perProduct}
+        />
       )}
 
-      {/* ─── Section 2: アップデート状況 ─────────────────── */}
+      {/* アップデート状況 */}
       <Card>
         <CardHeader className="flex-row items-baseline justify-between gap-3 space-y-0 border-b border-border bg-muted/40 px-5 py-3">
           <div className="flex items-baseline gap-2">
             <CardTitle className="text-sm">アップデート状況</CardTitle>
-            <CardDescription className="text-xs">
-              dependency_items に記録された更新候補
-            </CardDescription>
           </div>
           <Badge variant="outline" className="font-mono">
             {allItems.length} items

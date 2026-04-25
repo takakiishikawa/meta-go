@@ -3,7 +3,6 @@ import { EmptyState, PageHeader } from "@takaki/go-design-system";
 import { ScoreDonut } from "@/components/score/score-donut";
 import { ShieldAlert } from "lucide-react";
 import { SecurityVulnerabilityTable } from "@/components/security/security-vulnerability-table";
-import { ProductSecurityEvalButton } from "@/components/security/product-security-eval-button";
 import { SeverityCell } from "@/components/security/severity-cell";
 import { ScoreDelta } from "@/components/score/score-delta";
 
@@ -14,13 +13,6 @@ const GO_COLORS: Record<string, string> = {
   cookgo: "#FF991F",
   physicalgo: "#6554C0",
   taskgo: "#00B8D9",
-};
-
-const SEVERITY_COLORS: Record<string, string> = {
-  critical: "#FF5630",
-  high: "#FF8B00",
-  medium: "#FF991F",
-  low: "#36B37E",
 };
 
 const SEVERITY_ORDER = ["critical", "high", "medium", "low"];
@@ -204,7 +196,6 @@ export default async function SecurityPage() {
                 {[
                   "プロダクト",
                   "スコア",
-                  "評価",
                   "Critical",
                   "High",
                   "Medium",
@@ -256,19 +247,6 @@ export default async function SecurityPage() {
                           <ScoreDelta delta={delta} />
                         </div>
                       </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <ProductSecurityEvalButton
-                        items={productItems.map((i) => ({
-                          id: i.id,
-                          title: i.title,
-                          description: i.description ?? null,
-                          severity: i.severity,
-                          state: i.state,
-                        }))}
-                        score={score}
-                        productName={product.display_name}
-                      />
                     </td>
                     {SEVERITY_ORDER.map((sev_key) => (
                       <td key={sev_key} className="px-4 py-3">

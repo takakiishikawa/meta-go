@@ -1,12 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
-import { Badge, EmptyState, PageHeader } from "@takaki/go-design-system";
+import { EmptyState, PageHeader } from "@takaki/go-design-system";
 import { ScoreDonut } from "@/components/score/score-donut";
-import { Pagination } from "@/components/ui/pagination";
 import { ProductEvalButton } from "@/components/shared/product-eval-button";
 import { ScoreDelta } from "@/components/score/score-delta";
+import { DesignSystemViolationsTabs } from "@/components/design-system/violations-tabs";
 import { Palette } from "lucide-react";
-
-const PAGE_SIZE = 20;
 
 const GO_COLORS: Record<string, string> = {
   nativego: "#0052CC",
@@ -17,14 +15,7 @@ const GO_COLORS: Record<string, string> = {
   taskgo: "#00B8D9",
 };
 
-export default async function DesignSystemPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ page?: string }>;
-}) {
-  const { page: pageParam } = await searchParams;
-  const page = Math.max(1, parseInt(pageParam ?? "1", 10));
-
+export default async function DesignSystemPage() {
   const supabase = await createClient();
   const sevenDaysAgo = new Date(
     Date.now() - 7 * 24 * 60 * 60 * 1000,
@@ -104,9 +95,6 @@ export default async function DesignSystemPage({
   const topCategories = Object.entries(byCategory)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5);
-
-  const totalPages = Math.ceil(allItems.length / PAGE_SIZE);
-  const pagedItems = allItems.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
     <>
@@ -275,84 +263,7 @@ export default async function DesignSystemPage({
           description="GitHub Actions cronが実行されるとデータが表示されます"
         />
       ) : (
-        <div className="flex flex-col gap-3">
-          <span className="text-sm font-semibold text-foreground">
-            違反一覧{" "}
-            <span
-              style={{ color: "var(--color-text-secondary)", fontWeight: 400 }}
-            >
-              ({allItems.length}件)
-            </span>
-          </span>
-          <div className="rounded-lg border border-border overflow-hidden">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border bg-surface-subtle">
-                  {["プロダクト", "カテゴリ", "違反内容", "状態"].map((h) => (
-                    <th
-                      key={h}
-                      className="px-4 py-3 text-left text-xs font-medium"
-                      style={{ color: "var(--color-text-secondary)" }}
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {pagedItems.map((item) => (
-                  <tr
-                    key={item.id}
-                    className="border-b border-border last:border-0 hover:bg-surface-subtle"
-                  >
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <div
-                          className="size-2 rounded-full shrink-0"
-                          style={{
-                            backgroundColor:
-                              item.products?.primary_color || "#6B7280",
-                          }}
-                        />
-                        <span className="text-sm text-foreground whitespace-nowrap">
-                          {item.products?.display_name ?? "—"}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <Badge variant="outline">{item.category}</Badge>
-                    </td>
-                    <td className="px-4 py-3 max-w-xs">
-                      <div className="text-sm font-medium text-foreground">
-                        {item.title}
-                      </div>
-                      {item.description && (
-                        <div
-                          className="text-xs mt-0.5 line-clamp-2"
-                          style={{ color: "var(--color-text-secondary)" }}
-                        >
-                          {item.description}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <Badge
-                        variant={item.state === "done" ? "default" : "outline"}
-                      >
-                        {item.state}
-                      </Badge>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <Pagination
-            page={page}
-            totalPages={totalPages}
-            basePath="/design-system"
-          />
-        </div>
+        <DesignSystemViolationsTabs items={allItems} />
       )}
     </>
   );
