@@ -13,8 +13,8 @@ INSERT INTO metago.products (name, display_name, description, github_repo, verce
   ('cookgo',        'CookGo',        '健康的な自炊を継続する',                  'takakiishikawa/cook-go',          'https://cook-go.vercel.app',     '#FF991F', 4),
   ('physicalgo',    'PhysicalGo',    '身体を鍛え続ける',                        'takakiishikawa/physical-go',      'https://physical-go.vercel.app', '#6554C0', 5),
   ('taskgo',        'TaskGo',        'やるべきタスクを整理する',                'takakiishikawa/task-go',          'https://task-go.vercel.app',     '#00B8D9', 6),
-  ('designsystem',  'DesignSystem',  'goシリーズ共通デザインシステム',          'takakiishikawa/go-design-system', NULL,                             '#7C3AED', 7),
-  ('metago',        'MetaGo',        'goシリーズ全体を管理する自律的PM',         'takakiishikawa/meta-go',          NULL,                             '#1E3A8A', 8)
+  ('designsystem',  'DesignSystem',  'goシリーズ共通デザインシステム',          'takakiishikawa/go-design-system', 'https://go-design-system.vercel.app', '#7C3AED', 7),
+  ('metago',        'MetaGo',        'goシリーズ全体を管理する自律的PM',         'takakiishikawa/meta-go',          'https://metago.vercel.app',           '#1E3A8A', 8)
 ON CONFLICT (name) DO UPDATE SET
   display_name  = EXCLUDED.display_name,
   description   = EXCLUDED.description,
@@ -22,6 +22,14 @@ ON CONFLICT (name) DO UPDATE SET
   vercel_url    = EXCLUDED.vercel_url,
   primary_color = EXCLUDED.primary_color,
   priority      = EXCLUDED.priority;
+
+-- ============================================================
+-- 過去の収集ミスデータのクリーンアップ（idempotent）
+-- ============================================================
+-- designsystemはDS自身を測れないのでdesign_systemスコアを削除
+DELETE FROM metago.scores_history
+WHERE product_id = (SELECT id FROM metago.products WHERE name = 'designsystem')
+  AND category = 'design_system';
 
 -- ============================================================
 -- psf_metrics_definitions
@@ -116,3 +124,31 @@ FROM metago.products p WHERE p.name = 'taskgo';
 INSERT INTO metago.psf_metrics_definitions (product_id, metric_type, name, target_value, unit, description, weight, data_source)
 SELECT p.id, 'behavior', '完了数/日', 13, '件', '1日あたりのタスク完了数', 1.0, NULL
 FROM metago.products p WHERE p.name = 'taskgo';
+
+-- MetaGo（自身もプロダクトとして PSF 観点を持つ）
+-- result: 全goの健全性スコアを高水準に保てているか
+INSERT INTO metago.psf_metrics_definitions (product_id, metric_type, name, target_value, unit, description, weight, data_source)
+SELECT p.id, 'result', '全go平均スコア', 80, '点', 'quality/security/design_system/performanceの全プロダクト平均（直近）', 1.5, 'metago.scores_history (avg of all categories across products)'
+FROM metago.products p WHERE p.name = 'metago';
+
+-- behavior: 自動修正がどの程度回っているか
+INSERT INTO metago.psf_metrics_definitions (product_id, metric_type, name, target_value, unit, description, weight, data_source)
+SELECT p.id, 'behavior', 'L1自動マージ数/週', 10, '件', 'metagoが週間で自動マージしたL1 PRの数', 1.0, 'metago.execution_logs (level=L1, state=merged, weekly count)'
+FROM metago.products p WHERE p.name = 'metago';
+
+INSERT INTO metago.psf_metrics_definitions (product_id, metric_type, name, target_value, unit, description, weight, data_source)
+SELECT p.id, 'behavior', '自動修正成功率', 90, '%', 'L1自動修正PRがCI通過してマージされた割合', 1.0, 'metago.execution_logs (merged / created)'
+FROM metago.products p WHERE p.name = 'metago';
+
+INSERT INTO metago.psf_metrics_definitions (product_id, metric_type, name, target_value, unit, description, weight, data_source)
+SELECT p.id, 'behavior', '承認待ちPR残件数', 3, '件', 'L2承認待ちのPRが滞留していないか（少ないほど良い）', 0.5, 'metago.approval_queue (state=pending count)'
+FROM metago.products p WHERE p.name = 'metago';
+
+-- DesignSystem（ライブラリだが "全goから利用されているか" の観点でPSFを持つ）
+INSERT INTO metago.psf_metrics_definitions (product_id, metric_type, name, target_value, unit, description, weight, data_source)
+SELECT p.id, 'result', '全go採用率', 100, '%', 'go-design-systemをimportしているgoプロダクトの割合', 1.0, NULL
+FROM metago.products p WHERE p.name = 'designsystem';
+
+INSERT INTO metago.psf_metrics_definitions (product_id, metric_type, name, target_value, unit, description, weight, data_source)
+SELECT p.id, 'behavior', 'リリース頻度/月', 4, '回', '月間のバージョンリリース回数（活発な開発の証跡）', 1.0, NULL
+FROM metago.products p WHERE p.name = 'designsystem';

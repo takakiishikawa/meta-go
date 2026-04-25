@@ -34,8 +34,11 @@ const REPO_TO_SLUG: Record<string, string> = {
   "cook-go": "cookgo",
   "physical-go": "physicalgo",
   "task-go": "taskgo",
+  "meta-go": "metago",
 };
 
+// 計測対象（修正PRも作成）
+// designsystemはshowcaseのため計測のみ・修正PRなしの扱い（processProductでrepo=null）
 const GO_REPOS: Record<string, string> = {
   nativego: "native-go",
   carego: "care-go",
@@ -43,6 +46,7 @@ const GO_REPOS: Record<string, string> = {
   cookgo: "cook-go",
   physicalgo: "physical-go",
   taskgo: "task-go",
+  metago: "meta-go",
 };
 
 const THRESHOLDS = {
@@ -94,8 +98,13 @@ function runLighthouse(
       { stdio: "pipe", timeout: 120_000 },
     );
     const report = JSON.parse(fs.readFileSync(reportPath, "utf-8"));
+    const perfScore = report.categories?.performance?.score;
+    if (perfScore == null) {
+      console.warn(`  Lighthouse: performanceカテゴリスコアが取得できませんでした`);
+      return null;
+    }
     return {
-      score: Math.round((report.categories?.performance?.score ?? 0) * 100),
+      score: Math.round(perfScore * 100),
       lcp: Math.round(
         report.audits?.["largest-contentful-paint"]?.numericValue ?? 0,
       ),
@@ -184,7 +193,7 @@ Only include files you actually changed. Return ONLY the JSON — no explanation
     try {
       console.log(`  🤖 パフォーマンス改善分析... (試行 ${attempt})`);
       const message = await anthropic.messages.create({
-        model: "claude-sonnet-4-5",
+        model: "claude-sonnet-4-6",
         max_tokens: 4096,
         messages: [{ role: "user", content: prompt }],
       });
@@ -254,6 +263,13 @@ async function processProduct(product: any, repo: string | null) {
     score: metrics.score,
   });
 
+  // 保存前に同productの古いperformanceスコアを全削除して残留を防ぐ
+  await supabase
+    .schema("metago")
+    .from("scores_history")
+    .delete()
+    .eq("product_id", product.id)
+    .eq("category", "performance");
   await supabase.schema("metago").from("scores_history").insert({
     product_id: product.id,
     category: "performance",

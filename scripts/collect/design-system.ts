@@ -30,6 +30,8 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
+// designsystem 自身はDS準拠率の計測対象外（自分自身を測れない）
+// metago は通常のアプリとして計測対象に含める
 const GO_REPOS: Record<string, string> = {
   nativego: "native-go",
   carego: "care-go",
@@ -37,7 +39,6 @@ const GO_REPOS: Record<string, string> = {
   cookgo: "cook-go",
   physicalgo: "physical-go",
   taskgo: "task-go",
-  designsystem: "go-design-system",
   metago: "meta-go",
 };
 
@@ -425,7 +426,14 @@ async function analyzeRepo(product: any, repo: string) {
       });
     }
 
+    // 保存前に同productの古いdesign_systemスコアを全削除して残留を防ぐ
     const score = Math.max(0, 100 - totalPenalty);
+    await supabase
+      .schema("metago")
+      .from("scores_history")
+      .delete()
+      .eq("product_id", product.id)
+      .eq("category", "design_system");
     await supabase.schema("metago").from("scores_history").insert({
       product_id: product.id,
       category: "design_system",

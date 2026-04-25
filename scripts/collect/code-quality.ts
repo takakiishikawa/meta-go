@@ -269,7 +269,7 @@ ${sourceCode}
     try {
       console.log(`  🤖 Claude評価実行中... (試行 ${attempt}/${MAX_RETRIES})`);
       const message = await anthropic.messages.create({
-        model: "claude-sonnet-4-5",
+        model: "claude-sonnet-4-6",
         max_tokens: 4096,
         messages: [{ role: "user", content: prompt }],
       });
@@ -302,8 +302,17 @@ ${sourceCode}
         weightedSum += ax.score * def.weight;
         totalWeight += def.weight;
       }
-      const overallScore =
-        totalWeight > 0 ? Math.round(weightedSum / totalWeight) : 0;
+
+      // axisIdが全てQUALITY_AXESと不一致の場合はAPI失敗扱いにして空axisを返す
+      // → 上位の保存処理で「保存スキップ」される（過去の0スコア残留を防ぐ）
+      if (totalWeight === 0) {
+        console.warn(
+          "  ⚠️  全axisIdがQUALITY_AXESと不一致 (Claudeのレスポンス形式異常)、保存をスキップします",
+        );
+        return { axes: [], overallScore: 0 };
+      }
+
+      const overallScore = Math.round(weightedSum / totalWeight);
 
       // 評価結果をログ出力
       console.log(`  📊 評価結果:`);
@@ -398,7 +407,7 @@ async function fixTscErrors(
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
         const message = await anthropic.messages.create({
-          model: "claude-sonnet-4-5",
+          model: "claude-sonnet-4-6",
           max_tokens: 4096,
           messages: [
             {
@@ -518,11 +527,13 @@ async function processRepo(product: any, repo: string) {
     repoDir = cloneRepo(repo);
 
     // 1. 既存レコードを全削除（clone成功後すぐに実行し、古いデータを常にクリア）
+    //    quality_items は category="Performance" を除いて削除（performance.ts で別管理）
     await supabase
       .schema("metago")
       .from("quality_items")
       .delete()
-      .eq("product_id", product.id);
+      .eq("product_id", product.id)
+      .not("category", "in", '("Performance","パフォーマンス")');
 
     // 2. Claude による7軸評価（スコアの根拠）
     const evaluation = await evaluateCodeQuality(
@@ -572,8 +583,15 @@ async function processRepo(product: any, repo: string) {
     }
 
     // 5. スコア保存（Claudeの加重平均 — API失敗時はスキップ）
+    //    保存前に同productの古いqualityスコアを全削除して残留0を防ぐ
     const score = evaluation.overallScore;
     if (evaluation.axes.length > 0) {
+      await supabase
+        .schema("metago")
+        .from("scores_history")
+        .delete()
+        .eq("product_id", product.id)
+        .eq("category", "quality");
       await supabase.schema("metago").from("scores_history").insert({
         product_id: product.id,
         category: "quality",
