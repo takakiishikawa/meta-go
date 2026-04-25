@@ -1,31 +1,68 @@
 import { createClient } from "@/lib/supabase/server";
-import { Badge, EmptyState, PageHeader } from "@takaki/go-design-system";
-import { ExternalLink, Package, Layers } from "lucide-react";
+import {
+  Badge,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  EmptyState,
+  PageHeader,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@takaki/go-design-system";
+import {
+  ExternalLink,
+  Layers,
+  Package,
+  Anchor,
+  Palette,
+  Wrench,
+  Boxes,
+  Sparkles,
+  ShieldAlert,
+} from "lucide-react";
+import {
+  PACKAGE_DESCRIPTIONS,
+  LAYER_CONFIG,
+  LAYER_ORDER,
+  type PackageLayer,
+} from "@/lib/package-descriptions";
 
 // ---------------------------------------------------------
-// カテゴリ設定
+// Layer presentation
 // ---------------------------------------------------------
-const CATEGORY_CONFIG: Record<string, { color: string; order: number }> = {
-  フレームワーク: { color: "#1E3A8A", order: 1 },
-  "UI / デザイン": { color: "#6554C0", order: 2 },
-  "バックエンド / DB": { color: "#00875A", order: 3 },
-  "AI / ML": { color: "#FF5630", order: 4 },
-  決済: { color: "#FF991F", order: 5 },
-  "フォーム / バリデーション": { color: "#00B8D9", order: 6 },
-  ユーティリティ: { color: "#6B7280", order: 7 },
-  その他: { color: "#9CA3AF", order: 8 },
+const LAYER_ICON: Record<PackageLayer, typeof Anchor> = {
+  foundation: Anchor,
+  "layer1-ds": Palette,
+  "layer2-standard": Wrench,
+  "layer3-feature": Boxes,
+  "layer4-specific": Sparkles,
+  forbidden: ShieldAlert,
 };
 
-const CATEGORY_ORDER = Object.entries(CATEGORY_CONFIG)
-  .sort((a, b) => a[1].order - b[1].order)
-  .map(([k]) => k);
-
-const UPDATE_TYPE_COLORS: Record<string, string> = {
-  patch: "#36B37E",
-  minor: "#FF991F",
-  major: "#FF5630",
-  framework: "#6554C0",
+const LAYER_SHORT: Record<PackageLayer, string> = {
+  foundation: "Foundation",
+  "layer1-ds": "Layer 1 — Design System",
+  "layer2-standard": "Layer 2 — Standard",
+  "layer3-feature": "Layer 3 — Feature",
+  "layer4-specific": "Layer 4 — Product-specific",
+  forbidden: "方針違反",
 };
+
+const UNCLASSIFIED_LAYER: PackageLayer = "layer4-specific";
+
+function getLayer(name: string): PackageLayer {
+  return PACKAGE_DESCRIPTIONS[name]?.layer ?? UNCLASSIFIED_LAYER;
+}
+
+function getDescription(name: string): string | undefined {
+  return PACKAGE_DESCRIPTIONS[name]?.description;
+}
 
 const STATE_LABELS: Record<string, string> = {
   new: "未対応",
@@ -33,27 +70,61 @@ const STATE_LABELS: Record<string, string> = {
   done: "完了",
 };
 
+// Lozenge style update_type — Atlassian-flavored soft-fill pills
+const UPDATE_TYPE_STYLE: Record<
+  string,
+  { label: string; bg: string; fg: string; border: string }
+> = {
+  patch: {
+    label: "patch",
+    bg: "#DCFCE7",
+    fg: "#166534",
+    border: "#BBF7D0",
+  },
+  minor: {
+    label: "minor",
+    bg: "#FEF3C7",
+    fg: "#92400E",
+    border: "#FDE68A",
+  },
+  major: {
+    label: "major",
+    bg: "#FEE2E2",
+    fg: "#991B1B",
+    border: "#FECACA",
+  },
+  framework: {
+    label: "framework",
+    bg: "#EDE9FE",
+    fg: "#5B21B6",
+    border: "#DDD6FE",
+  },
+};
+
 // ---------------------------------------------------------
-// 子コンポーネント
+// Subcomponents
 // ---------------------------------------------------------
 
-function PackageChip({ name, color }: { name: string; color: string }) {
+function PackageChip({ name }: { name: string }) {
   const display = name
     .replace("@takaki/", "")
     .replace("@supabase/", "supabase/")
     .replace("@ai-sdk/", "ai-sdk/")
     .replace("@anthropic-ai/", "anthropic/")
-    .replace("@hookform/", "hookform/")
-    .replace("react-hook-form", "react-hook-form");
+    .replace("@hookform/", "hookform/");
+
+  const desc = getDescription(name);
+  const layer = getLayer(name);
+  const cfg = LAYER_CONFIG[layer];
 
   return (
     <span
-      title={name}
-      className="rounded px-1.5 py-0.5 text-xs font-mono leading-relaxed"
+      title={desc ? `${name}\n${desc}` : name}
+      className="inline-flex items-center rounded-full border px-2 py-0.5 font-mono text-[11px] leading-tight"
       style={{
-        backgroundColor: color + "1A",
-        color: color,
-        border: `1px solid ${color}33`,
+        backgroundColor: cfg.bg,
+        color: cfg.color,
+        borderColor: cfg.border,
       }}
     >
       {display}
@@ -61,32 +132,69 @@ function PackageChip({ name, color }: { name: string; color: string }) {
   );
 }
 
-function CategorySection({
-  category,
-  items,
+function LayerGroup({
+  layer,
+  packages,
 }: {
-  category: string;
-  items: { package_name: string }[];
+  layer: PackageLayer;
+  packages: string[];
 }) {
-  const color = CATEGORY_CONFIG[category]?.color ?? "#6B7280";
+  const cfg = LAYER_CONFIG[layer];
+  const Icon = LAYER_ICON[layer];
   return (
-    <div>
-      <div
-        className="text-[10px] font-semibold uppercase tracking-wide mb-1.5"
-        style={{ color }}
-      >
-        {category}
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center gap-2">
+        <span
+          className="inline-flex size-5 items-center justify-center rounded"
+          style={{ backgroundColor: cfg.bg, color: cfg.color }}
+        >
+          <Icon className="size-3" />
+        </span>
+        <span
+          className="text-[11px] font-semibold uppercase tracking-wider"
+          style={{ color: cfg.color }}
+        >
+          {LAYER_SHORT[layer]}
+        </span>
+        <span className="text-[11px] text-muted-foreground">
+          · {packages.length}
+        </span>
       </div>
-      <div className="flex flex-wrap gap-1">
-        {items.map((item) => (
-          <PackageChip
-            key={item.package_name}
-            name={item.package_name}
-            color={color}
-          />
+      <div className="flex flex-wrap gap-1.5">
+        {packages.map((name) => (
+          <PackageChip key={name} name={name} />
         ))}
       </div>
     </div>
+  );
+}
+
+function StatCard({
+  label,
+  value,
+  sublabel,
+  accent,
+}: {
+  label: string;
+  value: number | string;
+  sublabel?: string;
+  accent: string;
+}) {
+  return (
+    <Card className="overflow-hidden">
+      <div className="h-1" style={{ backgroundColor: accent }} />
+      <CardContent className="p-4">
+        <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          {label}
+        </div>
+        <div className="mt-1 text-2xl font-semibold text-foreground">
+          {value}
+        </div>
+        {sublabel && (
+          <div className="mt-0.5 text-xs text-muted-foreground">{sublabel}</div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -97,83 +205,85 @@ function CategorySection({
 export default async function DependencyPage() {
   const supabase = await createClient();
 
-  const [
-    { data: products },
-    { data: techStackRaw },
-    { data: dependencyItems },
-  ] = await Promise.all([
-    supabase
-      .schema("metago")
-      .from("products")
-      .select("id, name, display_name, primary_color")
-      .order("priority"),
-    supabase
-      .schema("metago")
-      .from("tech_stack_items")
-      .select("product_id, package_name, category, is_dev")
-      .eq("is_dev", false)
-      .order("category")
-      .order("package_name"),
-    supabase
-      .schema("metago")
-      .from("dependency_items")
-      .select("*, products(display_name, primary_color)")
-      .order("created_at", { ascending: false }),
-  ]);
+  const [{ data: products }, { data: techStackRaw }, { data: dependencyItems }] =
+    await Promise.all([
+      supabase
+        .schema("metago")
+        .from("products")
+        .select("id, name, display_name, primary_color")
+        .order("priority"),
+      supabase
+        .schema("metago")
+        .from("tech_stack_items")
+        .select("product_id, package_name, category, is_dev")
+        .eq("is_dev", false)
+        .order("package_name"),
+      supabase
+        .schema("metago")
+        .from("dependency_items")
+        .select("*, products(display_name, primary_color)")
+        .order("created_at", { ascending: false }),
+    ]);
 
   const allProducts = products ?? [];
   const techStack = techStackRaw ?? [];
   const allItems = dependencyItems ?? [];
 
-  // 共通スタック: 全プロダクトが持つパッケージ
+  // ── 共通パッケージ（全プロダクト共通）
   const productCount = allProducts.length;
-  const pkgProductCount = new Map<string, number>();
-  techStack.forEach((item) => {
-    pkgProductCount.set(
-      item.package_name,
-      (pkgProductCount.get(item.package_name) ?? 0) + 1,
-    );
-  });
-
-  // 共通パッケージ名セット
-  const sharedPkgNames = new Set(
+  const pkgCount = new Map<string, number>();
+  for (const item of techStack) {
+    pkgCount.set(item.package_name, (pkgCount.get(item.package_name) ?? 0) + 1);
+  }
+  const sharedPkgs = new Set(
     productCount > 0
-      ? [...pkgProductCount.entries()]
-          .filter(([, count]) => count === productCount)
-          .map(([name]) => name)
+      ? [...pkgCount.entries()]
+          .filter(([, c]) => c === productCount)
+          .map(([n]) => n)
       : [],
   );
 
-  // 共通スタックをカテゴリ別にまとめる（重複除去）
-  const sharedByCategory = new Map<string, string[]>();
+  // ── Layerごとに共通パッケージを分類
+  const sharedByLayer = new Map<PackageLayer, string[]>();
   const seenShared = new Set<string>();
   for (const item of techStack) {
-    if (!sharedPkgNames.has(item.package_name)) continue;
+    if (!sharedPkgs.has(item.package_name)) continue;
     if (seenShared.has(item.package_name)) continue;
     seenShared.add(item.package_name);
-    if (!sharedByCategory.has(item.category))
-      sharedByCategory.set(item.category, []);
-    sharedByCategory.get(item.category)!.push(item.package_name);
+    const layer = getLayer(item.package_name);
+    if (!sharedByLayer.has(layer)) sharedByLayer.set(layer, []);
+    sharedByLayer.get(layer)!.push(item.package_name);
   }
+  for (const arr of sharedByLayer.values()) arr.sort();
 
-  // プロダクトごとの固有スタック（共通を除く）
-  const stackByProduct = new Map<string, Map<string, string[]>>();
+  // ── プロダクトごとの固有パッケージ（共通除外）をLayerで分類
+  const uniqueByProduct = new Map<string, Map<PackageLayer, string[]>>();
   for (const item of techStack) {
-    if (sharedPkgNames.has(item.package_name)) continue;
-    if (!stackByProduct.has(item.product_id))
-      stackByProduct.set(item.product_id, new Map());
-    const catMap = stackByProduct.get(item.product_id)!;
-    if (!catMap.has(item.category)) catMap.set(item.category, []);
-    catMap.get(item.category)!.push(item.package_name);
+    if (sharedPkgs.has(item.package_name)) continue;
+    if (!uniqueByProduct.has(item.product_id))
+      uniqueByProduct.set(item.product_id, new Map());
+    const layerMap = uniqueByProduct.get(item.product_id)!;
+    const layer = getLayer(item.package_name);
+    if (!layerMap.has(layer)) layerMap.set(layer, []);
+    layerMap.get(layer)!.push(item.package_name);
+  }
+  for (const layerMap of uniqueByProduct.values()) {
+    for (const arr of layerMap.values()) arr.sort();
   }
 
   const hasTechStack = techStack.length > 0;
+  const sharedTotal = seenShared.size;
+  const uniqueTotal = [...uniqueByProduct.values()].reduce(
+    (sum, m) => sum + [...m.values()].reduce((s, a) => s + a.length, 0),
+    0,
+  );
   const majorCount = allItems.filter(
     (i) => i.update_type === "major" && i.state !== "done",
   ).length;
   const minorCount = allItems.filter(
     (i) => i.update_type === "minor" && i.state !== "done",
   ).length;
+  const pendingCount = allItems.filter((i) => i.state !== "done").length;
 
   return (
     <>
@@ -182,269 +292,267 @@ export default async function DependencyPage() {
         description="各プロダクトの技術スタックとパッケージ更新状況"
       />
 
-      {/* ======================================================
-          Section 1: 技術スタック
-      ====================================================== */}
-      <section>
-        <h2
-          className="text-sm font-semibold mb-4"
-          style={{ color: "var(--color-text-primary)" }}
-        >
-          技術スタック
-        </h2>
+      {/* ─── Stat row ─────────────────────────────────────── */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatCard
+          label="プロダクト"
+          value={allProducts.length}
+          sublabel="登録済み"
+          accent="#1E3A8A"
+        />
+        <StatCard
+          label="共通スタック"
+          value={sharedTotal}
+          sublabel="全プロダクト共通"
+          accent="#059669"
+        />
+        <StatCard
+          label="プロダクト固有"
+          value={uniqueTotal}
+          sublabel="合計（重複あり）"
+          accent="#D97706"
+        />
+        <StatCard
+          label="更新待ち"
+          value={pendingCount}
+          sublabel={`major ${majorCount} / minor ${minorCount}`}
+          accent="#DC2626"
+        />
+      </div>
 
-        {!hasTechStack ? (
-          <EmptyState
-            icon={<Layers className="size-12" />}
-            title="技術スタックがまだ収集されていません"
-            description="GitHub Actions の週次ワークフローが実行されるか、手動トリガーすると自動収集されます"
-          />
-        ) : (
-          <div className="flex flex-col gap-6">
-            {/* 共通スタック */}
-            {sharedByCategory.size > 0 && (
-              <div className="rounded-lg border border-border bg-surface overflow-hidden">
-                <div
-                  className="px-4 py-3 border-b border-border flex items-center gap-2"
-                  style={{ backgroundColor: "var(--color-surface-subtle)" }}
-                >
-                  <span
-                    className="text-sm font-semibold"
-                    style={{ color: "var(--color-text-primary)" }}
-                  >
-                    共通スタック
-                  </span>
-                  <span
-                    className="text-xs"
-                    style={{ color: "var(--color-text-secondary)" }}
-                  >
-                    全プロダクト共通 · {seenShared.size} packages
-                  </span>
+      {/* ─── Section 1: 技術スタック ─────────────────────── */}
+      {!hasTechStack ? (
+        <EmptyState
+          icon={<Layers className="size-12" />}
+          title="技術スタックがまだ収集されていません"
+          description="GitHub Actions の週次ワークフローが実行されるか、手動トリガーすると自動収集されます"
+        />
+      ) : (
+        <>
+          {/* 共通スタック */}
+          {sharedByLayer.size > 0 && (
+            <Card>
+              <CardHeader className="flex-row items-baseline justify-between gap-3 space-y-0 border-b border-border bg-muted/40 px-5 py-3">
+                <div className="flex items-baseline gap-2">
+                  <CardTitle className="text-sm">共通スタック</CardTitle>
+                  <CardDescription className="text-xs">
+                    全プロダクトが採用しているパッケージ
+                  </CardDescription>
                 </div>
-                <div className="px-4 py-4 flex flex-col gap-3">
-                  {CATEGORY_ORDER.filter((cat) =>
-                    sharedByCategory.has(cat),
-                  ).map((cat) => (
-                    <CategorySection
-                      key={cat}
-                      category={cat}
-                      items={sharedByCategory
-                        .get(cat)!
-                        .map((name) => ({ package_name: name }))}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
+                <Badge variant="outline" className="font-mono">
+                  {sharedTotal} packages
+                </Badge>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-5 p-5">
+                {LAYER_ORDER.filter((l) => sharedByLayer.has(l)).map((l) => (
+                  <LayerGroup
+                    key={l}
+                    layer={l}
+                    packages={sharedByLayer.get(l)!}
+                  />
+                ))}
+              </CardContent>
+            </Card>
+          )}
 
-            {/* プロダクト別固有スタック */}
+          {/* プロダクト別固有スタック */}
+          <section className="flex flex-col gap-3">
+            <div className="flex items-baseline justify-between">
+              <h2 className="text-sm font-semibold text-foreground">
+                プロダクト固有スタック
+              </h2>
+              <span className="text-xs text-muted-foreground">
+                共通スタックを除いた、各プロダクト独自のパッケージ
+              </span>
+            </div>
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               {allProducts.map((product) => {
-                const catMap = stackByProduct.get(product.id);
-                const hasUnique = catMap && catMap.size > 0;
+                const layerMap = uniqueByProduct.get(product.id);
+                const hasUnique = layerMap && layerMap.size > 0;
                 const uniqueCount = hasUnique
-                  ? [...catMap!.values()].reduce((s, a) => s + a.length, 0)
+                  ? [...layerMap!.values()].reduce((s, a) => s + a.length, 0)
                   : 0;
+                const accent = product.primary_color ?? "#6B7280";
 
                 return (
-                  <div
+                  <Card
                     key={product.id}
-                    className="rounded-lg border border-border bg-surface overflow-hidden"
+                    className="overflow-hidden"
+                    style={{ borderLeft: `3px solid ${accent}` }}
                   >
-                    {/* カラーバー */}
-                    <div
-                      className="h-1"
-                      style={{
-                        backgroundColor: product.primary_color ?? "#6B7280",
-                      }}
-                    />
-
-                    {/* カードヘッダー */}
-                    <div className="px-4 py-3 border-b border-border flex items-center gap-2">
-                      <span
-                        className="size-2 rounded-full shrink-0"
-                        style={{
-                          backgroundColor: product.primary_color ?? "#6B7280",
-                        }}
-                      />
-                      <span
-                        className="text-sm font-semibold"
-                        style={{ color: "var(--color-text-primary)" }}
-                      >
-                        {product.display_name}
-                      </span>
-                      {hasUnique && (
+                    <CardHeader className="flex-row items-center justify-between gap-3 space-y-0 border-b border-border bg-muted/40 px-4 py-3">
+                      <div className="flex items-center gap-2">
                         <span
-                          className="text-xs ml-auto"
-                          style={{ color: "var(--color-text-secondary)" }}
-                        >
-                          固有 {uniqueCount} packages
+                          className="size-2 shrink-0 rounded-full"
+                          style={{ backgroundColor: accent }}
+                        />
+                        <CardTitle className="text-sm">
+                          {product.display_name}
+                        </CardTitle>
+                      </div>
+                      {hasUnique ? (
+                        <Badge variant="outline" className="font-mono text-[11px]">
+                          固有 {uniqueCount}
+                        </Badge>
+                      ) : (
+                        <span className="text-[11px] text-muted-foreground">
+                          共通のみ
                         </span>
                       )}
-                    </div>
-
-                    {/* カテゴリ別パッケージ */}
-                    <div className="px-4 py-4">
+                    </CardHeader>
+                    <CardContent className="p-4">
                       {hasUnique ? (
-                        <div className="flex flex-col gap-3">
-                          {CATEGORY_ORDER.filter((cat) => catMap!.has(cat)).map(
-                            (cat) => (
-                              <CategorySection
-                                key={cat}
-                                category={cat}
-                                items={catMap!
-                                  .get(cat)!
-                                  .map((name) => ({ package_name: name }))}
+                        <div className="flex flex-col gap-4">
+                          {LAYER_ORDER.filter((l) => layerMap!.has(l)).map(
+                            (l) => (
+                              <LayerGroup
+                                key={l}
+                                layer={l}
+                                packages={layerMap!.get(l)!}
                               />
                             ),
                           )}
                         </div>
                       ) : (
-                        <p
-                          className="text-xs"
-                          style={{ color: "var(--color-text-secondary)" }}
-                        >
-                          共通スタックのみ（固有パッケージなし）
+                        <p className="text-xs text-muted-foreground">
+                          共通スタックのみで構成。固有のパッケージはありません。
                         </p>
                       )}
-                    </div>
-                  </div>
+                    </CardContent>
+                  </Card>
                 );
               })}
             </div>
-          </div>
-        )}
-      </section>
+          </section>
+        </>
+      )}
 
-      {/* ======================================================
-          Section 2: アップデート状況
-      ====================================================== */}
-      <section>
-        <h2
-          className="text-sm font-semibold mb-4"
-          style={{ color: "var(--color-text-primary)" }}
-        >
-          アップデート状況
-        </h2>
-
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 mb-4">
-          <div className="rounded-lg border border-border bg-surface p-4">
-            <div className="text-2xl font-semibold text-foreground">
-              {allItems.length}
-            </div>
-            <div
-              style={{
-                fontSize: "var(--text-sm)",
-                color: "var(--color-text-secondary)",
-              }}
-            >
-              確認済みパッケージ
-            </div>
+      {/* ─── Section 2: アップデート状況 ─────────────────── */}
+      <Card>
+        <CardHeader className="flex-row items-baseline justify-between gap-3 space-y-0 border-b border-border bg-muted/40 px-5 py-3">
+          <div className="flex items-baseline gap-2">
+            <CardTitle className="text-sm">アップデート状況</CardTitle>
+            <CardDescription className="text-xs">
+              dependency_items に記録された更新候補
+            </CardDescription>
           </div>
-          <div className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-950">
-            <div className="text-2xl font-semibold text-red-600">
-              {majorCount}
+          <Badge variant="outline" className="font-mono">
+            {allItems.length} items
+          </Badge>
+        </CardHeader>
+        <CardContent className="p-0">
+          {allItems.length === 0 ? (
+            <div className="p-6">
+              <EmptyState
+                icon={<Package className="size-12" />}
+                title="データがまだありません"
+                description="GitHub Actions cron が実行されるとデータが表示されます"
+              />
             </div>
-            <div className="text-sm text-red-600">Major 更新あり</div>
-          </div>
-          <div className="rounded-lg border border-orange-200 bg-orange-50 p-4 dark:border-orange-800 dark:bg-orange-950">
-            <div className="text-2xl font-semibold text-orange-600">
-              {minorCount}
-            </div>
-            <div className="text-sm text-orange-600">Minor 更新あり</div>
-          </div>
-        </div>
-
-        {allItems.length === 0 ? (
-          <EmptyState
-            icon={<Package className="size-12" />}
-            title="データがまだありません"
-            description="GitHub Actions cron が実行されるとデータが表示されます"
-          />
-        ) : (
-          <div className="rounded-lg border border-border overflow-hidden">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border bg-surface-subtle">
-                  {[
-                    "プロダクト",
-                    "パッケージ",
-                    "現バージョン",
-                    "最新バージョン",
-                    "種類",
-                    "状態",
-                    "PR",
-                  ].map((h) => (
-                    <th
-                      key={h}
-                      className="px-4 py-3 text-left text-xs font-medium"
-                      style={{ color: "var(--color-text-secondary)" }}
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {allItems.map((item) => (
-                  <tr
-                    key={item.id}
-                    className="border-b border-border last:border-0 hover:bg-surface-subtle"
-                  >
-                    <td className="px-4 py-3 text-sm">
-                      {(item.products as any)?.display_name ?? "—"}
-                    </td>
-                    <td className="px-4 py-3 text-sm font-mono font-medium text-foreground">
-                      {item.package_name}
-                    </td>
-                    <td
-                      className="px-4 py-3 text-sm font-mono"
-                      style={{ color: "var(--color-text-secondary)" }}
-                    >
-                      {item.current_version}
-                    </td>
-                    <td className="px-4 py-3 text-sm font-mono text-green-600">
-                      {item.latest_version}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className="rounded px-1.5 py-0.5 text-xs font-medium text-white"
-                        style={{
-                          backgroundColor:
-                            UPDATE_TYPE_COLORS[item.update_type] ?? "#6B7280",
-                        }}
-                      >
-                        {item.update_type}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <Badge
-                        variant={item.state === "done" ? "default" : "outline"}
-                      >
-                        {STATE_LABELS[item.state] ?? item.state}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3">
-                      {item.pr_url && (
-                        <a
-                          href={item.pr_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          <ExternalLink
-                            className="size-4"
-                            style={{ color: "var(--color-primary)" }}
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/30 hover:bg-muted/30">
+                  <TableHead className="px-4 text-[11px] uppercase tracking-wider">
+                    プロダクト
+                  </TableHead>
+                  <TableHead className="px-4 text-[11px] uppercase tracking-wider">
+                    パッケージ
+                  </TableHead>
+                  <TableHead className="px-4 text-[11px] uppercase tracking-wider">
+                    現バージョン
+                  </TableHead>
+                  <TableHead className="px-4 text-[11px] uppercase tracking-wider">
+                    最新
+                  </TableHead>
+                  <TableHead className="px-4 text-[11px] uppercase tracking-wider">
+                    種類
+                  </TableHead>
+                  <TableHead className="px-4 text-[11px] uppercase tracking-wider">
+                    状態
+                  </TableHead>
+                  <TableHead className="px-4 text-[11px] uppercase tracking-wider">
+                    PR
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {allItems.map((item) => {
+                  const accent =
+                    (item.products as { primary_color?: string } | null)
+                      ?.primary_color ?? "#6B7280";
+                  const updType = UPDATE_TYPE_STYLE[item.update_type];
+                  return (
+                    <TableRow key={item.id}>
+                      <TableCell className="px-4 py-2.5">
+                        <span className="inline-flex items-center gap-2 text-sm">
+                          <span
+                            className="size-1.5 shrink-0 rounded-full"
+                            style={{ backgroundColor: accent }}
                           />
-                        </a>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+                          {(item.products as { display_name?: string } | null)
+                            ?.display_name ?? "—"}
+                        </span>
+                      </TableCell>
+                      <TableCell className="px-4 py-2.5 font-mono text-sm font-medium text-foreground">
+                        {item.package_name}
+                      </TableCell>
+                      <TableCell className="px-4 py-2.5 font-mono text-xs text-muted-foreground">
+                        {item.current_version}
+                      </TableCell>
+                      <TableCell className="px-4 py-2.5 font-mono text-xs">
+                        <span className="text-emerald-600 dark:text-emerald-400">
+                          {item.latest_version}
+                        </span>
+                      </TableCell>
+                      <TableCell className="px-4 py-2.5">
+                        {updType ? (
+                          <span
+                            className="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide"
+                            style={{
+                              backgroundColor: updType.bg,
+                              color: updType.fg,
+                              borderColor: updType.border,
+                            }}
+                          >
+                            {updType.label}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">
+                            {item.update_type}
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell className="px-4 py-2.5">
+                        <Badge
+                          variant={
+                            item.state === "done" ? "default" : "outline"
+                          }
+                        >
+                          {STATE_LABELS[item.state] ?? item.state}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="px-4 py-2.5">
+                        {item.pr_url && (
+                          <a
+                            href={item.pr_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex text-primary hover:opacity-80"
+                            title="PR を開く"
+                          >
+                            <ExternalLink className="size-4" />
+                          </a>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
     </>
   );
 }
