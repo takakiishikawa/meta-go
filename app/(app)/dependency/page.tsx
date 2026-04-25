@@ -58,7 +58,7 @@ function StatCard({
     <Card className="overflow-hidden">
       <div className="h-1" style={{ backgroundColor: accent }} />
       <CardContent className="p-4">
-        <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+        <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           {label}
         </div>
         <div className="mt-1 text-2xl font-semibold text-foreground">
@@ -241,25 +241,25 @@ export default async function DependencyPage() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/30 hover:bg-muted/30">
-                  <TableHead className="px-4 text-[11px] uppercase tracking-wider">
+                  <TableHead className="px-4 text-xs uppercase tracking-wider">
                     プロダクト
                   </TableHead>
-                  <TableHead className="px-4 text-[11px] uppercase tracking-wider">
+                  <TableHead className="px-4 text-xs uppercase tracking-wider">
                     パッケージ
                   </TableHead>
-                  <TableHead className="px-4 text-[11px] uppercase tracking-wider">
+                  <TableHead className="px-4 text-xs uppercase tracking-wider">
                     現バージョン
                   </TableHead>
-                  <TableHead className="px-4 text-[11px] uppercase tracking-wider">
+                  <TableHead className="px-4 text-xs uppercase tracking-wider">
                     最新
                   </TableHead>
-                  <TableHead className="px-4 text-[11px] uppercase tracking-wider">
+                  <TableHead className="px-4 text-xs uppercase tracking-wider">
                     種類
                   </TableHead>
-                  <TableHead className="px-4 text-[11px] uppercase tracking-wider">
+                  <TableHead className="px-4 text-xs uppercase tracking-wider">
                     状態
                   </TableHead>
-                  <TableHead className="px-4 text-[11px] uppercase tracking-wider">
+                  <TableHead className="px-4 text-xs uppercase tracking-wider">
                     PR
                   </TableHead>
                 </TableRow>
@@ -296,7 +296,7 @@ export default async function DependencyPage() {
                       <TableCell className="px-4 py-2.5">
                         {updType ? (
                           <span
-                            className="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide"
+                            className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold uppercase tracking-wide"
                             style={{
                               backgroundColor: updType.bg,
                               color: updType.fg,

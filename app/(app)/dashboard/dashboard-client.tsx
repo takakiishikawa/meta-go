@@ -354,7 +354,7 @@ function KpiCard({
           >
             {icon}
           </span>
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             {label}
           </span>
         </div>
@@ -370,14 +370,14 @@ function KpiCard({
 function DeltaBadge({ delta }: { delta: number | null }) {
   if (delta === null) {
     return (
-      <span className="inline-flex items-center gap-0.5 rounded-full border border-border bg-muted/40 px-1.5 py-0.5 text-[11px] text-muted-foreground">
+      <span className="inline-flex items-center gap-0.5 rounded-full border border-border bg-muted/40 px-1.5 py-0.5 text-xs text-muted-foreground">
         <Minus className="size-3" />—
       </span>
     );
   }
   if (delta === 0) {
     return (
-      <span className="inline-flex items-center gap-0.5 rounded-full border border-border bg-muted/40 px-1.5 py-0.5 text-[11px] text-muted-foreground">
+      <span className="inline-flex items-center gap-0.5 rounded-full border border-border bg-muted/40 px-1.5 py-0.5 text-xs text-muted-foreground">
         <Minus className="size-3" />
         ±0
       </span>
@@ -401,7 +401,7 @@ function DeltaBadge({ delta }: { delta: number | null }) {
       };
   return (
     <span
-      className="inline-flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-[11px] font-semibold"
+      className="inline-flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-xs font-semibold"
       style={{
         backgroundColor: styles.bg,
         color: styles.fg,

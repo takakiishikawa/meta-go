@@ -51,10 +51,14 @@ export function MultiProductTrendChart({
   return (
     <div className="w-full" style={{ height }}>
       <ResponsiveContainer width="100%" height="100%">
+<<<<<<< Updated upstream
         <LineChart
           data={data}
           margin={{ top: 8, right: 12, left: -16, bottom: 0 }}
         >
+=======
+        <LineChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+>>>>>>> Stashed changes
           <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
           <XAxis
             dataKey="date"
@@ -67,7 +71,7 @@ export function MultiProductTrendChart({
             tick={{ fontSize: 11, fill: "var(--color-text-secondary)" }}
             tickLine={false}
             axisLine={{ stroke: "var(--color-border)" }}
-            width={32}
+            width={40}
           />
           <Tooltip
             contentStyle={{

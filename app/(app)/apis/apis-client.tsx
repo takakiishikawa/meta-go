@@ -245,7 +245,7 @@ export function ApisClient({
                               </code>
                               {key.auto_detected && (
                                 <span
-                                  className="rounded text-[10px] px-1 font-medium"
+                                  className="rounded text-xs px-1 font-medium"
                                   style={{
                                     backgroundColor:
                                       "var(--color-surface-subtle)",

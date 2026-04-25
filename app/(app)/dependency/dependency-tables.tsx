@@ -96,7 +96,7 @@ function ProductBadges({
       {sorted.map((p) => (
         <span
           key={p.id}
-          className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/40 px-1.5 py-0.5 text-[11px]"
+          className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/40 px-1.5 py-0.5 text-xs"
         >
           <ProductDot product={p} size={8} />
           {p.display_name}
@@ -128,16 +128,16 @@ function PackageTable({
     <Table>
       <TableHeader>
         <TableRow className="bg-muted/30 hover:bg-muted/30">
-          <TableHead className="px-4 text-[11px] uppercase tracking-wider">
+          <TableHead className="px-4 text-xs uppercase tracking-wider">
             パッケージ
           </TableHead>
-          <TableHead className="px-4 text-[11px] uppercase tracking-wider">
+          <TableHead className="px-4 text-xs uppercase tracking-wider">
             カテゴリ
           </TableHead>
-          <TableHead className="px-4 text-[11px] uppercase tracking-wider">
+          <TableHead className="px-4 text-xs uppercase tracking-wider">
             バージョン
           </TableHead>
-          <TableHead className="px-4 text-[11px] uppercase tracking-wider">
+          <TableHead className="px-4 text-xs uppercase tracking-wider">
             {showProducts ? "使用go" : "数"}
           </TableHead>
         </TableRow>
@@ -159,7 +159,7 @@ function PackageTable({
                 )}
               </TableCell>
               <TableCell className="px-4 py-2.5 align-top">
-                <Badge variant="outline" className="text-[11px]">
+                <Badge variant="outline" className="text-xs">
                   {row.category}
                 </Badge>
               </TableCell>
@@ -306,7 +306,7 @@ export function DependencyTables({
                     <ProductDot product={p} size={8} />
                     {p.display_name}
                     <span
-                      className={`inline-flex min-w-[1.25rem] items-center justify-center rounded-full px-1.5 text-[10px] font-semibold ${
+                      className={`inline-flex min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-semibold ${
                         active
                           ? "bg-primary text-primary-foreground"
                           : "bg-muted text-muted-foreground"

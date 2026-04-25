@@ -81,7 +81,7 @@ export function DesignSystemViolationsTabs({
             >
               {tab.label}
               <span
-                className={`inline-flex min-w-[1.25rem] items-center justify-center rounded-full px-1.5 text-[10px] font-semibold ${
+                className={`inline-flex min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-semibold ${
                   isActive
                     ? "bg-primary text-primary-foreground"
                     : "bg-muted text-muted-foreground"

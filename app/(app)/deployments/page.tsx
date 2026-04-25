@@ -38,7 +38,7 @@ function StatCard({
     <div className="overflow-hidden rounded-lg border border-border bg-surface">
       <div className="h-1" style={{ backgroundColor: accent }} />
       <div className="p-4">
-        <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+        <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           {label}
         </div>
         {value !== undefined && (
@@ -155,7 +155,7 @@ export default async function DeploymentsPage() {
                 <div className="text-2xl font-semibold text-primary">
                   {sum24h.pending}
                 </div>
-                <div className="text-[11px] text-muted-foreground">進行中</div>
+                <div className="text-xs text-muted-foreground">進行中</div>
               </div>
             )}
           </div>
@@ -179,7 +179,7 @@ export default async function DeploymentsPage() {
                   title={`${d.dateISO}: ${d.count} / ${HOBBY_DAILY_BUDGET}`}
                 >
                   <span
-                    className="text-[10px] font-mono"
+                    className="text-xs font-mono"
                     style={{ color, fontWeight: isToday ? 700 : 400 }}
                   >
                     {d.count}
@@ -194,7 +194,7 @@ export default async function DeploymentsPage() {
                       }}
                     />
                   </div>
-                  <span className="text-[10px] text-muted-foreground">
+                  <span className="text-xs text-muted-foreground">
                     {d.label}
                   </span>
                 </div>

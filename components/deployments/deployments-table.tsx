@@ -99,7 +99,7 @@ function StateBadge({ state }: { state: DeploymentState }) {
   const s = STATE_STYLE[state] ?? STATE_STYLE.unknown;
   return (
     <span
-      className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold"
+      className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-semibold"
       style={{ backgroundColor: s.bg, color: s.fg, borderColor: s.border }}
     >
       <s.Icon className="size-3" />
@@ -220,7 +220,7 @@ export function DeploymentsTable({ rows }: { rows: DeploymentRow[] }) {
             >
               {tab.label}
               <span
-                className={`inline-flex min-w-[1.25rem] items-center justify-center rounded-full px-1.5 text-[10px] font-semibold ${
+                className={`inline-flex min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-semibold ${
                   active
                     ? "bg-primary text-primary-foreground"
                     : "bg-muted text-muted-foreground"
@@ -238,7 +238,7 @@ export function DeploymentsTable({ rows }: { rows: DeploymentRow[] }) {
         <span className="text-xs text-muted-foreground">プロダクト:</span>
         <button
           onClick={() => setProductFilter("all")}
-          className={`rounded-full border px-2.5 py-0.5 text-[11px] transition-colors ${
+          className={`rounded-full border px-2.5 py-0.5 text-xs transition-colors ${
             productFilter === "all"
               ? "border-primary bg-primary text-primary-foreground"
               : "border-border bg-muted/40 text-muted-foreground hover:text-foreground"
@@ -252,7 +252,7 @@ export function DeploymentsTable({ rows }: { rows: DeploymentRow[] }) {
             <button
               key={p.id}
               onClick={() => setProductFilter(p.id)}
-              className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] transition-colors ${
+              className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs transition-colors ${
                 active
                   ? "border-primary bg-primary text-primary-foreground"
                   : "border-border bg-muted/40 text-muted-foreground hover:text-foreground"
@@ -276,7 +276,7 @@ export function DeploymentsTable({ rows }: { rows: DeploymentRow[] }) {
               {["プロダクト", "Commit", "状態", "詳細", "作成", ""].map((h) => (
                 <th
                   key={h}
-                  className="px-4 py-3 text-left text-[11px] font-medium uppercase tracking-wider text-muted-foreground"
+                  className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground"
                 >
                   {h}
                 </th>
