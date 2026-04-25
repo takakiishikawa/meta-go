@@ -118,51 +118,68 @@ function detectRechartsFiles(repoDir: string): string[] {
 async function fixRechartsImports(
   repoDir: string,
 ): Promise<{ changed: boolean; files: string[] }> {
-  const staticImportFiles = detectRechartsFiles(repoDir);
-  if (staticImportFiles.length === 0) return { changed: false, files: [] };
+  // go-design-system はフレームワーク非依存。next/dynamic も "use client" も持ち込まない。
+  if (TARGET_REPO === "go-design-system") {
+    console.log(`  ⏭  go-design-system: recharts 修正対象外`);
+    return { changed: false, files: [] };
+  }
 
-  const relFiles = staticImportFiles.map((f) => path.relative(repoDir, f));
-  console.log(`  🔍 recharts static import 発見: ${relFiles.join(", ")}`);
+  const rechartsFiles = detectRechartsFiles(repoDir);
+  if (rechartsFiles.length === 0) return { changed: false, files: [] };
+
+  // 既に "use client" がある or Server Component で recharts を使っている
+  // ファイルだけが対象。"use client" があれば既に正しい状態なので何もしない。
+  const targets = rechartsFiles.filter((f) => {
+    const content = fs.readFileSync(f, "utf-8");
+    const firstLine = content.split("\n").find((l) => l.trim().length > 0) || "";
+    return !/^["']use client["']/.test(firstLine.trim());
+  });
+
+  if (targets.length === 0) {
+    console.log(`  ⏭  recharts: 全ファイルに "use client" 既設 — 変換不要`);
+    return { changed: false, files: [] };
+  }
+
+  const relFiles = targets.map((f) => path.relative(repoDir, f));
+  console.log(`  🔍 recharts × Server Component 発見: ${relFiles.join(", ")}`);
 
   if (DRY_RUN) {
     console.log(
-      `  [DRY RUN] recharts dynamic import 変換予定: ${relFiles.join(", ")}`,
+      `  [DRY RUN] "use client" を付与予定: ${relFiles.join(", ")}`,
     );
     return { changed: true, files: relFiles };
   }
 
-  const prompt = `以下のファイルの recharts の static import を next/dynamic を使った dynamic import に変換してください。
+  const prompt = `以下のファイルは recharts を import していますが、ファイル先頭に "use client" ディレクティブが付いていません。
 
 対象ファイル:
 ${relFiles.map((f) => `- ${f}`).join("\n")}
 
-変換ルール:
-1. \`import { ComponentA, ComponentB } from "recharts"\` のような static import 行を削除
-2. 各コンポーネントを個別の dynamic import に変換:
-   \`\`\`tsx
-   import dynamic from 'next/dynamic'
-   const LineChart = dynamic(
-     () => import("recharts").then(m => ({ default: m.LineChart })),
-     { ssr: false, loading: () => <div className="animate-pulse h-40 bg-muted rounded" /> }
-   )
-   \`\`\`
-3. XAxis / YAxis / CartesianGrid / Tooltip / Legend / ResponsiveContainer 等のヘルパーは loading 不要:
-   \`\`\`tsx
-   const XAxis = dynamic(() => import("recharts").then(m => ({ default: m.XAxis })), { ssr: false })
-   \`\`\`
-4. ファイルの先頭に 'use client' がなければ追加（recharts は CSR 専用）
-5. TypeScript の型エラーが出ないようにする
-6. ファイルの他の部分は変更しない
+実施ルール:
+1. ファイルの **先頭行** に \`"use client"\` を追加する（既存の import より上）。
+2. 既存の import や JSX、ロジックは **一切変更しない**（dynamic import 化は不要）。
+3. ファイルが既に \`"use client"\` で始まっていたら何もしない。
 
-各ファイルをすべて変換してください。`;
+**重要**: \`next/dynamic\` を使った dynamic import への変換は行わないでください。
+\`"use client"\` 付与だけで recharts の SSR 問題は解決します。\`next/dynamic\` で
+ラップすると複雑性とフレームワーク依存だけが増え、ビルドの脆弱性源となります
+（実例: 2026-04-24 PR #7 で go-design-system に next/dynamic が混入し、依存する
+全 Go の Vercel デプロイが破綻）。
+
+各ファイルに "use client" を追加してください。`;
 
   const ok = runClaude(repoDir, prompt);
   if (!ok) return { changed: false, files: [] };
 
-  // 変換後に static import が残っていないか確認
-  const stillStatic = detectRechartsFiles(repoDir);
+  // 変換後に "use client" が無いファイルが残っていないか確認
+  const stillNeedingClient = targets.filter((f) => {
+    if (!fs.existsSync(f)) return false;
+    const content = fs.readFileSync(f, "utf-8");
+    const firstLine = content.split("\n").find((l) => l.trim().length > 0) || "";
+    return !/^["']use client["']/.test(firstLine.trim());
+  });
   const converted = relFiles.filter(
-    (f) => !stillStatic.map((s) => path.relative(repoDir, s)).includes(f),
+    (f) => !stillNeedingClient.map((s) => path.relative(repoDir, s)).includes(f),
   );
   return { changed: converted.length > 0, files: converted };
 }
@@ -170,6 +187,10 @@ ${relFiles.map((f) => `- ${f}`).join("\n")}
 // ── Fix 2: @vercel/analytics 導入 ─────────────────────────────
 
 async function addVercelAnalytics(repoDir: string): Promise<boolean> {
+  if (TARGET_REPO === "go-design-system") {
+    console.log(`  ⏭  go-design-system: @vercel/analytics 対象外`);
+    return false;
+  }
   const pkgPath = path.join(repoDir, "package.json");
   if (!fs.existsSync(pkgPath)) return false;
 
@@ -221,6 +242,10 @@ async function addVercelAnalytics(repoDir: string): Promise<boolean> {
 // ── Fix 3: 未使用recharts削除 ─────────────────────────────────
 
 function removeUnusedRecharts(repoDir: string): boolean {
+  if (TARGET_REPO === "go-design-system") {
+    console.log(`  ⏭  go-design-system: recharts 削除対象外`);
+    return false;
+  }
   const pkgPath = path.join(repoDir, "package.json");
   if (!fs.existsSync(pkgPath)) return false;
 
@@ -229,6 +254,18 @@ function removeUnusedRecharts(repoDir: string): boolean {
     pkg.dependencies?.["recharts"] || pkg.devDependencies?.["recharts"];
   if (!hasDep) {
     console.log(`  ⏭  recharts: package.json に存在しない`);
+    return false;
+  }
+
+  // go-design-system を依存に持つプロジェクトでは削除しない。
+  // DSバンドルが recharts を直 import するため、アプリコードで未使用でも
+  // モジュール解決のために必要（実例: 2026-04-24 task-go / kenyaku-go で
+  // recharts 削除によりビルド失敗）。
+  const allDeps = { ...pkg.dependencies, ...pkg.devDependencies };
+  if (allDeps["@takaki/go-design-system"]) {
+    console.log(
+      `  ⏭  recharts: @takaki/go-design-system 依存のため保持（DSバンドルが直importするpeer要件）`,
+    );
     return false;
   }
 
@@ -261,6 +298,12 @@ function addLayer2Missing(repoDir: string): {
   changed: boolean;
   added: string[];
 } {
+  if (TARGET_REPO === "go-design-system") {
+    console.log(
+      `  ⏭  go-design-system: Layer 2 補充対象外（peerDeps として既に列挙済み）`,
+    );
+    return { changed: false, added: [] };
+  }
   const pkgPath = path.join(repoDir, "package.json");
   if (!fs.existsSync(pkgPath)) return { changed: false, added: [] };
 
@@ -407,6 +450,10 @@ ${relFiles.map((f) => `- ${f}`).join("\n")}
 // ── Fix 6: openai 削除 ────────────────────────────────────────
 
 async function removeOpenAI(repoDir: string): Promise<boolean> {
+  if (TARGET_REPO === "go-design-system") {
+    console.log(`  ⏭  go-design-system: openai 削除対象外`);
+    return false;
+  }
   const pkgPath = path.join(repoDir, "package.json");
   if (!fs.existsSync(pkgPath)) return false;
 

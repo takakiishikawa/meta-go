@@ -71,33 +71,51 @@ MetaGoが中央から自動チェック・修正PRを作成する。
 
 ## Phase 1: 自動化対象（MetaGo auto-fix）
 
-### 1. recharts dynamic import化（全ファイル）
-**理由**: rechartsはSSR非対応のため static import するとバンドルサイズが膨らみHydration Errorのリスクがある。
-**効果**: 初期バンドル -250KB程度。
+> **重要な前提**: 全項目は **Next.js アプリケーション** を対象とする。
+> `go-design-system` のようなフレームワーク非依存ライブラリには **適用しない**
+> （ワークフロー matrix からも除外済み。実例: 2026-04-24 PR #7 で `next/dynamic`
+> を design-system に混入させ、依存する全 Go の Vercel デプロイをドミノ倒し
+> させた事故が発生）。
+
+### 1. rechartsは "use client" コンポーネントで使う
+**理由**: recharts は SSR 非対応のため、Server Component で直接 import すると
+ビルドエラーや Hydration エラーの原因になる。
+
+**対応**: recharts を import するファイルの先頭に `"use client"` ディレクティブ
+を付ける（Next.js App Router の標準パターン）。**`next/dynamic({ ssr: false })`
+でラップする必要は無い**（クライアントバンドルにしか入らないので意味が無く、
+ライブラリで使うとフレームワーク依存が増える）。
 
 ```tsx
-// ❌ 禁止
+// ✅ 正しい
+"use client"
 import { LineChart, XAxis } from "recharts"
-
-// ✅ 必須
-import dynamic from 'next/dynamic'
-const LineChart = dynamic(
-  () => import("recharts").then(m => ({ default: m.LineChart })),
-  { ssr: false, loading: () => <div className="animate-pulse h-40 bg-muted rounded" /> }
-)
 ```
 
-### 2. @vercel/analytics 導入
-**理由**: Core Web Vitalsの自動計測が必要。
-**実施**: package.json追加 + `app/layout.tsx` に `<Analytics />` を追加。
+**禁止**:
+- `@takaki/go-design-system` を含むフレームワーク非依存ライブラリで `next/dynamic`
+  や `next/*`, `@vercel/*` 等を import しない（peerDeps 外のモジュールを参照すると
+  DTS ビルドが破壊される）。
+- アプリ側でも、`"use client"` で十分なケースで `next/dynamic` を強制的に
+  使わない（複雑性が増えるだけで利益が無い）。
 
-### 3. 未使用recharts削除
+### 2. @vercel/analytics 導入
+**理由**: Core Web Vitals の自動計測が必要。
+**実施**: package.json 追加 + `app/layout.tsx` に `<Analytics />` を追加。
+**対象外**: `go-design-system`（共通UIライブラリ。アプリ側の責務）。
+
+### 3. 未使用 recharts 削除
 **理由**: 不要な依存はバンドルサイズとセキュリティリスクを増やす。
-**実施**: コード上で一切使われていない場合、package.jsonから削除。
+**実施**: コード上で一切使われていない場合、package.json から削除。
+**例外**: `@takaki/go-design-system` を依存に持つプロジェクトでは削除しない。
+DS のバンドルが `recharts` を直 import するため、アプリコードで使われていなくても
+モジュール解決のために必要（実例: 2026-04-24 task-go, kenyaku-go で recharts
+削除によるビルド失敗）。
 
 ### 4. Layer 2 欠損補充
 **理由**: 標準ユーティリティの統一でgoシリーズ全体の品質を均一化。
 **実施**: zod / date-fns / react-hook-form / @hookform/resolvers が欠損している場合に追加。
+**対象外**: `go-design-system`（peerDeps として既に列挙済み。consumer 側の責務）。
 
 ### 5. openai削除
 **理由**: AI SDKは@anthropic-ai/sdkに統一。openaiとの混在は禁止。
@@ -124,5 +142,5 @@ const LineChart = dynamic(
 | cook-go | ✅ | |
 | physical-go | ✅ | |
 | task-go | ✅ | |
-| go-design-system | ✅ | recharts dynamic importは対象外（DS自身はSSR対応前提） |
+| go-design-system | ❌ | フレームワーク非依存維持のため対象外（matrix から除外） |
 | meta-go | ❌ | 自己管理（Issue経由） |
