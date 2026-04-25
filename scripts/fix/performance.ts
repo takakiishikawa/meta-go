@@ -4,13 +4,13 @@
  * quality_items の category="Performance" / state='new' から N 件取り出し、
  * Claude にソースを分析させて L2 PR を作成 + approval_queue に追加
  *
+ * 認証: CLAUDE_CODE_OAUTH_TOKEN (Claude Code Max プラン)
+ *
  * 環境変数:
- *   TARGET_REPO        — 対象リポジトリ名
- *   ANTHROPIC_API_KEY  — Claude API キー
- *   FIX_BATCH_SIZE     — productごとの処理上限
+ *   TARGET_REPO     — 対象リポジトリ名
+ *   FIX_BATCH_SIZE  — productごとの処理上限
  */
 
-import Anthropic from "@anthropic-ai/sdk";
 import { execSync } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
@@ -31,6 +31,7 @@ import {
   PendingItem,
   DEFAULT_BATCH_SIZE,
 } from "../../lib/metago/items";
+import { runClaudeForJSON } from "../../lib/metago/claude-cli";
 
 const supabase = getSupabase();
 
@@ -38,7 +39,6 @@ async function analyzeAndFix(
   repoDir: string,
   productName: string,
   issues: string[],
-  anthropic: Anthropic,
 ): Promise<{ patchCount: number; summary: string }> {
   let files: string[] = [];
   try {
@@ -88,46 +88,25 @@ Return JSON:
 
 Only include changed files. Return ONLY the JSON.`;
 
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    try {
-      console.log(`  🤖 パフォーマンス改善分析... (試行 ${attempt})`);
-      const message = await anthropic.messages.create({
-        model: "claude-sonnet-4-6",
-        max_tokens: 4096,
-        messages: [{ role: "user", content: prompt }],
-      });
-      const raw =
-        message.content[0]?.type === "text" ? message.content[0].text : "";
-      const cleaned = raw
-        .replace(/^```[^\n]*\n?/, "")
-        .replace(/\n?```$/, "")
-        .trim();
-      const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) throw new Error("JSON not found");
+  try {
+    console.log(`  🤖 パフォーマンス改善分析...`);
+    const result = await runClaudeForJSON<{
+      patches: Array<{ file: string; newContent: string }>;
+      summary: string;
+    }>(prompt);
 
-      const result = JSON.parse(jsonMatch[0]) as {
-        patches: Array<{ file: string; newContent: string }>;
-        summary: string;
-      };
-
-      let patchCount = 0;
-      for (const patch of result.patches ?? []) {
-        const fullPath = path.join(repoDir, patch.file);
-        if (!fs.existsSync(fullPath)) continue;
-        fs.writeFileSync(fullPath, patch.newContent, "utf-8");
-        patchCount++;
-      }
-      return { patchCount, summary: result.summary ?? "" };
-    } catch (e: any) {
-      if (e?.status === 429 && attempt < 3) {
-        await new Promise((r) => setTimeout(r, 60_000 * attempt));
-        continue;
-      }
-      console.warn("  Claude分析失敗:", String(e).slice(0, 150));
-      return { patchCount: 0, summary: "" };
+    let patchCount = 0;
+    for (const patch of result.patches ?? []) {
+      const fullPath = path.join(repoDir, patch.file);
+      if (!fs.existsSync(fullPath)) continue;
+      fs.writeFileSync(fullPath, patch.newContent, "utf-8");
+      patchCount++;
     }
+    return { patchCount, summary: result.summary ?? "" };
+  } catch (e) {
+    console.warn("  Claude分析失敗:", String(e).slice(0, 150));
+    return { patchCount: 0, summary: "" };
   }
-  return { patchCount: 0, summary: "" };
 }
 
 async function fixForProduct(product: any, repo: string) {
@@ -173,7 +152,6 @@ async function fixForProduct(product: any, repo: string) {
   );
 
   let repoDir: string | null = null;
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
   try {
     repoDir = cloneRepo(repo);
@@ -182,7 +160,6 @@ async function fixForProduct(product: any, repo: string) {
       repoDir,
       product.display_name,
       issues,
-      anthropic,
     );
 
     if (patchCount === 0 || !hasChanges(repoDir)) {

@@ -9,12 +9,12 @@
  * Claude による軸評価ベースのfindings修正は scope が大きすぎるため一旦見送り。
  * 必要なら後続タスクで個別軸ごとに細かいfix を追加する。
  *
+ * 認証: CLAUDE_CODE_OAUTH_TOKEN (Claude Code Max プラン)
+ *
  * 環境変数:
- *   TARGET_REPO        — 対象リポジトリ名
- *   ANTHROPIC_API_KEY  — Claude API キー（TSCエラー修正用）
+ *   TARGET_REPO  — 対象リポジトリ名
  */
 
-import Anthropic from "@anthropic-ai/sdk";
 import { execSync } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
@@ -26,13 +26,11 @@ import {
   cleanup,
 } from "../../lib/github/git-operations";
 import { GO_REPOS, REPO_TO_SLUG, getSupabase } from "../../lib/metago/items";
+import { runClaudeForText } from "../../lib/metago/claude-cli";
 
 const supabase = getSupabase();
 
-async function fixTscErrors(
-  repoDir: string,
-  anthropic: Anthropic,
-): Promise<void> {
+async function fixTscErrors(repoDir: string): Promise<void> {
   let tscOutput = "";
   try {
     execSync("npx tsc --noEmit", {
@@ -66,15 +64,9 @@ async function fixTscErrors(
     const content = fs.readFileSync(filePath, "utf-8");
     if (content.length > 80_000) continue;
 
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      try {
-        const message = await anthropic.messages.create({
-          model: "claude-sonnet-4-6",
-          max_tokens: 4096,
-          messages: [
-            {
-              role: "user",
-              content: `Fix the TypeScript compiler errors listed below. Return ONLY the complete fixed file content — no explanation, no markdown fences.
+    try {
+      const fixed = await runClaudeForText(
+        `Fix the TypeScript compiler errors listed below. Return ONLY the complete fixed file content — no explanation, no markdown fences.
 
 File: ${file}
 
@@ -85,27 +77,13 @@ Current content:
 \`\`\`tsx
 ${content}
 \`\`\``,
-            },
-          ],
-        });
-        const raw =
-          message.content[0]?.type === "text" ? message.content[0].text : "";
-        const fixed = raw
-          .replace(/^```[^\n]*\n?/, "")
-          .replace(/\n?```$/, "")
-          .trim();
-        if (fixed && fixed !== content) {
-          fs.writeFileSync(filePath, fixed, "utf-8");
-          console.log(`  ✓ TSC修正: ${file}`);
-        }
-        break;
-      } catch (e: any) {
-        if (e?.status === 429 && attempt < 3) {
-          await new Promise((r) => setTimeout(r, 60_000 * attempt));
-          continue;
-        }
-        break;
+      );
+      if (fixed && fixed !== content) {
+        fs.writeFileSync(filePath, fixed, "utf-8");
+        console.log(`  ✓ TSC修正: ${file}`);
       }
+    } catch (e) {
+      console.warn(`  TSC修正失敗 (${file}):`, String(e).slice(0, 200));
     }
   }
 }
@@ -113,8 +91,6 @@ ${content}
 async function fixForRepo(product: any, repo: string) {
   console.log(`\n🔧 [FIX] code-quality: ${product.display_name} (${repo})`);
   let repoDir: string | null = null;
-
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
   try {
     repoDir = cloneRepo(repo);
@@ -150,7 +126,7 @@ async function fixForRepo(product: any, repo: string) {
     } catch {}
 
     // TSC
-    await fixTscErrors(repoDir, anthropic);
+    await fixTscErrors(repoDir);
 
     if (!hasChanges(repoDir)) {
       console.log("  修正なし");

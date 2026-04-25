@@ -1,10 +1,11 @@
 /**
- * Claude API を使ってコード修正を行うユーティリティ
+ * Claude を使ってコード修正を行うユーティリティ
+ *
+ * GitHub Actions 上では Claude Code Max プランの CLI 経由で呼び出す
+ * (Anthropic API 課金なし)。詳細は lib/metago/claude-cli.ts 参照。
  */
 
-import Anthropic from "@anthropic-ai/sdk";
-
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+import { runClaudeForText } from "../metago/claude-cli";
 
 export interface FilePatch {
   filePath: string;
@@ -30,16 +31,9 @@ export async function fixFileWithClaude(params: {
     return null;
   }
 
-  const MAX_RETRIES = 3;
-  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-    try {
-      const message = await anthropic.messages.create({
-        model: "claude-sonnet-4-6",
-        max_tokens: 4096,
-        messages: [
-          {
-            role: "user",
-            content: `You are fixing code violations in a TypeScript/React file.
+  try {
+    return await runClaudeForText(
+      `You are fixing code violations in a TypeScript/React file.
 
 File: ${fileName}
 
@@ -54,33 +48,11 @@ ${fileContent}
 \`\`\`
 
 Fix all listed violations. Return ONLY the complete fixed file content with no explanation, no markdown code fences, no prefix text.`,
-          },
-        ],
-      });
-
-      const content = message.content[0];
-      if (content.type !== "text") return null;
-
-      return content.text
-        .replace(/^```[^\n]*\n/, "")
-        .replace(/\n```$/, "")
-        .trim();
-    } catch (e: any) {
-      const isRateLimit =
-        e?.status === 429 || e?.error?.error?.type === "rate_limit_error";
-      if (isRateLimit && attempt < MAX_RETRIES) {
-        const wait = 60_000 * attempt;
-        console.warn(
-          `  Rate limit hit for ${fileName} (attempt ${attempt}/${MAX_RETRIES}), waiting ${wait / 1000}s...`,
-        );
-        await new Promise((r) => setTimeout(r, wait));
-        continue;
-      }
-      console.warn(`Claude API error for ${fileName}:`, e);
-      return null;
-    }
+    );
+  } catch (e) {
+    console.warn(`Claude fix failed for ${fileName}:`, String(e).slice(0, 200));
+    return null;
   }
-  return null;
 }
 
 /**
@@ -102,8 +74,8 @@ export async function fixViolationsWithClaude(
     if (fixed) {
       patches.push({ filePath: v.file, newContent: fixed });
     }
-    // Rate limit pause: 6リポ並列実行を考慮して長めに待つ
-    await new Promise((r) => setTimeout(r, 3000));
+    // 並列実行 + CLI 呼び出し間隔調整
+    await new Promise((r) => setTimeout(r, 1000));
   }
 
   return patches;

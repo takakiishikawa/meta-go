@@ -4,12 +4,13 @@
  * Claude が7軸でコードを評価 → 問題itemをUPSERT + score保存
  * ESLint/Prettier/TSC修正PRは fix-cron に委譲
  *
+ * 認証: CLAUDE_CODE_OAUTH_TOKEN (Claude Code Max プラン、Anthropic API 課金なし)
+ * 前提: ワークフロー側で `npm install -g @anthropic-ai/claude-code` 済み
+ *
  * 環境変数:
- *   TARGET_REPO        — 対象リポジトリ名
- *   ANTHROPIC_API_KEY  — Claude API キー
+ *   TARGET_REPO  — 対象リポジトリ名
  */
 
-import Anthropic from "@anthropic-ai/sdk";
 import { execSync } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
@@ -21,6 +22,7 @@ import {
   saveScore,
   upsertItem,
 } from "../../lib/metago/items";
+import { runClaudeForJSON } from "../../lib/metago/claude-cli";
 
 const supabase = getSupabase();
 
@@ -176,7 +178,6 @@ function collectSourceFiles(repoDir: string): string {
 async function evaluateCodeQuality(
   repoDir: string,
   productName: string,
-  anthropic: Anthropic,
 ): Promise<{ axes: AxisEvaluation[]; overallScore: number }> {
   const sourceCode = collectSourceFiles(repoDir);
   if (!sourceCode) return { axes: [], overallScore: 0 };
@@ -224,69 +225,37 @@ ${sourceCode}
   ]
 }`;
 
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    try {
-      console.log(`  🤖 Claude評価実行中... (試行 ${attempt}/3)`);
-      const message = await anthropic.messages.create({
-        model: "claude-sonnet-4-6",
-        max_tokens: 4096,
-        messages: [{ role: "user", content: prompt }],
-      });
+  try {
+    console.log(`  🤖 Claude評価実行中...`);
+    const parsed = await runClaudeForJSON<{ axes: AxisEvaluation[] }>(prompt);
+    const axes = parsed.axes ?? [];
 
-      const text =
-        message.content[0]?.type === "text" ? message.content[0].text : "";
-      const cleaned = text
-        .replace(/^```[^\n]*\n?/, "")
-        .replace(/\n?```$/, "")
-        .trim();
+    let totalWeight = 0;
+    let weightedSum = 0;
+    for (const ax of axes) {
+      const def = QUALITY_AXES.find((q) => q.id === ax.axisId);
+      if (!def) continue;
+      weightedSum += ax.score * def.weight;
+      totalWeight += def.weight;
+    }
 
-      let parsed: { axes: AxisEvaluation[] };
-      try {
-        parsed = JSON.parse(cleaned);
-      } catch {
-        const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-        if (!jsonMatch) throw new Error("JSON not found");
-        parsed = JSON.parse(jsonMatch[0]);
-      }
-
-      const axes = parsed.axes ?? [];
-
-      let totalWeight = 0;
-      let weightedSum = 0;
-      for (const ax of axes) {
-        const def = QUALITY_AXES.find((q) => q.id === ax.axisId);
-        if (!def) continue;
-        weightedSum += ax.score * def.weight;
-        totalWeight += def.weight;
-      }
-
-      if (totalWeight === 0) {
-        console.warn("  ⚠️ 全axisIdが不一致、保存スキップ");
-        return { axes: [], overallScore: 0 };
-      }
-
-      const overallScore = Math.round(weightedSum / totalWeight);
-      console.log(`  🏆 総合スコア: ${overallScore}点`);
-      return { axes, overallScore };
-    } catch (e: any) {
-      const isRateLimit =
-        e?.status === 429 || e?.error?.error?.type === "rate_limit_error";
-      if (isRateLimit && attempt < 3) {
-        await new Promise((r) => setTimeout(r, 60_000 * attempt));
-        continue;
-      }
-      console.warn("  Claude評価失敗:", String(e).slice(0, 300));
+    if (totalWeight === 0) {
+      console.warn("  ⚠️ 全axisIdが不一致、保存スキップ");
       return { axes: [], overallScore: 0 };
     }
+
+    const overallScore = Math.round(weightedSum / totalWeight);
+    console.log(`  🏆 総合スコア: ${overallScore}点`);
+    return { axes, overallScore };
+  } catch (e) {
+    console.warn("  Claude評価失敗:", String(e).slice(0, 300));
+    return { axes: [], overallScore: 0 };
   }
-  return { axes: [], overallScore: 0 };
 }
 
 async function scanRepo(product: any, repo: string) {
   console.log(`\n🔍 [SCAN] code-quality: ${product.display_name} (${repo})`);
   let repoDir: string | null = null;
-
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
   try {
     repoDir = cloneRepo(repo);
@@ -294,7 +263,6 @@ async function scanRepo(product: any, repo: string) {
     const evaluation = await evaluateCodeQuality(
       repoDir,
       product.display_name,
-      anthropic,
     );
 
     if (evaluation.axes.length === 0) {

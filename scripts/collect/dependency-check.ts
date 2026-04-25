@@ -6,9 +6,10 @@
  *
  * L2 は技術スタック自体の変更（FW移行・DB移行等）など人間の判断が必要な場合のみ。
  * major 依存更新はコードも一緒に修正して自動マージする。
+ *
+ * 認証: CLAUDE_CODE_OAUTH_TOKEN (Claude Code Max プラン)
  */
 
-import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@supabase/supabase-js";
 import { execSync } from "child_process";
 import * as fs from "fs";
@@ -23,6 +24,7 @@ import {
   createAndMergePR,
   cleanup,
 } from "../../lib/github/git-operations";
+import { runClaudeForText } from "../../lib/metago/claude-cli";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -102,7 +104,6 @@ interface FixReport {
 async function fixBreakingChanges(
   repoDir: string,
   majorUpdates: OutdatedPackage[],
-  anthropic: Anthropic,
 ): Promise<FixReport> {
   const report: FixReport = { filesFixed: [], remainingErrors: 0 };
   const majorContext = majorUpdates
@@ -164,17 +165,10 @@ async function fixBreakingChanges(
         continue;
       }
 
-      const MAX_RETRIES = 3;
-      for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-        try {
-          console.log(`  🤖 修正中: ${relPath} (${errors.length}件のエラー)`);
-          const message = await anthropic.messages.create({
-            model: "claude-sonnet-4-6",
-            max_tokens: 8096,
-            messages: [
-              {
-                role: "user",
-                content: `You are fixing TypeScript breaking changes caused by major dependency updates.
+      try {
+        console.log(`  🤖 修正中: ${relPath} (${errors.length}件のエラー)`);
+        const fixedContent = await runClaudeForText(
+          `You are fixing TypeScript breaking changes caused by major dependency updates.
 
 **Updated packages:** ${majorContext}
 
@@ -192,36 +186,13 @@ Fix all TypeScript errors by updating the code to match the new API of the updat
 - Preserve all existing functionality and logic
 - Only change what is necessary to fix the TypeScript errors
 - Return ONLY the complete fixed file content with no explanation, no markdown code fences, no prefix text.`,
-              },
-            ],
-          });
+        );
 
-          const fixed = message.content[0];
-          if (fixed.type !== "text") break;
-
-          const fixedContent = fixed.text
-            .replace(/^```[^\n]*\n/, "")
-            .replace(/\n```$/, "")
-            .trim();
-
-          fs.writeFileSync(fullPath, fixedContent, "utf-8");
-          report.filesFixed.push(relPath);
-          console.log(`  ✓ 修正完了: ${relPath}`);
-          break;
-        } catch (e: any) {
-          const isRateLimit =
-            e?.status === 429 || e?.error?.error?.type === "rate_limit_error";
-          if (isRateLimit && attempt < MAX_RETRIES) {
-            const wait = 60_000 * attempt;
-            console.warn(
-              `  レート制限 (${attempt}/${MAX_RETRIES}回目)、${wait / 1000}秒待機...`,
-            );
-            await new Promise((r) => setTimeout(r, wait));
-            continue;
-          }
-          console.warn(`  修正失敗: ${relPath}`, String(e).slice(0, 200));
-          break;
-        }
+        fs.writeFileSync(fullPath, fixedContent, "utf-8");
+        report.filesFixed.push(relPath);
+        console.log(`  ✓ 修正完了: ${relPath}`);
+      } catch (e) {
+        console.warn(`  修正失敗: ${relPath}`, String(e).slice(0, 200));
       }
 
       await new Promise((r) => setTimeout(r, 2000));
@@ -257,8 +228,6 @@ Fix all TypeScript errors by updating the code to match the new API of the updat
 async function processRepo(product: any, repo: string) {
   console.log(`\n📦 Dependency check: ${product.display_name} (${repo})`);
   let repoDir: string | null = null;
-
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
   try {
     repoDir = cloneRepo(repo);
@@ -367,11 +336,7 @@ ${patchMinor.map((p) => `- \`${p.name}\`: ${p.current} → ${p.latest} (${p.upda
         }
 
         // Claude で破壊的変更を修正
-        const fixReport = await fixBreakingChanges(
-          majorDir,
-          majorUpdates,
-          anthropic,
-        );
+        const fixReport = await fixBreakingChanges(majorDir, majorUpdates);
 
         // ESLint + Prettier で仕上げ
         try {
