@@ -16,7 +16,9 @@ export interface ClaudeCliOptions {
   maxRetries?: number;
 }
 
-const DEFAULT_TIMEOUT_MS = 180_000;
+// 70KB ソースの 7軸評価で 3 分超えるケースがあったため 10 分に設定。
+// CLI 側の応答が止まれば early-exit するので、上限を上げてもコスト悪化はしない。
+const DEFAULT_TIMEOUT_MS = 600_000;
 const DEFAULT_MAX_RETRIES = 3;
 const STDOUT_MAX_BUFFER = 10 * 1024 * 1024;
 
