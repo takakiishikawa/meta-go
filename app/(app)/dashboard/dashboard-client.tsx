@@ -20,6 +20,12 @@ import {
   ScoreTrendChart,
   type TrendPoint,
 } from "@/components/charts/score-trend-chart";
+import {
+  MultiProductTrendChart,
+  type TrendPoint as MultiTrendPoint,
+} from "@/components/charts/multi-product-trend";
+
+const TREND_DAYS = 30;
 
 interface Product {
   id: string;
@@ -105,6 +111,54 @@ export function DashboardClient({
   const hasData = products.length > 0;
   const [trendOpen, setTrendOpen] = useState<Product | null>(null);
 
+  // 全プロダクトの overall (4カテゴリ平均) スコア × 30日 を組み立て
+  const overviewTrend = useMemo<MultiTrendPoint[]>(() => {
+    const fmtKey = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Tokyo",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+    const fmtLabel = new Intl.DateTimeFormat("ja-JP", {
+      timeZone: "Asia/Tokyo",
+      month: "2-digit",
+      day: "2-digit",
+    });
+    const points: MultiTrendPoint[] = [];
+    const now = new Date();
+    for (let i = TREND_DAYS - 1; i >= 0; i--) {
+      const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+      const key = fmtKey.format(d);
+      const point: MultiTrendPoint = { date: fmtLabel.format(d) };
+      for (const product of products) {
+        const cats = trendByProduct[product.id]?.[key];
+        if (!cats) {
+          point[product.id] = null;
+          continue;
+        }
+        const values = CATS.map((c) => cats[c]).filter(
+          (v): v is number => v != null,
+        );
+        point[product.id] =
+          values.length > 0
+            ? Math.round(values.reduce((a, b) => a + b, 0) / values.length)
+            : null;
+      }
+      points.push(point);
+    }
+    return points;
+  }, [products, trendByProduct]);
+
+  const overviewSeries = useMemo(
+    () =>
+      products.map((p) => ({
+        id: p.id,
+        name: p.display_name,
+        color: p.primary_color || GO_COLORS[p.name] || "#6B7280",
+      })),
+    [products],
+  );
+
   return (
     <>
       <PageHeader
@@ -156,6 +210,23 @@ export function DashboardClient({
         />
       ) : (
         <>
+          {/* All-products score trend */}
+          <div className="rounded-lg border border-border bg-surface p-4">
+            <div className="mb-3 flex items-baseline justify-between">
+              <span className="text-sm font-semibold text-foreground">
+                総合スコア推移
+              </span>
+              <span className="text-xs text-muted-foreground">
+                直近 {TREND_DAYS} 日 / 4カテゴリの平均
+              </span>
+            </div>
+            <MultiProductTrendChart
+              data={overviewTrend}
+              products={overviewSeries}
+              height={260}
+            />
+          </div>
+
           {/* Product Grid */}
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
             {products.map((product) => {

@@ -4,7 +4,11 @@ import { ScoreDonut } from "@/components/score/score-donut";
 import { ProductEvalButton } from "@/components/shared/product-eval-button";
 import { ScoreDelta } from "@/components/score/score-delta";
 import { DesignSystemViolationsTabs } from "@/components/design-system/violations-tabs";
+import { MultiProductTrendChart } from "@/components/charts/multi-product-trend";
+import { buildTrend } from "@/lib/metago/score-trend";
 import { Palette } from "lucide-react";
+
+const TREND_DAYS = 30;
 
 const GO_COLORS: Record<string, string> = {
   nativego: "#0052CC",
@@ -20,12 +24,16 @@ export default async function DesignSystemPage() {
   const sevenDaysAgo = new Date(
     Date.now() - 7 * 24 * 60 * 60 * 1000,
   ).toISOString();
+  const trendSince = new Date(
+    Date.now() - TREND_DAYS * 24 * 60 * 60 * 1000,
+  ).toISOString();
 
   const [
     { data: items },
     { data: scores },
     { data: products },
     { data: weekAgoScores },
+    { data: trendScores },
   ] = await Promise.all([
     supabase
       .schema("metago")
@@ -50,6 +58,13 @@ export default async function DesignSystemPage() {
       .eq("category", "design_system")
       .lte("collected_at", sevenDaysAgo)
       .order("collected_at", { ascending: false }),
+    supabase
+      .schema("metago")
+      .from("scores_history")
+      .select("product_id, score, collected_at")
+      .eq("category", "design_system")
+      .gte("collected_at", trendSince)
+      .order("collected_at", { ascending: true }),
   ]);
 
   const allItems = items ?? [];
@@ -95,6 +110,17 @@ export default async function DesignSystemPage() {
   const topCategories = Object.entries(byCategory)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5);
+
+  const trendSeries = allProducts.map((p) => ({
+    id: p.id,
+    name: p.display_name,
+    color: p.primary_color || GO_COLORS[p.name] || "#6B7280",
+  }));
+  const trendData = buildTrend(
+    trendScores ?? [],
+    allProducts.map((p) => p.id),
+    TREND_DAYS,
+  );
 
   return (
     <>
@@ -168,6 +194,20 @@ export default async function DesignSystemPage() {
           )}
         </div>
       </div>
+
+      {allProducts.length > 0 && (
+        <div className="rounded-lg border border-border bg-surface p-4">
+          <div className="mb-3 flex items-baseline justify-between">
+            <span className="text-sm font-semibold text-foreground">
+              準拠率推移
+            </span>
+            <span className="text-xs text-muted-foreground">
+              直近 {TREND_DAYS} 日 / プロダクト別
+            </span>
+          </div>
+          <MultiProductTrendChart data={trendData} products={trendSeries} />
+        </div>
+      )}
 
       {allProducts.length > 0 && (
         <div className="rounded-lg border border-border overflow-hidden">

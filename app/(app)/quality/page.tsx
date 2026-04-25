@@ -4,9 +4,12 @@ import { ScoreDonut } from "@/components/score/score-donut";
 import { Pagination } from "@/components/ui/pagination";
 import { ProductEvalButton } from "@/components/shared/product-eval-button";
 import { ScoreDelta } from "@/components/score/score-delta";
+import { MultiProductTrendChart } from "@/components/charts/multi-product-trend";
+import { buildTrend } from "@/lib/metago/score-trend";
 import { Code2 } from "lucide-react";
 
 const PAGE_SIZE = 20;
+const TREND_DAYS = 30;
 
 const GO_COLORS: Record<string, string> = {
   nativego: "#0052CC",
@@ -31,12 +34,16 @@ export default async function QualityPage({
   const sevenDaysAgo = new Date(
     Date.now() - 7 * 24 * 60 * 60 * 1000,
   ).toISOString();
+  const trendSince = new Date(
+    Date.now() - TREND_DAYS * 24 * 60 * 60 * 1000,
+  ).toISOString();
 
   const [
     { data: items },
     { data: scores },
     { data: products },
     { data: weekAgoScores },
+    { data: trendScores },
   ] = await Promise.all([
     supabase
       .schema("metago")
@@ -64,6 +71,13 @@ export default async function QualityPage({
       .eq("category", "quality")
       .lte("collected_at", sevenDaysAgo)
       .order("collected_at", { ascending: false }),
+    supabase
+      .schema("metago")
+      .from("scores_history")
+      .select("product_id, score, collected_at")
+      .eq("category", "quality")
+      .gte("collected_at", trendSince)
+      .order("collected_at", { ascending: true }),
   ]);
 
   const allItems = items ?? [];
@@ -102,6 +116,17 @@ export default async function QualityPage({
 
   const totalPages = Math.ceil(allItems.length / PAGE_SIZE);
   const pagedItems = allItems.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  const trendSeries = allProducts.map((p) => ({
+    id: p.id,
+    name: p.display_name,
+    color: p.primary_color || GO_COLORS[p.name] || "#6B7280",
+  }));
+  const trendData = buildTrend(
+    trendScores ?? [],
+    allProducts.map((p) => p.id),
+    TREND_DAYS,
+  );
 
   return (
     <>
@@ -154,6 +179,20 @@ export default async function QualityPage({
           </div>
         </div>
       </div>
+
+      {allProducts.length > 0 && (
+        <div className="rounded-lg border border-border bg-surface p-4">
+          <div className="mb-3 flex items-baseline justify-between">
+            <span className="text-sm font-semibold text-foreground">
+              スコア推移
+            </span>
+            <span className="text-xs text-muted-foreground">
+              直近 {TREND_DAYS} 日 / プロダクト別
+            </span>
+          </div>
+          <MultiProductTrendChart data={trendData} products={trendSeries} />
+        </div>
+      )}
 
       {allProducts.length > 0 && (
         <div className="rounded-lg border border-border overflow-hidden">

@@ -7,6 +7,10 @@ import {
   summarize,
 } from "@/lib/metago/github-deployments";
 import { DeploymentsTable } from "@/components/deployments/deployments-table";
+import {
+  ProductSuccessRateChart,
+  type SuccessRateRow,
+} from "@/components/charts/product-success-rate";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -81,6 +85,31 @@ export default async function DeploymentsPage() {
   // 7日 daily breakdown
   const daily = dailyCounts(allRows, CHART_DAYS);
   const todayCount = daily[daily.length - 1]?.count ?? 0;
+
+  // プロダクト別 success rate (status fetch 済の 48h 範囲だけで計算)
+  const successByProduct = new Map<string, SuccessRateRow>();
+  for (const p of products ?? []) {
+    successByProduct.set(p.id, {
+      productId: p.id,
+      name: p.display_name,
+      color: p.primary_color ?? "#6B7280",
+      total: 0,
+      success: 0,
+      failure: 0,
+      rateLimited: 0,
+    });
+  }
+  for (const r of tableRows) {
+    const row = successByProduct.get(r.productId);
+    if (!row) continue;
+    row.total++;
+    if (r.state === "success") row.success++;
+    else if (r.state === "failure" || r.state === "error") row.failure++;
+    else if (r.state === "rate_limited") row.rateLimited++;
+  }
+  const successRows = [...successByProduct.values()]
+    .filter((r) => r.total > 0)
+    .sort((a, b) => b.success / b.total - a.success / a.total);
 
   return (
     <>
@@ -175,6 +204,20 @@ export default async function DeploymentsPage() {
           </div>
         </StatCard>
       </div>
+
+      {successRows.length > 0 && (
+        <div className="rounded-lg border border-border bg-surface p-4">
+          <div className="mb-3 flex items-baseline justify-between">
+            <span className="text-sm font-semibold text-foreground">
+              プロダクト別 成功率
+            </span>
+            <span className="text-xs text-muted-foreground">
+              直近 {STATUS_WINDOW_HOURS}h / 成功率の高い順
+            </span>
+          </div>
+          <ProductSuccessRateChart data={successRows} />
+        </div>
+      )}
 
       {tableRows.length === 0 ? (
         <EmptyState
