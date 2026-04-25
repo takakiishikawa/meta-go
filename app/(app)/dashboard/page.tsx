@@ -17,11 +17,7 @@ export default async function DashboardPage() {
     { data: designItems },
     { data: depItems },
   ] = await Promise.all([
-    supabase
-      .schema("metago")
-      .from("products")
-      .select("*")
-      .order("priority"),
+    supabase.schema("metago").from("products").select("*").order("priority"),
     supabase
       .schema("metago")
       .from("scores_history")

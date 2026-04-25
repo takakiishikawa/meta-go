@@ -212,7 +212,10 @@ async function collectTechStack(product: any, pkg: any) {
   );
 
   // 同名が複数経路で来た場合は dependencies > peer > dev の優先で1件に丸める
-  const merged = new Map<string, { name: string; ver: string; isDev: boolean }>();
+  const merged = new Map<
+    string,
+    { name: string; ver: string; isDev: boolean }
+  >();
   for (const e of [...devDeps, ...peerDeps, ...deps]) {
     merged.set(e.name, e);
   }

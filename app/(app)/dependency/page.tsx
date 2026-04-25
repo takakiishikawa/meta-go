@@ -75,25 +75,28 @@ function StatCard({
 export default async function DependencyPage() {
   const supabase = await createClient();
 
-  const [{ data: products }, { data: techStackRaw }, { data: dependencyItems }] =
-    await Promise.all([
-      supabase
-        .schema("metago")
-        .from("products")
-        .select("id, name, display_name, primary_color")
-        .order("priority"),
-      supabase
-        .schema("metago")
-        .from("tech_stack_items")
-        .select("product_id, package_name, version, category, is_dev")
-        .eq("is_dev", false)
-        .order("package_name"),
-      supabase
-        .schema("metago")
-        .from("dependency_items")
-        .select("*, products(display_name, primary_color)")
-        .order("created_at", { ascending: false }),
-    ]);
+  const [
+    { data: products },
+    { data: techStackRaw },
+    { data: dependencyItems },
+  ] = await Promise.all([
+    supabase
+      .schema("metago")
+      .from("products")
+      .select("id, name, display_name, primary_color")
+      .order("priority"),
+    supabase
+      .schema("metago")
+      .from("tech_stack_items")
+      .select("product_id, package_name, version, category, is_dev")
+      .eq("is_dev", false)
+      .order("package_name"),
+    supabase
+      .schema("metago")
+      .from("dependency_items")
+      .select("*, products(display_name, primary_color)")
+      .order("created_at", { ascending: false }),
+  ]);
 
   const allProducts: ProductSummary[] = products ?? [];
   const techStack = techStackRaw ?? [];

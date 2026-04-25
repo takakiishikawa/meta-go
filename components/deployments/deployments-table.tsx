@@ -10,7 +10,10 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
-import type { DeploymentRow, DeploymentState } from "@/lib/metago/github-deployments";
+import type {
+  DeploymentRow,
+  DeploymentState,
+} from "@/lib/metago/github-deployments";
 
 const PAGE_SIZE = 100;
 
@@ -26,7 +29,13 @@ const STATE_TABS: { key: StateFilter; label: string }[] = [
 
 const STATE_STYLE: Record<
   DeploymentState,
-  { bg: string; fg: string; border: string; label: string; Icon: typeof CheckCircle2 }
+  {
+    bg: string;
+    fg: string;
+    border: string;
+    label: string;
+    Icon: typeof CheckCircle2;
+  }
 > = {
   success: {
     bg: "#DCFCE7",
@@ -122,7 +131,10 @@ export function DeploymentsTable({ rows }: { rows: DeploymentRow[] }) {
   }, [stateFilter, productFilter]);
 
   const products = useMemo(() => {
-    const m = new Map<string, { id: string; name: string; color: string | null }>();
+    const m = new Map<
+      string,
+      { id: string; name: string; color: string | null }
+    >();
     for (const r of rows) {
       if (!m.has(r.productId)) {
         m.set(r.productId, {
@@ -160,7 +172,11 @@ export function DeploymentsTable({ rows }: { rows: DeploymentRow[] }) {
   const filtered = useMemo(() => {
     return rows.filter((r) => {
       if (stateFilter !== "all") {
-        if (stateFilter === "failure" && r.state !== "failure" && r.state !== "error")
+        if (
+          stateFilter === "failure" &&
+          r.state !== "failure" &&
+          r.state !== "error"
+        )
           return false;
         if (stateFilter === "success" && r.state !== "success") return false;
         if (stateFilter === "rate_limited" && r.state !== "rate_limited")
@@ -173,14 +189,18 @@ export function DeploymentsTable({ rows }: { rows: DeploymentRow[] }) {
         )
           return false;
       }
-      if (productFilter !== "all" && r.productId !== productFilter) return false;
+      if (productFilter !== "all" && r.productId !== productFilter)
+        return false;
       return true;
     });
   }, [rows, stateFilter, productFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
-  const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const paged = filtered.slice(
+    (safePage - 1) * PAGE_SIZE,
+    safePage * PAGE_SIZE,
+  );
 
   return (
     <div className="flex flex-col gap-3">
@@ -326,7 +346,8 @@ export function DeploymentsTable({ rows }: { rows: DeploymentRow[] }) {
         <div className="flex items-center justify-between gap-3">
           <span className="text-xs text-muted-foreground">
             {(safePage - 1) * PAGE_SIZE + 1}–
-            {Math.min(safePage * PAGE_SIZE, filtered.length)} / {filtered.length}
+            {Math.min(safePage * PAGE_SIZE, filtered.length)} /{" "}
+            {filtered.length}
           </span>
           <div className="flex items-center gap-2">
             <button
