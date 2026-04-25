@@ -29,6 +29,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # go-design-system はフレームワーク非依存の共通UIライブラリのため対象外。
+        # Next.js固有のAPI（next/dynamic, @vercel/analytics 等）の自動適用が
+        # design-systemのDTSビルドを破壊し、依存する全Goのデプロイをドミノ
+        # 倒しにした事故（PR #7, 2026-04-24）以降、明示的に除外している。
         repo:
           - native-go
           - care-go
@@ -36,7 +40,6 @@ jobs:
           - cook-go
           - physical-go
           - task-go
-          - go-design-system
     steps:
       - uses: actions/checkout@v4
 

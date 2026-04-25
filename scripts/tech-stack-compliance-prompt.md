@@ -3,9 +3,17 @@
 【方針書参照】
 meta-go/docs/tech-stack-policy-v2.md を前提として作業してください。
 
+【絶対ガード — フレームワーク非依存リポジトリ】
+リポジトリ名が `go-design-system` の場合、**全項目を即座にスキップしてPRを作成しない**こと。
+go-design-system はフレームワーク非依存の共通UIライブラリで、Next.js固有のAPI
+（`next/dynamic`, `next/link`, `@vercel/analytics` 等）に依存させてはいけない。
+これらを混入させるとライブラリの DTS ビルドが破壊され、依存する全Goのデプロイを
+ドミノ倒しにする（実例: PR #7, 2026-04-24）。
+
 【実施項目】
 以下のうち、このリポジトリに該当するものを実施してください。
 該当しない項目はスキップして構いません。
+（ただし、このリポジトリが Next.js アプリでない場合は項目1, 2は適用不可。）
 
 ### 1. rechartsのdynamic import化
 rechartsを static import している箇所を dynamic import に置き換える。
