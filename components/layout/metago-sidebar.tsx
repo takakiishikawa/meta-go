@@ -11,7 +11,7 @@ import {
   Package,
   Palette,
   Gauge,
-  ScrollText,
+  Rocket,
   TrendingUp,
   Activity,
   Lightbulb,
@@ -88,7 +88,7 @@ const navGroups = [
       { title: "依存・技術スタック", href: "/dependency", icon: Package },
       { title: "デザインシステム", href: "/design-system", icon: Palette },
       { title: "パフォーマンス", href: "/performance", icon: Gauge },
-      { title: "実行ログ", href: "/exec-log", icon: ScrollText },
+      { title: "Deployments", href: "/deployments", icon: Rocket },
     ],
   },
   {
