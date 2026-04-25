@@ -7,8 +7,19 @@ import {
   Button,
   Input,
   Switch,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  Label,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Textarea,
 } from "@takaki/go-design-system";
-import { Play, Save, AlertCircle } from "lucide-react";
+import { Save, AlertCircle, Trash2, Plus } from "lucide-react";
 
 interface Schedule {
   id: string;
@@ -43,6 +54,24 @@ function formatDateTime(iso: string | null): string {
   return new Date(iso).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" });
 }
 
+interface FormState {
+  workflow_name: string;
+  workflow_file: string;
+  display_name: string;
+  description: string;
+  category: "scan" | "fix" | "collect";
+  cron_expression: string;
+}
+
+const EMPTY_FORM: FormState = {
+  workflow_name: "",
+  workflow_file: "",
+  display_name: "",
+  description: "",
+  category: "scan",
+  cron_expression: "0 18 * * *",
+};
+
 export function WorkflowsClient({
   initialSchedules,
 }: {
@@ -53,6 +82,9 @@ export function WorkflowsClient({
   const [editing, setEditing] = useState<Record<string, string>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const [form, setForm] = useState<FormState>(EMPTY_FORM);
+  const [adding, setAdding] = useState(false);
 
   async function handleSaveCron(schedule: Schedule) {
     const newCron = editing[schedule.id] ?? schedule.cron_expression;
@@ -104,24 +136,59 @@ export function WorkflowsClient({
     setBusyId(null);
   }
 
-  async function handleRunNow(schedule: Schedule) {
-    if (!confirm(`「${schedule.display_name}」を即時実行しますか？`)) return;
-
+  async function handleDelete(schedule: Schedule) {
+    if (
+      !confirm(
+        `「${schedule.display_name}」を削除しますか？\n（DBエントリのみ削除。 .yml ファイルは別途削除が必要）`,
+      )
+    )
+      return;
     setBusyId(schedule.id);
     setErrorMessage(null);
 
     try {
-      const res = await fetch(
-        `/api/admin/workflows/${schedule.id}/run-now`,
-        { method: "POST" },
-      );
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "実行失敗");
-      router.refresh();
+      const res = await fetch(`/api/admin/workflows/${schedule.id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "削除失敗");
+      }
+      setSchedules((prev) => prev.filter((s) => s.id !== schedule.id));
     } catch (e: any) {
       setErrorMessage(e.message);
     }
     setBusyId(null);
+  }
+
+  async function handleAdd() {
+    if (
+      !form.workflow_name ||
+      !form.workflow_file ||
+      !form.display_name ||
+      !form.cron_expression
+    ) {
+      setErrorMessage("workflow_name / workflow_file / display_name / cron_expression は必須");
+      return;
+    }
+    setAdding(true);
+    setErrorMessage(null);
+
+    try {
+      const res = await fetch(`/api/admin/workflows`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "追加失敗");
+      setSchedules((prev) => [...prev, data.schedule]);
+      setForm(EMPTY_FORM);
+      setAddOpen(false);
+    } catch (e: any) {
+      setErrorMessage(e.message);
+    }
+    setAdding(false);
   }
 
   return (
@@ -135,6 +202,13 @@ export function WorkflowsClient({
           <span>{errorMessage}</span>
         </div>
       )}
+
+      <div className="flex justify-end">
+        <Button size="sm" onClick={() => setAddOpen(true)}>
+          <Plus className="size-3.5 mr-1" />
+          新規追加
+        </Button>
+      </div>
 
       <div className="rounded-lg border border-border overflow-hidden">
         <table className="w-full">
@@ -265,17 +339,28 @@ export function WorkflowsClient({
                   <td className="px-4 py-3">
                     <Button
                       size="sm"
-                      variant="outline"
+                      variant="ghost"
                       disabled={isBusy}
-                      onClick={() => handleRunNow(s)}
+                      onClick={() => handleDelete(s)}
+                      style={{ color: "var(--color-danger)" }}
                     >
-                      <Play className="size-3.5 mr-1" />
-                      今すぐ実行
+                      <Trash2 className="size-3.5" />
                     </Button>
                   </td>
                 </tr>
               );
             })}
+            {schedules.length === 0 && (
+              <tr>
+                <td
+                  colSpan={7}
+                  className="px-4 py-8 text-center text-sm"
+                  style={{ color: "var(--color-text-secondary)" }}
+                >
+                  Workflowが登録されていません
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
@@ -284,7 +369,7 @@ export function WorkflowsClient({
         className="rounded-md border border-border p-4 text-xs"
         style={{ color: "var(--color-text-secondary)" }}
       >
-        <strong>cron式の例:</strong>
+        <strong>cron式の例 (UTC基準):</strong>
         <ul className="mt-1 ml-4 list-disc">
           <li>
             <code>0 18 * * *</code> — 毎日 UTC 18:00 (JST 03:00)
@@ -300,10 +385,112 @@ export function WorkflowsClient({
           </li>
         </ul>
         <p className="mt-2">
-          すべてUTC基準。timezone は workflow_schedules.cron_timezone (デフォルト
-          Asia/Tokyo) を使って次回時刻が計算される。
+          実行は GitHub Actions 側で行われます。手動実行が必要な場合は GitHub
+          Actions の Run workflow ボタンから実行してください。
         </p>
       </div>
+
+      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <DialogContent className="max-w-[560px]">
+          <DialogHeader>
+            <DialogTitle>Workflow 新規追加</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>workflow_name</Label>
+                <Input
+                  value={form.workflow_name}
+                  onChange={(e) =>
+                    setForm({ ...form, workflow_name: e.target.value })
+                  }
+                  placeholder="my-new-scan"
+                />
+              </div>
+              <div>
+                <Label>workflow_file</Label>
+                <Input
+                  value={form.workflow_file}
+                  onChange={(e) =>
+                    setForm({ ...form, workflow_file: e.target.value })
+                  }
+                  placeholder="my-new-scan.yml"
+                />
+              </div>
+            </div>
+            <div>
+              <Label>display_name</Label>
+              <Input
+                value={form.display_name}
+                onChange={(e) =>
+                  setForm({ ...form, display_name: e.target.value })
+                }
+                placeholder="UI表示名"
+              />
+            </div>
+            <div>
+              <Label>description</Label>
+              <Textarea
+                value={form.description}
+                onChange={(e) =>
+                  setForm({ ...form, description: e.target.value })
+                }
+                placeholder="何をするworkflowか"
+                rows={2}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>category</Label>
+                <Select
+                  value={form.category}
+                  onValueChange={(v: any) =>
+                    setForm({ ...form, category: v })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="scan">調査 (scan)</SelectItem>
+                    <SelectItem value="fix">実行 (fix)</SelectItem>
+                    <SelectItem value="collect">API収集 (collect)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>cron_expression (UTC)</Label>
+                <Input
+                  value={form.cron_expression}
+                  onChange={(e) =>
+                    setForm({ ...form, cron_expression: e.target.value })
+                  }
+                  className="font-mono"
+                  placeholder="0 18 * * *"
+                />
+              </div>
+            </div>
+            <p
+              className="text-xs"
+              style={{ color: "var(--color-text-secondary)" }}
+            >
+              ※ workflow_file に対応する .yml は別途リポジトリに配置してください
+            </p>
+            <div className="flex justify-end gap-2 mt-2">
+              <Button
+                variant="ghost"
+                onClick={() => setAddOpen(false)}
+                disabled={adding}
+              >
+                キャンセル
+              </Button>
+              <Button onClick={handleAdd} disabled={adding}>
+                {adding ? "追加中..." : "追加"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

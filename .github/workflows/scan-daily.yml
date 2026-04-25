@@ -10,8 +10,8 @@ on:
         description: '特定リポだけ実行する場合のリポ名'
         required: false
         type: string
-  schedule:
-    - cron: '0 18 * * *'  # daily JST 3am
+# scheduleはmeta-goのDBが source of truth (workflow_schedules)。
+# Vercel Cron が15分おきに /api/cron/dispatcher を叩いて workflow_dispatch を起動。
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true

@@ -4,8 +4,7 @@ name: Scan Weekly (調査cron)
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '0 19 * * 1'  # 毎週月曜 JST 4am
+# scheduleはmeta-goのDBが source of truth。Vercel Cron + dispatcher で起動。
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true

@@ -4,8 +4,7 @@ name: Fix Weekly (実行cron)
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '0 21 * * 1'  # 毎週月曜 JST 6am
+# scheduleはmeta-goのDBが source of truth。Vercel Cron + dispatcher で起動。
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
