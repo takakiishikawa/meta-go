@@ -1,28 +1,28 @@
-name: Collect Daily Data (API系)
+name: Scan Daily API系 (調査cron)
 
-# clone不要のAPI経由データ収集のみ。
-# 違反検出・修正PRはscan-daily.yml / fix-hourly.yml に分離した。
+# clone不要のAPI経由データ収集。軽量。
+# 違反検出は scan-daily.yml に分離した。
 
 on:
-  schedule:
-    - cron: '0 20 * * *'
   workflow_dispatch:
+  # cronはDB主導(meta-goダッシュボード)。フォールバック用デフォルトのみ。
+  schedule:
+    - cron: '0 20 * * *'  # daily JST 5am
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  api-collect:
+  api:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Install dependencies
-        run: npm ci
+      - run: npm ci
 
-      - name: Collect GitHub data (Dependabot + tech stack)
+      - name: GitHub data (Dependabot + tech_stack)
         run: npx tsx scripts/collect/github-data.ts
         env:
           GH_PAT: ${{ secrets.GH_PAT }}
@@ -32,14 +32,14 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
 
-      - name: Collect Vercel data
+      - name: Vercel data (deployment status)
         run: npx tsx scripts/collect/vercel-data.ts
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
 
-      - name: Collect Supabase metrics
+      - name: Supabase metrics (engagement)
         run: npx tsx scripts/collect/supabase-data.ts
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}

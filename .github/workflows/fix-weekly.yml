@@ -1,0 +1,30 @@
+name: Fix Weekly (実行cron)
+
+# 週次の修正タスク: 依存更新 (patch/minor/major)
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 21 * * 1'  # 毎週月曜 JST 6am
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  dependency-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm ci
+
+      - name: Dependency check + auto-update PR (all repos)
+        run: npx tsx scripts/collect/dependency-check.ts
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+          GITHUB_OWNER: ${{ secrets.GITHUB_OWNER }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

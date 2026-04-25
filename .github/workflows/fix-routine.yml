@@ -1,17 +1,14 @@
-name: Fix Hourly (実行cron)
+name: Fix Routine (実行cron)
 
-# DBに溜まった pending items を取り出して修正PRを作成。
+# DBに溜まった pending items (state='new') を batch で取り出し修正PRを作成。
 # L1は自動マージ、L2はapproval_queueに積む。
-# 1実行あたり productごとに FIX_BATCH_SIZE 件処理（rate limit対策）。
+# 各実行で productごと FIX_BATCH_SIZE 件処理（rate limit対策）。
 
 on:
-  schedule:
-    # 4時間おき (JST 0,4,8,12,16,20)
-    - cron: '0 */4 * * *'
   workflow_dispatch:
     inputs:
       target_repo:
-        description: '特定のリポだけ実行する場合のリポ名'
+        description: '特定リポだけ実行する場合のリポ名'
         required: false
         type: string
       batch_size:
@@ -19,6 +16,8 @@ on:
         required: false
         default: '10'
         type: string
+  schedule:
+    - cron: '0 */4 * * *'  # 4時間おき
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -29,20 +28,20 @@ jobs:
     strategy:
       matrix:
         repo: [native-go, care-go, kenyaku-go, cook-go, physical-go, task-go, go-design-system, meta-go]
-        fixer: [code-quality, design-system, security]
+        fixer: [code-quality, design-system, security, tech-stack]
         exclude:
           - repo: go-design-system
             fixer: design-system
+          - repo: go-design-system
+            fixer: tech-stack
       fail-fast: false
-      # 同じrepoに対して複数fixerが同時にPR作るとconflictするので、最大同時実行数を絞る
       max-parallel: 4
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Install dependencies
-        run: npm ci
+      - run: npm ci
 
       - name: Run ${{ matrix.fixer }} fix for ${{ matrix.repo }}
         run: npx tsx scripts/fix/${{ matrix.fixer }}.ts
@@ -68,8 +67,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Install dependencies
-        run: npm ci
+      - run: npm ci
 
       - name: Performance fix for ${{ matrix.repo }}
         run: npx tsx scripts/fix/performance.ts
