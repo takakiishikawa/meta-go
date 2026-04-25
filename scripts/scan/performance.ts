@@ -146,6 +146,11 @@ async function scanProduct(product: any) {
   console.log(`  ${issues.length} issues found`);
 }
 
+// designsystem は public な showcase のみで計測ターゲットが薄い。
+// metago は login wall 内なので Lighthouse がランディング相当しか取れず数値が
+// 全社プロダクトと比較不能なので除外。
+const SKIP_PRODUCTS = new Set(["designsystem", "metago"]);
+
 async function main() {
   console.log("🚀 [SCAN] performance (Lighthouse)");
 
@@ -159,6 +164,7 @@ async function main() {
   const targetSlug = targetRepo ? REPO_TO_SLUG[targetRepo] : null;
 
   for (const product of products) {
+    if (SKIP_PRODUCTS.has(product.name)) continue;
     if (targetSlug && product.name !== targetSlug) continue;
     await scanProduct(product);
   }

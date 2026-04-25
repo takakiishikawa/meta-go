@@ -65,7 +65,7 @@ export function MultiProductTrendChart({
             tick={{ fontSize: 11, fill: "var(--color-text-secondary)" }}
             tickLine={false}
             axisLine={{ stroke: "var(--color-border)" }}
-            width={40}
+            width={48}
           />
           <Tooltip
             contentStyle={{

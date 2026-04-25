@@ -42,20 +42,24 @@ export default async function PerformancePage() {
   ]);
 
   const allProducts = products ?? [];
+  // 計測対象外プロダクト (Lighthouse が public URL を取れない / そもそも対象外)
+  const PERF_EXCLUDED = new Set(["designsystem", "metago"]);
   // Performance は measured_at だが buildTrend は collected_at 前提なので変換
   const trendRows = (trendMetrics ?? []).map((r) => ({
     product_id: r.product_id,
     score: r.score,
     collected_at: r.measured_at,
   }));
-  const trendSeries = allProducts.map((p) => ({
-    id: p.id,
-    name: p.display_name,
-    color: p.primary_color || "#6B7280",
-  }));
+  const trendSeries = allProducts
+    .filter((p) => !PERF_EXCLUDED.has(p.name))
+    .map((p) => ({
+      id: p.id,
+      name: p.display_name,
+      color: p.primary_color || "#6B7280",
+    }));
   const trendData = buildTrend(
     trendRows,
-    allProducts.map((p) => p.id),
+    trendSeries.map((p) => p.id),
   );
 
   const allMetrics = metrics ?? [];
@@ -88,6 +92,19 @@ export default async function PerformancePage() {
             latest.length,
         )
       : null;
+
+  const exempt = allProducts
+    .filter((p) => PERF_EXCLUDED.has(p.name))
+    .map((p) => ({
+      id: p.id,
+      name: p.name,
+      display_name: p.display_name,
+      primary_color: p.primary_color,
+      reason:
+        p.name === "metago"
+          ? "管理アプリ (login wall)"
+          : "デザインシステム本体",
+    }));
 
   return (
     <>
@@ -127,14 +144,18 @@ export default async function PerformancePage() {
         </div>
       )}
 
-      {latest.length === 0 ? (
+      {latest.length === 0 && exempt.length === 0 ? (
         <EmptyState
           icon={<Gauge className="size-12" />}
           title="データがまだありません"
           description="GitHub Actions cronが実行されるとデータが表示されます"
         />
       ) : (
-        <PerformanceTable metrics={latest as any[]} deltas={deltas} />
+        <PerformanceTable
+          metrics={latest as any[]}
+          deltas={deltas}
+          exempt={exempt}
+        />
       )}
     </>
   );

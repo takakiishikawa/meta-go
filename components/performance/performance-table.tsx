@@ -97,12 +97,22 @@ function MetricCell({
   );
 }
 
+export interface ExemptProduct {
+  id: string;
+  name: string;
+  display_name: string;
+  primary_color: string | null;
+  reason: string;
+}
+
 export function PerformanceTable({
   metrics,
   deltas = {},
+  exempt = [],
 }: {
   metrics: PerformanceMetric[];
   deltas?: Record<string, number | null>;
+  exempt?: ExemptProduct[];
 }) {
   return (
     <div className="rounded-lg border border-border overflow-hidden">
@@ -221,6 +231,34 @@ export function PerformanceTable({
               </tr>
             );
           })}
+          {exempt.map((p) => (
+            <tr
+              key={p.id}
+              className="border-b border-border last:border-0 bg-muted/20"
+            >
+              <td className="px-4 py-3">
+                <div className="flex items-center gap-2">
+                  <div
+                    className="size-2.5 rounded-full"
+                    style={{
+                      backgroundColor: p.primary_color ?? "#6B7280",
+                    }}
+                  />
+                  <span className="text-sm text-foreground">
+                    {p.display_name}
+                  </span>
+                </div>
+              </td>
+              <td className="px-4 py-3" colSpan={6}>
+                <span
+                  className="inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-xs text-muted-foreground"
+                  title={p.reason}
+                >
+                  計測対象外 — {p.reason}
+                </span>
+              </td>
+            </tr>
+          ))}
         </tbody>
       </table>
     </div>

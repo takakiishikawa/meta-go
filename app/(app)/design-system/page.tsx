@@ -8,6 +8,9 @@ import { MultiProductTrendChart } from "@/components/charts/multi-product-trend"
 import { buildTrend } from "@/lib/metago/score-trend";
 import { Palette } from "lucide-react";
 
+// 計測対象外プロダクト (scanner 側 SKIP_PRODUCTS と同期)
+const DS_EXCLUDED = new Set(["designsystem", "metago"]);
+
 const GO_COLORS: Record<string, string> = {
   nativego: "#0052CC",
   carego: "#00875A",
@@ -105,14 +108,16 @@ export default async function DesignSystemPage() {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5);
 
-  const trendSeries = allProducts.map((p) => ({
-    id: p.id,
-    name: p.display_name,
-    color: p.primary_color || GO_COLORS[p.name] || "#6B7280",
-  }));
+  const trendSeries = allProducts
+    .filter((p) => !DS_EXCLUDED.has(p.name))
+    .map((p) => ({
+      id: p.id,
+      name: p.display_name,
+      color: p.primary_color || GO_COLORS[p.name] || "#6B7280",
+    }));
   const trendData = buildTrend(
     trendScores ?? [],
-    allProducts.map((p) => p.id),
+    trendSeries.map((p) => p.id),
   );
 
   return (
@@ -229,11 +234,49 @@ export default async function DesignSystemPage() {
               {allProducts.map((product) => {
                 const color =
                   product.primary_color || GO_COLORS[product.name] || "#6B7280";
+                const isExempt = DS_EXCLUDED.has(product.name);
                 const score = latestScore[product.id] ?? null;
                 const prev = weekAgoScore[product.id] ?? null;
                 const delta =
                   score !== null && prev !== null ? score - prev : null;
                 const productItems = itemsByProduct[product.id] ?? [];
+
+                if (isExempt) {
+                  return (
+                    <tr
+                      key={product.id}
+                      className="border-b border-border last:border-0 bg-muted/20"
+                    >
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <div
+                            className="size-2.5 rounded-full shrink-0"
+                            style={{ backgroundColor: color }}
+                          />
+                          <span className="text-sm text-foreground">
+                            {product.display_name}
+                          </span>
+                        </div>
+                      </td>
+                      <td colSpan={4} className="px-4 py-3">
+                        <span
+                          className="inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-xs text-muted-foreground"
+                          title={
+                            product.name === "metago"
+                              ? "管理アプリ"
+                              : "DS本体"
+                          }
+                        >
+                          計測対象外 —{" "}
+                          {product.name === "metago"
+                            ? "管理アプリ"
+                            : "DS本体"}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                }
+
                 return (
                   <tr
                     key={product.id}
