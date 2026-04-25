@@ -88,30 +88,51 @@ export default async function DeploymentsPage() {
   const daily = dailyCounts(allRows, CHART_DAYS);
   const todayCount = daily[daily.length - 1]?.count ?? 0;
 
-  // プロダクト別 success rate (status fetch 済の 48h 範囲だけで計算)
-  const successByProduct = new Map<string, SuccessRateRow>();
-  for (const p of products ?? []) {
-    successByProduct.set(p.id, {
-      productId: p.id,
-      name: p.display_name,
-      color: p.primary_color ?? "#6B7280",
-      total: 0,
-      success: 0,
-      failure: 0,
-      rateLimited: 0,
-    });
+  // 直近7日の "成功" deploy 数を date × productId で集計 (stacked bar 用)
+  const productSeries: ProductSeries[] = (products ?? []).map((p) => ({
+    id: p.id,
+    name: p.display_name,
+    color: p.primary_color ?? "#6B7280",
+  }));
+
+  const fmtKey = new Intl.DateTimeFormat("en-CA", {
+    timeZone: TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const fmtLabel = new Intl.DateTimeFormat("ja-JP", {
+    timeZone: TZ,
+    month: "2-digit",
+    day: "2-digit",
+  });
+
+  const successBuckets = new Map<string, Map<string, number>>(); // dateKey -> productId -> count
+  for (const r of allRows) {
+    if (r.state !== "success") continue;
+    const key = fmtKey.format(new Date(r.createdAt));
+    if (!successBuckets.has(key)) successBuckets.set(key, new Map());
+    const inner = successBuckets.get(key)!;
+    inner.set(r.productId, (inner.get(r.productId) ?? 0) + 1);
   }
-  for (const r of tableRows) {
-    const row = successByProduct.get(r.productId);
-    if (!row) continue;
-    row.total++;
-    if (r.state === "success") row.success++;
-    else if (r.state === "failure" || r.state === "error") row.failure++;
-    else if (r.state === "rate_limited") row.rateLimited++;
+
+  const successTrend: DailySuccessPoint[] = [];
+  const today = new Date();
+  for (let i = CHART_DAYS - 1; i >= 0; i--) {
+    const d = new Date(today.getTime() - i * 24 * 60 * 60 * 1000);
+    const key = fmtKey.format(d);
+    const inner = successBuckets.get(key);
+    const point: DailySuccessPoint = { date: fmtLabel.format(d) };
+    for (const p of productSeries) {
+      point[p.id] = inner?.get(p.id) ?? 0;
+    }
+    successTrend.push(point);
   }
-  const successRows = [...successByProduct.values()]
-    .filter((r) => r.total > 0)
-    .sort((a, b) => b.success / b.total - a.success / a.total);
+  const totalSuccess7d = successTrend.reduce((sum, p) => {
+    let row = 0;
+    for (const k of Object.keys(p)) if (k !== "date") row += Number(p[k]) || 0;
+    return sum + row;
+  }, 0);
 
   return (
     <>
@@ -204,19 +225,20 @@ export default async function DeploymentsPage() {
         </StatCard>
       </div>
 
-      {successRows.length > 0 && (
-        <div className="rounded-lg border border-border bg-surface p-4">
-          <div className="mb-3 flex items-baseline justify-between">
-            <span className="text-sm font-semibold text-foreground">
-              プロダクト別 成功率
-            </span>
-            <span className="text-xs text-muted-foreground">
-              直近 {STATUS_WINDOW_HOURS}h / 成功率の高い順
-            </span>
-          </div>
-          <ProductSuccessRateChart data={successRows} />
+      <div className="rounded-lg border border-border bg-surface p-4">
+        <div className="mb-3 flex items-baseline justify-between">
+          <span className="text-sm font-semibold text-foreground">
+            デプロイ成功数の推移
+          </span>
+          <span className="text-xs text-muted-foreground">
+            直近 {CHART_DAYS} 日 / プロダクト別 (合計 {totalSuccess7d})
+          </span>
         </div>
-      )}
+        <DeploySuccessTrendChart
+          data={successTrend}
+          products={productSeries}
+        />
+      </div>
 
       {tableRows.length === 0 ? (
         <EmptyState

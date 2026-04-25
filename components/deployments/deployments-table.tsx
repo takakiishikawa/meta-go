@@ -273,7 +273,7 @@ export function DeploymentsTable({ rows }: { rows: DeploymentRow[] }) {
         <table className="w-full">
           <thead>
             <tr className="border-b border-border bg-muted/30">
-              {["プロダクト", "Commit", "状態", "詳細", "作成", ""].map((h) => (
+              {["プロダクト", "Commit / 変更内容", "状態", "失敗理由", "作成", ""].map((h) => (
                 <th
                   key={h}
                   className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground"
@@ -310,14 +310,35 @@ export function DeploymentsTable({ rows }: { rows: DeploymentRow[] }) {
                       {r.productDisplayName}
                     </span>
                   </td>
-                  <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">
-                    {r.sha}
+                  <td className="px-4 py-2.5 max-w-md">
+                    <div className="flex items-baseline gap-2">
+                      {r.commitUrl ? (
+                        <a
+                          href={r.commitUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-mono text-xs text-muted-foreground hover:text-primary"
+                        >
+                          {r.sha}
+                        </a>
+                      ) : (
+                        <span className="font-mono text-xs text-muted-foreground">
+                          {r.sha}
+                        </span>
+                      )}
+                      <span
+                        className="truncate text-sm text-foreground"
+                        title={r.commitSubject ?? undefined}
+                      >
+                        {r.commitSubject ?? "—"}
+                      </span>
+                    </div>
                   </td>
                   <td className="px-4 py-2.5">
                     <StateBadge state={r.state} />
                   </td>
                   <td className="px-4 py-2.5 text-xs text-muted-foreground max-w-md truncate">
-                    {r.description || "—"}
+                    {r.state === "success" ? "—" : r.description || "—"}
                   </td>
                   <td className="px-4 py-2.5 text-xs text-muted-foreground whitespace-nowrap">
                     {relTime(r.createdAt)}

@@ -33,6 +33,8 @@ export interface DeploymentRow {
   state: DeploymentState;
   description: string;
   targetUrl: string | null;
+  commitSubject: string | null;
+  commitUrl: string | null;
 }
 
 interface GhDeployment {
@@ -52,11 +54,20 @@ interface GhDeploymentStatus {
   created_at: string;
 }
 
+interface GhCommit {
+  sha: string;
+  html_url: string;
+  commit: { message: string };
+}
+
 const HEADERS = {
   Authorization: `Bearer ${process.env.GITHUB_TOKEN ?? ""}`,
   Accept: "application/vnd.github+json",
   "X-GitHub-Api-Version": "2022-11-28",
 };
+
+// Next.js fetch cache TTL — page リクエスト毎に発火を避けるため 15 分キャッシュ
+const FETCH_CACHE = { next: { revalidate: 900 } } as const;
 
 function classify(state: string, description: string): DeploymentState {
   if (/rate limited/i.test(description)) return "rate_limited";
@@ -86,7 +97,7 @@ async function fetchAllDeploymentsForRepo(
   for (let page = 1; page <= 10; page++) {
     const res = await fetch(
       `https://api.github.com/repos/${repo}/deployments?per_page=100&page=${page}`,
-      { headers: HEADERS, cache: "no-store" },
+      { headers: HEADERS, ...FETCH_CACHE },
     );
     if (!res.ok) break;
     const items = (await res.json()) as GhDeployment[];
@@ -108,7 +119,7 @@ async function fetchLatestStatus(
 }> {
   const sres = await fetch(`${d.statuses_url}?per_page=1`, {
     headers: HEADERS,
-    cache: "no-store",
+    ...FETCH_CACHE,
   });
   if (!sres.ok) {
     return { state: "unknown", description: "", targetUrl: null };
@@ -122,6 +133,37 @@ async function fetchLatestStatus(
   };
 }
 
+/**
+ * 当該リポの recent commits を取得して sha → {subject, url} の Map を返す。
+ * deployment の sha は40文字、表示用には7文字に短縮するので両方の lookup を入れる。
+ */
+async function fetchCommitsByRepo(
+  repoFullName: string,
+  sinceISO: string,
+): Promise<Map<string, { subject: string; url: string }>> {
+  const repo = repoFullName.includes("/")
+    ? repoFullName
+    : `${GITHUB_OWNER}/${repoFullName}`;
+  const map = new Map<string, { subject: string; url: string }>();
+  for (let page = 1; page <= 5; page++) {
+    const res = await fetch(
+      `https://api.github.com/repos/${repo}/commits?since=${sinceISO}&per_page=100&page=${page}`,
+      { headers: HEADERS, ...FETCH_CACHE },
+    );
+    if (!res.ok) break;
+    const items = (await res.json()) as GhCommit[];
+    if (items.length === 0) break;
+    for (const c of items) {
+      const subject = (c.commit?.message ?? "").split("\n")[0].trim();
+      const entry = { subject, url: c.html_url };
+      map.set(c.sha, entry);
+      map.set(c.sha.slice(0, 7), entry);
+    }
+    if (items.length < 100) break;
+  }
+  return map;
+}
+
 async function fetchRepoDeployments(
   repoFullName: string,
   product: {
@@ -133,10 +175,11 @@ async function fetchRepoDeployments(
   countWindowSinceISO: string,
   statusWindowSinceISO: string,
 ): Promise<DeploymentRow[]> {
-  const deployments = await fetchAllDeploymentsForRepo(
-    repoFullName,
-    countWindowSinceISO,
-  );
+  const [deployments, commitMap] = await Promise.all([
+    fetchAllDeploymentsForRepo(repoFullName, countWindowSinceISO),
+    fetchCommitsByRepo(repoFullName, countWindowSinceISO),
+  ]);
+
   // statusWindow に入るものだけ status fetch、その他は count 用に state="unknown"
   const rows = await Promise.all(
     deployments.map(async (d): Promise<DeploymentRow> => {
@@ -148,6 +191,7 @@ async function fetchRepoDeployments(
       if (d.created_at >= statusWindowSinceISO) {
         extra = await fetchLatestStatus(d);
       }
+      const commit = commitMap.get(d.sha) ?? null;
       return {
         productId: product.id,
         productName: product.name,
@@ -164,6 +208,8 @@ async function fetchRepoDeployments(
         state: extra.state,
         description: extra.description,
         targetUrl: extra.targetUrl,
+        commitSubject: commit?.subject ?? null,
+        commitUrl: commit?.url ?? null,
       };
     }),
   );

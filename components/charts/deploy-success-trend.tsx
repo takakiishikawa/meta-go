@@ -1,8 +1,8 @@
 "use client";
 
 import {
-  LineChart,
-  Line,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -17,42 +17,33 @@ export interface ProductSeries {
   color: string;
 }
 
-export interface TrendPoint {
-  date: string; // MM-DD
-  // dynamic keys: productId → score
-  [key: string]: string | number | null | undefined;
+export interface DailySuccessPoint {
+  date: string; // MM-DD label
+  // dynamic keys: productId → count
+  [key: string]: string | number;
 }
 
 interface Props {
-  data: TrendPoint[];
+  data: DailySuccessPoint[];
   products: ProductSeries[];
   height?: number;
-  yMin?: number;
-  yMax?: number;
 }
 
-export function MultiProductTrendChart({
-  data,
-  products,
-  height = 240,
-  yMin = 0,
-  yMax = 100,
-}: Props) {
+export function DeploySuccessTrendChart({ data, products, height = 240 }: Props) {
   if (data.length === 0) {
     return (
       <div
         className="flex items-center justify-center text-sm text-muted-foreground"
         style={{ height }}
       >
-        スコア履歴がまだありません
+        deployment データがまだありません
       </div>
     );
   }
   return (
     <div className="w-full" style={{ height }}>
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
-
+        <BarChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
           <XAxis
             dataKey="date"
@@ -61,11 +52,11 @@ export function MultiProductTrendChart({
             axisLine={{ stroke: "var(--color-border)" }}
           />
           <YAxis
-            domain={[yMin, yMax]}
             tick={{ fontSize: 11, fill: "var(--color-text-secondary)" }}
             tickLine={false}
             axisLine={{ stroke: "var(--color-border)" }}
             width={40}
+            allowDecimals={false}
           />
           <Tooltip
             contentStyle={{
@@ -78,19 +69,19 @@ export function MultiProductTrendChart({
             wrapperStyle={{ fontSize: 11, paddingTop: 4 }}
             iconType="circle"
           />
-          {products.map((p) => (
-            <Line
+          {products.map((p, i) => (
+            <Bar
               key={p.id}
-              type="monotone"
               dataKey={p.id}
               name={p.name}
-              stroke={p.color}
-              strokeWidth={1.8}
-              dot={false}
-              connectNulls
+              stackId="success"
+              fill={p.color}
+              radius={
+                i === products.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]
+              }
             />
           ))}
-        </LineChart>
+        </BarChart>
       </ResponsiveContainer>
     </div>
   );
