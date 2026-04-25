@@ -13,7 +13,7 @@ import * as path from "path";
 import {
   cloneRepo,
   createBranchAndCommit,
-  createReviewPR,
+  createAndMergePR,
   cleanup,
 } from "../../lib/github/git-operations";
 
@@ -315,7 +315,7 @@ async function run() {
       return;
     }
 
-    const pr = await createReviewPR(TARGET_REPO, {
+    const pr = await createAndMergePR(TARGET_REPO, {
       title: `docs: CLAUDE.md 更新 (${TEMPLATE_VERSION})`,
       body: `## MetaGo による CLAUDE.md 自動配布
 
@@ -325,17 +325,13 @@ async function run() {
 - \`CLAUDE.md\` を最新テンプレートに更新
 - 全goシリーズ共通のルール・パッケージ規則を統一
 
-### レビューポイント
-- プロジェクト固有の記述に漏れがないか確認
-- 問題なければマージしてください（L2: 手動承認）
-
 ---
-*このPRはMetaGoが自動作成しました*`,
+*このPRはMetaGoが自動作成しました（L1: auto-merge）*`,
       head: branch,
-      labels: ["metago-needs-review"],
+      labels: ["metago-auto-merge"],
     });
 
-    console.log(`  📋 PR作成: ${pr.url}`);
+    console.log(`  ✓ PR作成 & マージ: ${pr.url}`);
   } finally {
     if (tmpDir) cleanup(tmpDir);
   }

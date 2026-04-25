@@ -15,10 +15,6 @@ on:
         description: 'Dry run — show changes only, no PR creation'
         type: boolean
         default: true
-      auto_merge:
-        description: 'Enable auto-merge on created PRs (use only after dry_run review)'
-        type: boolean
-        default: false
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -60,7 +56,6 @@ jobs:
           TARGET_REPOS: ${{ inputs.target_repos }}
           TARGET_FIXES: ${{ inputs.target_fixes }}
           DRY_RUN: ${{ inputs.dry_run }}
-          AUTO_MERGE: ${{ inputs.auto_merge }}
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           GH_PAT: ${{ secrets.GH_PAT }}
           GITHUB_TOKEN: ${{ secrets.GH_PAT }}

@@ -187,16 +187,6 @@ export async function createAndMergePR(
   return pr;
 }
 
-/** L2: PR 作成のみ（承認待ち） */
-export async function createReviewPR(
-  repo: string,
-  opts: Parameters<typeof createPR>[1],
-): Promise<PullRequest> {
-  const pr = await createPR(repo, { ...opts, labels: ["metago-needs-review"] });
-  console.log(`📋 L2 PR created (pending approval): ${pr.url}`);
-  return pr;
-}
-
 /** open PR 一覧取得 */
 export async function listOpenPRs(repo: string): Promise<any[]> {
   const res = await ghFetch(

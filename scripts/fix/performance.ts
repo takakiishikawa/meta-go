@@ -18,7 +18,7 @@ import {
   cloneRepo,
   hasChanges,
   createBranchAndCommit,
-  createReviewPR,
+  createAndMergePR,
   cleanup,
 } from "../../lib/github/git-operations";
 import {
@@ -213,10 +213,10 @@ async function fixForProduct(product: any, repo: string) {
     }
 
     const itemIdRefs = items.map((i) => `metago-issue:${i.id}`).join(", ");
-    const pr = await createReviewPR(repo, {
-      title: `🤖 [MetaGo L2] パフォーマンス改善 — ${product.display_name}`,
+    const pr = await createAndMergePR(repo, {
+      title: `🤖 [MetaGo L1] パフォーマンス改善 — ${product.display_name}`,
       body: [
-        `MetaGo + Claude によるパフォーマンス改善提案です。`,
+        `MetaGo + Claude によるパフォーマンス改善です。`,
         ``,
         `**Lighthouse計測結果**`,
         ...issues.map((i) => `- ${i}`),
@@ -226,12 +226,10 @@ async function fixForProduct(product: any, repo: string) {
         ``,
         `修正ファイル数: ${patchCount} 件`,
         ``,
-        `> ⚠️ L2: 動作確認後に承認してください。`,
-        ``,
         `Fixes: ${itemIdRefs}`,
       ].join("\n"),
       head: branch,
-      labels: ["metago-needs-review"],
+      labels: ["metago-auto-merge"],
     });
 
     await supabase

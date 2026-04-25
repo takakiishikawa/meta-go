@@ -8,7 +8,8 @@
  *                    Phase 1: recharts-dynamic, vercel-analytics, remove-unused, layer2-missing, remove-openai
  *                    Phase 2a: layer1-violations
  *   DRY_RUN        — "true" の場合、PR を作成せずログのみ
- *   AUTO_MERGE     — "true" の場合、PR に auto-merge を設定
+ *
+ * PR は L1 として createAndMergePR で即マージされる。
  *
  * 認証: CLAUDE_CODE_OAUTH_TOKEN (Max プラン内、Anthropic API 課金なし)
  */
@@ -19,15 +20,15 @@ import * as path from "path";
 import {
   cloneRepo,
   createBranchAndCommit,
-  createPR,
+  createAndMergePR,
   cleanup,
+  PullRequest,
 } from "../../lib/github/git-operations";
 
 const TARGET_REPO = process.env.TARGET_REPO!;
 const TARGET_REPOS = process.env.TARGET_REPOS || "all";
 const TARGET_FIXES = process.env.TARGET_FIXES || "all";
 const DRY_RUN = process.env.DRY_RUN === "true";
-const AUTO_MERGE = process.env.AUTO_MERGE === "true";
 const GITHUB_OWNER = process.env.GITHUB_OWNER || "takakiishikawa";
 const GITHUB_RUN_ID = process.env.GITHUB_RUN_ID || "";
 
@@ -551,27 +552,6 @@ async function findExistingPR(
   return { url: pr.html_url, number: pr.number, nodeId: pr.node_id };
 }
 
-// ── GitHub: auto-merge 有効化 ─────────────────────────────────
-
-async function enableAutoMerge(prNodeId: string) {
-  const query = `
-    mutation($id: ID!) {
-      enablePullRequestAutoMerge(input: { pullRequestId: $id, mergeMethod: SQUASH }) {
-        pullRequest { id }
-      }
-    }
-  `;
-  const GH_PAT = process.env.GH_PAT || process.env.GITHUB_TOKEN!;
-  await fetch("https://api.github.com/graphql", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${GH_PAT}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ query, variables: { id: prNodeId } }),
-  });
-}
-
 // ── メイン ───────────────────────────────────────────────────
 
 async function run() {
@@ -588,9 +568,7 @@ async function run() {
   }
 
   console.log(`\n🔍 ${TARGET_REPO}: tech-stack compliance チェック開始`);
-  console.log(
-    `   fixes: ${TARGET_FIXES} | dry_run: ${DRY_RUN} | auto_merge: ${AUTO_MERGE}`,
-  );
+  console.log(`   fixes: ${TARGET_FIXES} | dry_run: ${DRY_RUN}`);
 
   let tmpDir: string | null = null;
   try {
@@ -724,9 +702,9 @@ async function run() {
       ? "refactor: Phase 2a — Eliminate Layer 1 direct imports"
       : "chore: Tech stack compliance to v2.0 policy";
 
-    let pr: { url: string; number: number; nodeId: string };
+    let pr: PullRequest;
     try {
-      pr = await createPR(TARGET_REPO, {
+      pr = await createAndMergePR(TARGET_REPO, {
         title: prTitle,
         body: `## MetaGoが自動生成した技術スタック刷新PRです。
 
@@ -741,11 +719,11 @@ ${appliedFixes.map((f) => `- ${f}`).join("\n")}
 - 実行workflow: ${runUrl}
 
 ---
-*このPRはMetaGoが自動作成しました*`,
+*このPRはMetaGoが自動作成しました（L1: auto-merge）*`,
         head: branch,
-        labels: ["tech-stack-compliance", "metago-auto"],
+        labels: ["tech-stack-compliance", "metago-auto-merge"],
       });
-      console.log(`  📋 PR作成: ${pr.url}`);
+      console.log(`  ✓ PR作成 & マージ: ${pr.url}`);
     } catch (e: any) {
       if (e?.message?.includes("already exists")) {
         const existing = await findExistingPR(TARGET_REPO, branch);
@@ -758,11 +736,6 @@ ${appliedFixes.map((f) => `- ${f}`).join("\n")}
       } else {
         throw e;
       }
-    }
-
-    if (AUTO_MERGE) {
-      await enableAutoMerge(pr.nodeId);
-      console.log(`  ✓ auto-merge 有効化`);
     }
   } finally {
     if (tmpDir) cleanup(tmpDir);
