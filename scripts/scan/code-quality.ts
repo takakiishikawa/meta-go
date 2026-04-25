@@ -127,10 +127,12 @@ function collectSourceFiles(repoDir: string): string {
   let files: string[] = [];
   try {
     files = execSync(
+      // root 直置き (./app/...) と src/ レイアウト (./src/app/...) の両方をサポート
       `find . -type f \\( -name "*.ts" -o -name "*.tsx" \\) ` +
         `-not -path "./node_modules/*" -not -path "./.next/*" ` +
         `-not -name "*.test.*" -not -name "*.spec.*" ` +
-        `\\( -path "./app/*" -o -path "./components/*" -o -path "./lib/*" -o -path "./hooks/*" \\) ` +
+        `\\( -path "./app/*" -o -path "./components/*" -o -path "./lib/*" -o -path "./hooks/*" ` +
+        `   -o -path "./src/*" \\) ` +
         `| xargs ls -S 2>/dev/null | head -40`,
       { cwd: repoDir, stdio: "pipe" },
     )
