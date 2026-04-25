@@ -2,7 +2,7 @@
  * security FIX
  *
  * security_items の state='new' から critical/high を N 件取り出し、
- * Claude にソースを修正させて L2 PR を作成 + approval_queue に追加
+ * Claude にソースを修正させて L1 PR を即マージし approval_queue に履歴を残す
  *
  * 認証: CLAUDE_CODE_OAUTH_TOKEN (Claude Code Max プラン)
  *
@@ -26,6 +26,7 @@ import {
   REPO_TO_SLUG,
   getSupabase,
   markItemFailed,
+  markItemFixed,
   PendingItem,
   DEFAULT_BATCH_SIZE,
 } from "../../lib/metago/items";
@@ -174,7 +175,7 @@ async function fixForProduct(product: any, repo: string) {
     const pushed = createBranchAndCommit(
       repoDir,
       branch,
-      `fix(security): ${items.length}件のセキュリティ問題修正 [MetaGo L2]`,
+      `fix(security): ${items.length}件のセキュリティ問題修正 [MetaGo L1]`,
     );
     if (!pushed) {
       await markItemFailed(
@@ -214,28 +215,24 @@ async function fixForProduct(product: any, repo: string) {
         title: `セキュリティ修正PR: ${product.display_name}`,
         description: items.map((f) => `[${f.severity}] ${f.title}`).join("\n"),
         category: "security",
-        state: "pending",
+        state: "merged",
         meta: {
           pr_url: pr.url,
-          level: "L2",
+          level: "L1",
           repo,
           item_ids: items.map((i) => i.id),
         },
       });
 
-    // L2 は承認待ちなので fixing のまま (PRマージで approval flow が fixed に遷移)
-    await supabase
-      .schema("metago")
-      .from("security_items")
-      .update({
-        pr_url: pr.url,
-      })
-      .in(
-        "id",
-        items.map((i) => i.id),
-      );
+    // L1: PRは即マージ済みなので items を fixed に遷移
+    await markItemFixed(
+      supabase,
+      "security_items",
+      items.map((i) => i.id),
+      pr.url,
+    );
 
-    console.log(`  📋 L2 PR: ${pr.url}`);
+    console.log(`  ✓ L1 PR merged: ${pr.url}`);
   } catch (e) {
     console.error(`  ❌ Failed: ${repo}`, e);
     await markItemFailed(
@@ -250,7 +247,7 @@ async function fixForProduct(product: any, repo: string) {
 }
 
 async function main() {
-  console.log("🚀 [FIX] security (L2)");
+  console.log("🚀 [FIX] security (L1)");
 
   const { data: products } = await supabase
     .schema("metago")
