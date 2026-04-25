@@ -29,7 +29,11 @@ interface Props {
   height?: number;
 }
 
-export function DeploySuccessTrendChart({ data, products, height = 240 }: Props) {
+export function DeploySuccessTrendChart({
+  data,
+  products,
+  height = 240,
+}: Props) {
   if (data.length === 0) {
     return (
       <div
@@ -43,7 +47,10 @@ export function DeploySuccessTrendChart({ data, products, height = 240 }: Props)
   return (
     <div className="w-full" style={{ height }}>
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+        <BarChart
+          data={data}
+          margin={{ top: 8, right: 12, left: 0, bottom: 0 }}
+        >
           <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
           <XAxis
             dataKey="date"
@@ -76,9 +83,7 @@ export function DeploySuccessTrendChart({ data, products, height = 240 }: Props)
               name={p.name}
               stackId="success"
               fill={p.color}
-              radius={
-                i === products.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]
-              }
+              radius={i === products.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
             />
           ))}
         </BarChart>

@@ -110,9 +110,7 @@ async function fetchAllDeploymentsForRepo(
   return all;
 }
 
-async function fetchLatestStatus(
-  d: GhDeployment,
-): Promise<{
+async function fetchLatestStatus(d: GhDeployment): Promise<{
   state: DeploymentState;
   description: string;
   targetUrl: string | null;
