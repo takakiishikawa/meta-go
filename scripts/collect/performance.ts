@@ -100,7 +100,9 @@ function runLighthouse(
     const report = JSON.parse(fs.readFileSync(reportPath, "utf-8"));
     const perfScore = report.categories?.performance?.score;
     if (perfScore == null) {
-      console.warn(`  Lighthouse: performanceカテゴリスコアが取得できませんでした`);
+      console.warn(
+        `  Lighthouse: performanceカテゴリスコアが取得できませんでした`,
+      );
       return null;
     }
     return {
