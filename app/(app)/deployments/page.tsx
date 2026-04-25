@@ -3,6 +3,7 @@ import { EmptyState, PageHeader } from "@takaki/go-design-system";
 import { Rocket } from "lucide-react";
 import {
   fetchAllDeployments,
+  dailyCounts,
   summarize,
 } from "@/lib/metago/github-deployments";
 import { DeploymentsTable } from "@/components/deployments/deployments-table";
@@ -10,18 +11,22 @@ import { DeploymentsTable } from "@/components/deployments/deployments-table";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-const WINDOW_HOURS = 48;
+const STATUS_WINDOW_HOURS = 48;
+const CHART_DAYS = 7;
+const HOBBY_DAILY_BUDGET = 100;
 
 function StatCard({
   label,
   value,
   sublabel,
   accent,
+  children,
 }: {
   label: string;
-  value: number | string;
+  value?: number | string;
   sublabel?: string;
   accent: string;
+  children?: React.ReactNode;
 }) {
   return (
     <div className="overflow-hidden rounded-lg border border-border bg-surface">
@@ -30,10 +35,15 @@ function StatCard({
         <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
           {label}
         </div>
-        <div className="mt-1 text-2xl font-semibold text-foreground">{value}</div>
+        {value !== undefined && (
+          <div className="mt-1 text-2xl font-semibold text-foreground">
+            {value}
+          </div>
+        )}
         {sublabel && (
           <div className="mt-0.5 text-xs text-muted-foreground">{sublabel}</div>
         )}
+        {children}
       </div>
     </div>
   );
@@ -48,63 +58,136 @@ export default async function DeploymentsPage() {
     .select("id, name, display_name, primary_color, github_repo")
     .order("priority");
 
-  const rows = await fetchAllDeployments(products ?? [], WINDOW_HOURS);
-  const sum = summarize(rows);
+  // 7日(count) + 48h(status) を1回のfetchでまとめて取得
+  const allRows = await fetchAllDeployments(
+    products ?? [],
+    CHART_DAYS * 24,
+    STATUS_WINDOW_HOURS,
+  );
 
-  // Hobby plan の day budget = 100。直近24h を別計算で出す
-  const sinceDay = Date.now() - 24 * 60 * 60 * 1000;
-  const last24h = rows.filter(
-    (r) => new Date(r.createdAt).getTime() >= sinceDay,
+  // tableに渡すのは status 取得済みの 48h 分のみ
+  const statusSinceMs = Date.now() - STATUS_WINDOW_HOURS * 60 * 60 * 1000;
+  const tableRows = allRows.filter(
+    (r) => new Date(r.createdAt).getTime() >= statusSinceMs,
+  );
+
+  // 24h 集計
+  const dayAgoMs = Date.now() - 24 * 60 * 60 * 1000;
+  const last24h = allRows.filter(
+    (r) => new Date(r.createdAt).getTime() >= dayAgoMs,
   );
   const sum24h = summarize(last24h);
+
+  // 7日 daily breakdown
+  const daily = dailyCounts(allRows, CHART_DAYS);
+  const todayCount = daily[daily.length - 1]?.count ?? 0;
 
   return (
     <>
       <PageHeader
         title="Deployments"
-        description={`Vercel への全デプロイと結果（直近 ${WINDOW_HOURS}h）。GitHub Deployments API 経由でリアルタイム取得。`}
+        description={`Vercel への全デプロイと結果（直近 ${STATUS_WINDOW_HOURS}h、7日分のbudget可視化）`}
       />
 
-      {/* Hobby plan budget */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
         <StatCard
-          label="24h 合計"
-          value={`${sum24h.total} / 100`}
-          sublabel={`Hobby day budget`}
-          accent={sum24h.total >= 90 ? "#DC2626" : "#1E3A8A"}
+          label="今日の使用率"
+          value={`${todayCount} / ${HOBBY_DAILY_BUDGET}`}
+          sublabel="Hobby plan day budget (Asia/Tokyo)"
+          accent={
+            todayCount >= 90
+              ? "#DC2626"
+              : todayCount >= 70
+                ? "#D97706"
+                : "#1E3A8A"
+          }
         />
+
         <StatCard
-          label="成功"
-          value={sum24h.success}
-          sublabel="直近24h"
+          label="直近24h 結果"
           accent="#059669"
-        />
-        <StatCard
-          label="失敗"
-          value={sum24h.failure + sum24h.rateLimited}
-          sublabel={`含 rate limit ${sum24h.rateLimited}`}
-          accent="#DC2626"
-        />
-        <StatCard
-          label="48h 視点"
-          value={`P:${sum.production}  /  Pre:${sum.preview}`}
-          sublabel={`計 ${sum.total}`}
-          accent="#6554C0"
-        />
+        >
+          <div className="mt-1 flex items-end gap-4">
+            <div>
+              <div className="text-2xl font-semibold text-emerald-600">
+                {sum24h.success}
+              </div>
+              <div className="text-[11px] text-muted-foreground">成功</div>
+            </div>
+            <div>
+              <div className="text-2xl font-semibold text-red-600">
+                {sum24h.failure}
+              </div>
+              <div className="text-[11px] text-muted-foreground">
+                失敗{sum24h.rateLimited > 0 && ` (rate ${sum24h.rateLimited})`}
+              </div>
+            </div>
+            {sum24h.pending > 0 && (
+              <div>
+                <div className="text-2xl font-semibold text-blue-600">
+                  {sum24h.pending}
+                </div>
+                <div className="text-[11px] text-muted-foreground">進行中</div>
+              </div>
+            )}
+          </div>
+        </StatCard>
+
+        <StatCard label="直近7日 daily budget" accent="#6554C0">
+          <div className="mt-2 flex items-end justify-between gap-1">
+            {daily.map((d, i) => {
+              const ratio = Math.min(1, d.count / HOBBY_DAILY_BUDGET);
+              const over = d.count >= HOBBY_DAILY_BUDGET;
+              const isToday = i === daily.length - 1;
+              const color = over
+                ? "#DC2626"
+                : ratio >= 0.9
+                  ? "#D97706"
+                  : "#6554C0";
+              return (
+                <div
+                  key={d.dateISO}
+                  className="flex flex-1 flex-col items-center gap-1"
+                  title={`${d.dateISO}: ${d.count} / ${HOBBY_DAILY_BUDGET}`}
+                >
+                  <span
+                    className="text-[10px] font-mono"
+                    style={{ color, fontWeight: isToday ? 700 : 400 }}
+                  >
+                    {d.count}
+                  </span>
+                  <div className="relative h-12 w-full overflow-hidden rounded bg-muted/40">
+                    <div
+                      className="absolute bottom-0 left-0 right-0"
+                      style={{
+                        height: `${ratio * 100}%`,
+                        backgroundColor: color,
+                        opacity: isToday ? 1 : 0.7,
+                      }}
+                    />
+                  </div>
+                  <span className="text-[10px] text-muted-foreground">
+                    {d.label}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </StatCard>
       </div>
 
-      {rows.length === 0 ? (
+      {tableRows.length === 0 ? (
         <EmptyState
           icon={<Rocket className="size-12" />}
           title="deployment がまだありません"
           description={
             process.env.GITHUB_TOKEN
-              ? "直近48h に Vercel deployment が観測されませんでした"
+              ? `直近 ${STATUS_WINDOW_HOURS}h に Vercel deployment が観測されませんでした`
               : "GITHUB_TOKEN が未設定です。Vercel deployment 履歴を取得できません"
           }
         />
       ) : (
-        <DeploymentsTable rows={rows} />
+        <DeploymentsTable rows={tableRows} />
       )}
     </>
   );

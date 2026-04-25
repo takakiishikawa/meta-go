@@ -76,6 +76,51 @@ function classify(
   }
 }
 
+async function fetchAllDeploymentsForRepo(
+  repoFullName: string,
+  sinceISO: string,
+): Promise<GhDeployment[]> {
+  // /repos/{owner}/{repo}/deployments は降順なのでページを進めるごとに古くなる
+  // sinceISO より古いものに到達したら打ち切り
+  const repo = repoFullName.includes("/")
+    ? repoFullName
+    : `${GITHUB_OWNER}/${repoFullName}`;
+  const all: GhDeployment[] = [];
+  for (let page = 1; page <= 10; page++) {
+    const res = await fetch(
+      `https://api.github.com/repos/${repo}/deployments?per_page=100&page=${page}`,
+      { headers: HEADERS, cache: "no-store" },
+    );
+    if (!res.ok) break;
+    const items = (await res.json()) as GhDeployment[];
+    if (items.length === 0) break;
+    for (const d of items) {
+      if (d.created_at >= sinceISO) all.push(d);
+    }
+    if (items[items.length - 1].created_at < sinceISO) break;
+  }
+  return all;
+}
+
+async function fetchLatestStatus(
+  d: GhDeployment,
+): Promise<{ state: DeploymentState; description: string; targetUrl: string | null }> {
+  const sres = await fetch(`${d.statuses_url}?per_page=1`, {
+    headers: HEADERS,
+    cache: "no-store",
+  });
+  if (!sres.ok) {
+    return { state: "unknown", description: "", targetUrl: null };
+  }
+  const statuses = (await sres.json()) as GhDeploymentStatus[];
+  const latest = statuses[0];
+  return {
+    state: latest ? classify(latest.state, latest.description) : "unknown",
+    description: latest?.description ?? "",
+    targetUrl: latest?.target_url ?? null,
+  };
+}
+
 async function fetchRepoDeployments(
   repoFullName: string,
   product: {
@@ -84,51 +129,44 @@ async function fetchRepoDeployments(
     display_name: string;
     primary_color: string | null;
   },
-  sinceISO: string,
+  countWindowSinceISO: string,
+  statusWindowSinceISO: string,
 ): Promise<DeploymentRow[]> {
-  // /repos/{owner}/{repo}/deployments?per_page=100  (Vercel が作る最新分が降順)
-  const repo = repoFullName.includes("/")
-    ? repoFullName
-    : `${GITHUB_OWNER}/${repoFullName}`;
-  const res = await fetch(
-    `https://api.github.com/repos/${repo}/deployments?per_page=100`,
-    { headers: HEADERS, cache: "no-store" },
+  const deployments = await fetchAllDeploymentsForRepo(
+    repoFullName,
+    countWindowSinceISO,
   );
-  if (!res.ok) return [];
-  const deployments = (await res.json()) as GhDeployment[];
-
-  const recent = deployments.filter((d) => d.created_at >= sinceISO);
-
-  // 各 deployment の最新 status を並列取得
+  // statusWindow に入るものだけ status fetch、その他は count 用に state="unknown"
   const rows = await Promise.all(
-    recent.map(async (d): Promise<DeploymentRow | null> => {
-      const sres = await fetch(`${d.statuses_url}?per_page=1`, {
-        headers: HEADERS,
-        cache: "no-store",
-      });
-      if (!sres.ok) return null;
-      const statuses = (await sres.json()) as GhDeploymentStatus[];
-      const latest = statuses[0];
-      const state = latest ? classify(latest.state, latest.description) : "unknown";
+    deployments.map(async (d): Promise<DeploymentRow> => {
+      let extra = {
+        state: "unknown" as DeploymentState,
+        description: "",
+        targetUrl: null as string | null,
+      };
+      if (d.created_at >= statusWindowSinceISO) {
+        extra = await fetchLatestStatus(d);
+      }
       return {
         productId: product.id,
         productName: product.name,
         productDisplayName: product.display_name,
         primaryColor: product.primary_color,
-        repo,
+        repo: repoFullName.includes("/")
+          ? repoFullName
+          : `${GITHUB_OWNER}/${repoFullName}`,
         deploymentId: d.id,
         sha: d.sha.slice(0, 7),
         ref: d.ref,
         environment: d.environment,
         createdAt: d.created_at,
-        state,
-        description: latest?.description ?? "",
-        targetUrl: latest?.target_url ?? null,
+        state: extra.state,
+        description: extra.description,
+        targetUrl: extra.targetUrl,
       };
     }),
   );
-
-  return rows.filter((r): r is DeploymentRow => r !== null);
+  return rows;
 }
 
 export async function fetchAllDeployments(
@@ -139,19 +177,26 @@ export async function fetchAllDeployments(
     primary_color: string | null;
     github_repo: string | null;
   }>,
-  windowHours = 48,
+  countWindowHours = 168, // 7日: chart用
+  statusWindowHours = 48, // 48h: table+成功/失敗 集計用
 ): Promise<DeploymentRow[]> {
   if (!process.env.GITHUB_TOKEN) {
     return [];
   }
-  const sinceISO = new Date(
-    Date.now() - windowHours * 60 * 60 * 1000,
+  const now = Date.now();
+  const countSinceISO = new Date(
+    now - countWindowHours * 60 * 60 * 1000,
+  ).toISOString();
+  const statusSinceISO = new Date(
+    now - statusWindowHours * 60 * 60 * 1000,
   ).toISOString();
 
   const settled = await Promise.allSettled(
     products
       .filter((p) => p.github_repo)
-      .map((p) => fetchRepoDeployments(p.github_repo!, p, sinceISO)),
+      .map((p) =>
+        fetchRepoDeployments(p.github_repo!, p, countSinceISO, statusSinceISO),
+      ),
   );
 
   const all: DeploymentRow[] = [];
@@ -161,6 +206,45 @@ export async function fetchAllDeployments(
   // 新しい順
   all.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
   return all;
+}
+
+/**
+ * Asia/Tokyo の calendar day で過去 N 日分の deploy 数を集計
+ * 戻り値: 古い順に並んだ {label, dateISO, count}[]
+ */
+export function dailyCounts(
+  rows: DeploymentRow[],
+  days = 7,
+  timezone = "Asia/Tokyo",
+): Array<{ label: string; dateISO: string; count: number }> {
+  const fmt = new Intl.DateTimeFormat("ja-JP", {
+    timeZone: timezone,
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const fmtKey = new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const buckets = new Map<string, number>();
+  for (const r of rows) {
+    const key = fmtKey.format(new Date(r.createdAt)); // YYYY-MM-DD
+    buckets.set(key, (buckets.get(key) ?? 0) + 1);
+  }
+  const out: Array<{ label: string; dateISO: string; count: number }> = [];
+  const today = new Date();
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(today.getTime() - i * 24 * 60 * 60 * 1000);
+    const key = fmtKey.format(d);
+    out.push({
+      label: fmt.format(d),
+      dateISO: key,
+      count: buckets.get(key) ?? 0,
+    });
+  }
+  return out;
 }
 
 /**

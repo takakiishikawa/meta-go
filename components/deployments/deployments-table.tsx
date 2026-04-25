@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Badge } from "@takaki/go-design-system";
 import {
   CheckCircle2,
   XCircle,
@@ -110,9 +109,6 @@ function relTime(iso: string): string {
 
 export function DeploymentsTable({ rows }: { rows: DeploymentRow[] }) {
   const [stateFilter, setStateFilter] = useState<StateFilter>("all");
-  const [envFilter, setEnvFilter] = useState<"all" | "Production" | "Preview">(
-    "all",
-  );
   const [productFilter, setProductFilter] = useState<string>("all");
 
   const products = useMemo(() => {
@@ -167,11 +163,10 @@ export function DeploymentsTable({ rows }: { rows: DeploymentRow[] }) {
         )
           return false;
       }
-      if (envFilter !== "all" && r.environment !== envFilter) return false;
       if (productFilter !== "all" && r.productId !== productFilter) return false;
       return true;
     });
-  }, [rows, stateFilter, envFilter, productFilter]);
+  }, [rows, stateFilter, productFilter]);
 
   return (
     <div className="flex flex-col gap-3">
@@ -204,26 +199,9 @@ export function DeploymentsTable({ rows }: { rows: DeploymentRow[] }) {
         })}
       </div>
 
-      {/* env + product chip filters */}
+      {/* product chip filter */}
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs text-muted-foreground">環境:</span>
-        {(["all", "Production", "Preview"] as const).map((env) => {
-          const active = envFilter === env;
-          return (
-            <button
-              key={env}
-              onClick={() => setEnvFilter(env)}
-              className={`rounded-full border px-2.5 py-0.5 text-[11px] transition-colors ${
-                active
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border bg-muted/40 text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {env === "all" ? "全て" : env}
-            </button>
-          );
-        })}
-        <span className="ml-3 text-xs text-muted-foreground">プロダクト:</span>
+        <span className="text-xs text-muted-foreground">プロダクト:</span>
         <button
           onClick={() => setProductFilter("all")}
           className={`rounded-full border px-2.5 py-0.5 text-[11px] transition-colors ${
@@ -261,23 +239,21 @@ export function DeploymentsTable({ rows }: { rows: DeploymentRow[] }) {
         <table className="w-full">
           <thead>
             <tr className="border-b border-border bg-muted/30">
-              {["プロダクト", "環境", "Commit", "状態", "詳細", "作成", ""].map(
-                (h) => (
-                  <th
-                    key={h}
-                    className="px-4 py-3 text-left text-[11px] font-medium uppercase tracking-wider text-muted-foreground"
-                  >
-                    {h}
-                  </th>
-                ),
-              )}
+              {["プロダクト", "Commit", "状態", "詳細", "作成", ""].map((h) => (
+                <th
+                  key={h}
+                  className="px-4 py-3 text-left text-[11px] font-medium uppercase tracking-wider text-muted-foreground"
+                >
+                  {h}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
               <tr>
                 <td
-                  colSpan={7}
+                  colSpan={6}
                   className="px-4 py-10 text-center text-sm text-muted-foreground"
                 >
                   該当する deployment はありません。
@@ -299,16 +275,6 @@ export function DeploymentsTable({ rows }: { rows: DeploymentRow[] }) {
                       />
                       {r.productDisplayName}
                     </span>
-                  </td>
-                  <td className="px-4 py-2.5">
-                    <Badge
-                      variant={
-                        r.environment === "Production" ? "default" : "outline"
-                      }
-                      className="text-[11px]"
-                    >
-                      {r.environment}
-                    </Badge>
                   </td>
                   <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">
                     {r.sha}
