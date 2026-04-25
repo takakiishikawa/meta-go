@@ -180,7 +180,7 @@ export function DashboardClient({
           pendingApprovals.length > 0 ? (
             <Link
               href="/approval"
-              className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800 transition-colors hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200"
+              className="flex items-center gap-2 rounded-md border border-warning bg-warning-subtle px-3 py-2 text-sm font-medium text-warning transition-colors hover:opacity-80"
             >
               <AlertCircle className="size-4" />
               承認待ち {pendingApprovals.length}件
@@ -290,7 +290,7 @@ export function DashboardClient({
                     className="flex items-center justify-between rounded-md border border-border p-3"
                   >
                     <div className="flex items-center gap-2">
-                      <Clock className="size-4 text-amber-500" />
+                      <Clock className="size-4 text-warning" />
                       <span
                         style={{
                           fontSize: "var(--text-sm)",

@@ -8,16 +8,18 @@ import {
 } from "@/lib/metago/github-deployments";
 import { DeploymentsTable } from "@/components/deployments/deployments-table";
 import {
-  ProductSuccessRateChart,
-  type SuccessRateRow,
-} from "@/components/charts/product-success-rate";
+  DeploySuccessTrendChart,
+  type DailySuccessPoint,
+  type ProductSeries,
+} from "@/components/charts/deploy-success-trend";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-const STATUS_WINDOW_HOURS = 48;
+const STATUS_WINDOW_HOURS = 168; // 7日: 成功推移チャート用に status も全期間 fetch
 const CHART_DAYS = 7;
 const HOBBY_DAILY_BUDGET = 100;
+const TZ = "Asia/Tokyo";
 
 function StatCard({
   label,
@@ -135,22 +137,22 @@ export default async function DeploymentsPage() {
         <StatCard label="直近24h 結果" accent="#059669">
           <div className="mt-1 flex items-end gap-4">
             <div>
-              <div className="text-2xl font-semibold text-emerald-600">
+              <div className="text-2xl font-semibold text-success">
                 {sum24h.success}
               </div>
-              <div className="text-[11px] text-muted-foreground">成功</div>
+              <div className="text-xs text-muted-foreground">成功</div>
             </div>
             <div>
-              <div className="text-2xl font-semibold text-red-600">
+              <div className="text-2xl font-semibold text-destructive">
                 {sum24h.failure}
               </div>
-              <div className="text-[11px] text-muted-foreground">
+              <div className="text-xs text-muted-foreground">
                 失敗{sum24h.rateLimited > 0 && ` (rate ${sum24h.rateLimited})`}
               </div>
             </div>
             {sum24h.pending > 0 && (
               <div>
-                <div className="text-2xl font-semibold text-blue-600">
+                <div className="text-2xl font-semibold text-primary">
                   {sum24h.pending}
                 </div>
                 <div className="text-[11px] text-muted-foreground">進行中</div>

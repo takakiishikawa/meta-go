@@ -176,7 +176,7 @@ function PackageTable({
                             `${productMap[id]?.display_name ?? id}: ${v}`,
                         )
                         .join("\n")}
-                      className="rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200"
+                      className="rounded-full border border-warning bg-warning-subtle px-1.5 py-0.5 text-xs font-medium text-warning"
                     >
                       混在
                     </span>

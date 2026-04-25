@@ -289,7 +289,7 @@ export default async function DependencyPage() {
                         {item.current_version}
                       </TableCell>
                       <TableCell className="px-4 py-2.5 font-mono text-xs">
-                        <span className="text-emerald-600 dark:text-emerald-400">
+                        <span className="text-success">
                           {item.latest_version}
                         </span>
                       </TableCell>

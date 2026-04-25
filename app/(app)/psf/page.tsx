@@ -26,8 +26,9 @@ const GO_COLORS: Record<string, string> = {
 };
 
 function TrendIcon({ trend }: { trend: string | null }) {
-  if (trend === "up") return <TrendingUp className="size-4 text-green-500" />;
-  if (trend === "down") return <TrendingDown className="size-4 text-red-500" />;
+  if (trend === "up") return <TrendingUp className="size-4 text-success" />;
+  if (trend === "down")
+    return <TrendingDown className="size-4 text-destructive" />;
   return (
     <Minus
       className="size-4"

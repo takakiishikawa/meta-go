@@ -294,7 +294,7 @@ function PendingCard({
               size="sm"
               onClick={handleReject}
               disabled={isPending}
-              className="text-red-500 hover:text-red-600 hover:border-red-300"
+              className="text-destructive hover:opacity-80 hover:border-destructive"
             >
               {isPending && action === "reject" ? (
                 <Loader2 className="size-3 animate-spin" />
@@ -438,7 +438,7 @@ export function ApprovalClient({ items }: { items: ApprovalItem[] }) {
                           承認済み
                         </div>
                       ) : (
-                        <div className="flex items-center gap-1 text-xs text-red-500">
+                        <div className="flex items-center gap-1 text-xs text-destructive">
                           <XCircle className="size-3" />
                           却下
                         </div>

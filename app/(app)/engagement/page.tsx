@@ -136,9 +136,9 @@ export default function EngagementPage() {
                       </td>
                       <td className="px-4 py-3">
                         {latest?.trend === "up" ? (
-                          <TrendingUp className="size-4 text-green-500" />
+                          <TrendingUp className="size-4 text-success" />
                         ) : latest?.trend === "down" ? (
-                          <TrendingDown className="size-4 text-red-500" />
+                          <TrendingDown className="size-4 text-destructive" />
                         ) : (
                           <Minus
                             className="size-4"
