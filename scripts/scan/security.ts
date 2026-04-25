@@ -132,8 +132,7 @@ const SCAN_PATTERNS: ScanPattern[] = [
     pattern: /console\.log\([^)]*(?:token|secret|password|key|auth)/gi,
     severity: "medium",
     title: "機密情報のログ出力",
-    description:
-      "機密情報をconsole.logで出力しているパターンがあります。",
+    description: "機密情報をconsole.logで出力しているパターンがあります。",
   },
   {
     pattern: /\.innerHTML\s*=/g,
