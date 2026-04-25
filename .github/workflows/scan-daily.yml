@@ -1,0 +1,72 @@
+name: Scan Daily (調査cron)
+
+# 各goリポをcloneして違反/問題を検出 → DBに保存だけ。修正PRは作らない（fix-hourlyに委譲）
+
+on:
+  schedule:
+    # 毎日 JST 03:00 (UTC 18:00)
+    - cron: '0 18 * * *'
+  workflow_dispatch:
+    inputs:
+      target_repo:
+        description: '特定のリポだけ実行する場合のリポ名 (例: meta-go)'
+        required: false
+        type: string
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        repo: [native-go, care-go, kenyaku-go, cook-go, physical-go, task-go, go-design-system, meta-go]
+        scanner: [code-quality, design-system, security]
+        exclude:
+          # designsystem は DS 違反の評価対象外
+          - repo: go-design-system
+            scanner: design-system
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ${{ matrix.scanner }} scan for ${{ matrix.repo }}
+        run: npx tsx scripts/scan/${{ matrix.scanner }}.ts
+        env:
+          TARGET_REPO: ${{ inputs.target_repo || matrix.repo }}
+          GH_PAT: ${{ secrets.GH_PAT }}
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+          GITHUB_OWNER: ${{ secrets.GITHUB_OWNER }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+  performance-scan:
+    # Lighthouse は別job (Chrome必要)
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        repo: [native-go, care-go, kenyaku-go, cook-go, physical-go, task-go, go-design-system, meta-go]
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install dependencies
+        run: npm ci
+      - name: Setup Chrome
+        uses: browser-actions/setup-chrome@v1
+
+      - name: Performance scan for ${{ matrix.repo }}
+        run: npx tsx scripts/scan/performance.ts
+        env:
+          TARGET_REPO: ${{ inputs.target_repo || matrix.repo }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

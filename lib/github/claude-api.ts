@@ -34,7 +34,7 @@ export async function fixFileWithClaude(params: {
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
       const message = await anthropic.messages.create({
-        model: "claude-sonnet-4-5",
+        model: "claude-sonnet-4-6",
         max_tokens: 4096,
         messages: [
           {
