@@ -234,10 +234,7 @@ export default async function DeploymentsPage() {
             直近 {CHART_DAYS} 日 / プロダクト別 (合計 {totalSuccess7d})
           </span>
         </div>
-        <DeploySuccessTrendChart
-          data={successTrend}
-          products={productSeries}
-        />
+        <DeploySuccessTrendChart data={successTrend} products={productSeries} />
       </div>
 
       {tableRows.length === 0 ? (

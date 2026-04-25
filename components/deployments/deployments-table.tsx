@@ -273,7 +273,14 @@ export function DeploymentsTable({ rows }: { rows: DeploymentRow[] }) {
         <table className="w-full">
           <thead>
             <tr className="border-b border-border bg-muted/30">
-              {["プロダクト", "Commit / 変更内容", "状態", "失敗理由", "作成", ""].map((h) => (
+              {[
+                "プロダクト",
+                "Commit / 変更内容",
+                "状態",
+                "失敗理由",
+                "作成",
+                "",
+              ].map((h) => (
                 <th
                   key={h}
                   className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground"

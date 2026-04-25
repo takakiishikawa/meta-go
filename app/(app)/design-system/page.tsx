@@ -262,15 +262,11 @@ export default async function DesignSystemPage() {
                         <span
                           className="inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-xs text-muted-foreground"
                           title={
-                            product.name === "metago"
-                              ? "管理アプリ"
-                              : "DS本体"
+                            product.name === "metago" ? "管理アプリ" : "DS本体"
                           }
                         >
                           計測対象外 —{" "}
-                          {product.name === "metago"
-                            ? "管理アプリ"
-                            : "DS本体"}
+                          {product.name === "metago" ? "管理アプリ" : "DS本体"}
                         </span>
                       </td>
                     </tr>
