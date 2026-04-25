@@ -77,17 +77,17 @@ const navGroups = [
     label: "Overview",
     items: [
       { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-      { title: "承認待ち", href: "/approval", icon: ClipboardList },
+      { title: "Approvals", href: "/approval", icon: ClipboardList },
     ],
   },
   {
     label: "Delivery",
     items: [
-      { title: "コード品質", href: "/quality", icon: Code2 },
-      { title: "セキュリティ", href: "/security", icon: ShieldCheck },
-      { title: "依存・技術スタック", href: "/dependency", icon: Package },
-      { title: "デザインシステム", href: "/design-system", icon: Palette },
-      { title: "パフォーマンス", href: "/performance", icon: Gauge },
+      { title: "Code Quality", href: "/quality", icon: Code2 },
+      { title: "Security", href: "/security", icon: ShieldCheck },
+      { title: "Dependencies", href: "/dependency", icon: Package },
+      { title: "Design System", href: "/design-system", icon: Palette },
+      { title: "Performance", href: "/performance", icon: Gauge },
       { title: "Deployments", href: "/deployments", icon: Rocket },
     ],
   },
@@ -95,8 +95,8 @@ const navGroups = [
     label: "Discovery",
     items: [
       { title: "PSF", href: "/psf", icon: TrendingUp },
-      { title: "使用パターン", href: "/engagement", icon: Activity },
-      { title: "仮説・バックログ", href: "/hypothesis", icon: Lightbulb },
+      { title: "Engagement", href: "/engagement", icon: Activity },
+      { title: "Hypotheses", href: "/hypothesis", icon: Lightbulb },
     ],
   },
 ];
@@ -180,19 +180,19 @@ export function MetaGoSidebar() {
           avatarUrl={avatarUrl}
           items={[
             {
-              title: "コンセプト",
+              title: "Concept",
               icon: Layers,
               onSelect: () => router.push("/concept"),
               isActive: pathname === "/concept",
             },
             {
-              title: "API管理",
+              title: "API Keys",
               icon: Key,
               onSelect: () => router.push("/apis"),
               isActive: pathname === "/apis",
             },
             {
-              title: isDark ? "ダーク" : "ライト",
+              title: isDark ? "Dark" : "Light",
               icon: isDark ? Moon : Sun,
               onSelect: toggleTheme,
             },

@@ -1,14 +1,18 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   CheckCircle2,
   XCircle,
   Clock,
   AlertTriangle,
   ExternalLink,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import type { DeploymentRow, DeploymentState } from "@/lib/metago/github-deployments";
+
+const PAGE_SIZE = 100;
 
 type StateFilter = "all" | "success" | "failure" | "rate_limited" | "pending";
 
@@ -110,6 +114,12 @@ function relTime(iso: string): string {
 export function DeploymentsTable({ rows }: { rows: DeploymentRow[] }) {
   const [stateFilter, setStateFilter] = useState<StateFilter>("all");
   const [productFilter, setProductFilter] = useState<string>("all");
+  const [page, setPage] = useState(1);
+
+  // フィルタ変更時は1ページ目に戻す
+  useEffect(() => {
+    setPage(1);
+  }, [stateFilter, productFilter]);
 
   const products = useMemo(() => {
     const m = new Map<string, { id: string; name: string; color: string | null }>();
@@ -167,6 +177,10 @@ export function DeploymentsTable({ rows }: { rows: DeploymentRow[] }) {
       return true;
     });
   }, [rows, stateFilter, productFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   return (
     <div className="flex flex-col gap-3">
@@ -250,7 +264,7 @@ export function DeploymentsTable({ rows }: { rows: DeploymentRow[] }) {
             </tr>
           </thead>
           <tbody>
-            {filtered.length === 0 ? (
+            {paged.length === 0 ? (
               <tr>
                 <td
                   colSpan={6}
@@ -260,7 +274,7 @@ export function DeploymentsTable({ rows }: { rows: DeploymentRow[] }) {
                 </td>
               </tr>
             ) : (
-              filtered.map((r) => (
+              paged.map((r) => (
                 <tr
                   key={r.deploymentId}
                   className="border-b border-border last:border-0 hover:bg-muted/20"
@@ -307,6 +321,36 @@ export function DeploymentsTable({ rows }: { rows: DeploymentRow[] }) {
           </tbody>
         </table>
       </div>
+
+      {filtered.length > PAGE_SIZE && (
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-xs text-muted-foreground">
+            {(safePage - 1) * PAGE_SIZE + 1}–
+            {Math.min(safePage * PAGE_SIZE, filtered.length)} / {filtered.length}
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={safePage === 1}
+              className="rounded-md border border-border p-1.5 hover:bg-muted/40 disabled:opacity-40 transition-colors"
+              aria-label="Previous page"
+            >
+              <ChevronLeft className="size-4 text-muted-foreground" />
+            </button>
+            <span className="text-sm text-muted-foreground">
+              {safePage} / {totalPages}
+            </span>
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={safePage === totalPages}
+              className="rounded-md border border-border p-1.5 hover:bg-muted/40 disabled:opacity-40 transition-colors"
+              aria-label="Next page"
+            >
+              <ChevronRight className="size-4 text-muted-foreground" />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
