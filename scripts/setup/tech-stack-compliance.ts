@@ -131,7 +131,8 @@ async function fixRechartsImports(
   // ファイルだけが対象。"use client" があれば既に正しい状態なので何もしない。
   const targets = rechartsFiles.filter((f) => {
     const content = fs.readFileSync(f, "utf-8");
-    const firstLine = content.split("\n").find((l) => l.trim().length > 0) || "";
+    const firstLine =
+      content.split("\n").find((l) => l.trim().length > 0) || "";
     return !/^["']use client["']/.test(firstLine.trim());
   });
 
@@ -144,9 +145,7 @@ async function fixRechartsImports(
   console.log(`  🔍 recharts × Server Component 発見: ${relFiles.join(", ")}`);
 
   if (DRY_RUN) {
-    console.log(
-      `  [DRY RUN] "use client" を付与予定: ${relFiles.join(", ")}`,
-    );
+    console.log(`  [DRY RUN] "use client" を付与予定: ${relFiles.join(", ")}`);
     return { changed: true, files: relFiles };
   }
 
@@ -175,11 +174,13 @@ ${relFiles.map((f) => `- ${f}`).join("\n")}
   const stillNeedingClient = targets.filter((f) => {
     if (!fs.existsSync(f)) return false;
     const content = fs.readFileSync(f, "utf-8");
-    const firstLine = content.split("\n").find((l) => l.trim().length > 0) || "";
+    const firstLine =
+      content.split("\n").find((l) => l.trim().length > 0) || "";
     return !/^["']use client["']/.test(firstLine.trim());
   });
   const converted = relFiles.filter(
-    (f) => !stillNeedingClient.map((s) => path.relative(repoDir, s)).includes(f),
+    (f) =>
+      !stillNeedingClient.map((s) => path.relative(repoDir, s)).includes(f),
   );
   return { changed: converted.length > 0, files: converted };
 }
