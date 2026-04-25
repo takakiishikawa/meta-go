@@ -5,11 +5,5 @@
       "main": true,
       "**": false
     }
-  },
-  "crons": [
-    {
-      "path": "/api/cron/dispatcher",
-      "schedule": "*/15 * * * *"
-    }
-  ]
+  }
 }

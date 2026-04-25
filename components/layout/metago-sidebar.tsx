@@ -12,7 +12,6 @@ import {
   Palette,
   Gauge,
   ScrollText,
-  Clock,
   TrendingUp,
   Activity,
   Lightbulb,
@@ -90,7 +89,6 @@ const navGroups = [
       { title: "デザインシステム", href: "/design-system", icon: Palette },
       { title: "パフォーマンス", href: "/performance", icon: Gauge },
       { title: "実行ログ", href: "/exec-log", icon: ScrollText },
-      { title: "Workflows", href: "/workflows", icon: Clock },
     ],
   },
   {

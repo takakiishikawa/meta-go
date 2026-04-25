@@ -5,7 +5,8 @@ name: Scan Daily API系 (調査cron)
 
 on:
   workflow_dispatch:
-# scheduleはmeta-goのDBが source of truth。Vercel Cron + dispatcher で起動。
+  schedule:
+    - cron: '0 11 * * *'  # JST 20:00 daily
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true

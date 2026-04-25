@@ -16,7 +16,8 @@ on:
         required: false
         default: '10'
         type: string
-# scheduleはmeta-goのDBが source of truth。Vercel Cron + dispatcher で起動。
+  schedule:
+    - cron: '0 */4 * * *'  # every 4 hours
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
