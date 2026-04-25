@@ -440,7 +440,7 @@ function ProductCard({
           onOpenTrend();
         }
       }}
-      className="group cursor-pointer rounded-lg border border-border bg-surface p-4 transition-shadow hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className="group cursor-pointer rounded-lg border border-border bg-surface p-4 transition-colors hover:border-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       {/* Product Header */}
       <div className="mb-4 flex items-center justify-between">

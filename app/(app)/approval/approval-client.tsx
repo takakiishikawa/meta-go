@@ -194,19 +194,10 @@ function PendingCard({
 
         {/* Merit / Risk */}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div
-            className="rounded-md p-3"
-            style={{
-              backgroundColor: "#36B37E11",
-              border: "1px solid #36B37E33",
-            }}
-          >
+          <div className="rounded-md border border-success/20 bg-success/10 p-3">
             <div className="flex items-center gap-1.5 mb-1.5">
-              <TrendingUp className="size-3.5" style={{ color: "#36B37E" }} />
-              <span
-                className="text-xs font-semibold"
-                style={{ color: "#36B37E" }}
-              >
+              <TrendingUp className="size-3.5 text-success" />
+              <span className="text-xs font-semibold text-success">
                 承認のメリット
               </span>
             </div>
@@ -214,34 +205,18 @@ function PendingCard({
               {merits.map((m, i) => (
                 <li
                   key={i}
-                  className="flex items-start gap-1.5 text-xs"
-                  style={{ color: "var(--color-text-secondary)" }}
+                  className="flex items-start gap-1.5 text-xs text-muted-foreground"
                 >
-                  <span
-                    className="mt-1 size-1 rounded-full shrink-0"
-                    style={{ backgroundColor: "#36B37E" }}
-                  />
+                  <span className="mt-1 size-1 rounded-full shrink-0 bg-success" />
                   {m}
                 </li>
               ))}
             </ul>
           </div>
-          <div
-            className="rounded-md p-3"
-            style={{
-              backgroundColor: "#FF563011",
-              border: "1px solid #FF563033",
-            }}
-          >
+          <div className="rounded-md border border-destructive/20 bg-destructive/10 p-3">
             <div className="flex items-center gap-1.5 mb-1.5">
-              <AlertTriangle
-                className="size-3.5"
-                style={{ color: "#FF8B00" }}
-              />
-              <span
-                className="text-xs font-semibold"
-                style={{ color: "#FF8B00" }}
-              >
+              <AlertTriangle className="size-3.5 text-warning" />
+              <span className="text-xs font-semibold text-warning">
                 リスクと注意点
               </span>
             </div>
@@ -430,10 +405,7 @@ export function ApprovalClient({ items }: { items: ApprovalItem[] }) {
                     </td>
                     <td className="px-4 py-3">
                       {item.state === "approved" ? (
-                        <div
-                          className="flex items-center gap-1 text-xs"
-                          style={{ color: "#36B37E" }}
-                        >
+                        <div className="flex items-center gap-1 text-xs text-success">
                           <CheckCircle className="size-3" />
                           承認済み
                         </div>
