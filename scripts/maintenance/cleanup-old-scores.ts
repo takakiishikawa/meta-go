@@ -14,7 +14,9 @@ const RETENTION_DAYS = Number(process.env.SCORES_RETENTION_DAYS ?? 90);
 
 async function main() {
   if (!SUPABASE_URL || !SUPABASE_KEY) {
-    console.error("Missing NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY");
+    console.error(
+      "Missing NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY",
+    );
     process.exit(1);
   }
 
