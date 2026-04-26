@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Button } from "@takaki/go-design-system";
 import { SimpleDialog } from "@/components/ui/simple-dialog";
 
 interface SeverityItem {
@@ -51,13 +52,15 @@ export function SeverityCell({
 
   return (
     <>
-      <button
+      <Button
+        variant="link"
+        size="sm"
         onClick={() => setOpen(true)}
-        className="text-sm font-medium underline-offset-2 hover:underline transition-colors"
+        className="h-auto p-0 text-sm font-medium underline-offset-2 hover:underline"
         style={{ color }}
       >
         {count}
-      </button>
+      </Button>
 
       <SimpleDialog
         open={open}

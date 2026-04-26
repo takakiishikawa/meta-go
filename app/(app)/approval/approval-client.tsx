@@ -229,7 +229,7 @@ function PendingCard({
                 >
                   <span
                     className="mt-1 size-1 rounded-full shrink-0"
-                    style={{ backgroundColor: "#FF8B00" }}
+                    style={{ backgroundColor: "var(--color-warning)" }}
                   />
                   {r}
                 </li>

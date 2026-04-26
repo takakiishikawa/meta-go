@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Badge } from "@takaki/go-design-system";
+import { Badge, Button } from "@takaki/go-design-system";
 import { SimpleDialog } from "@/components/ui/simple-dialog";
 import { BarChart3 } from "lucide-react";
 
@@ -52,17 +52,16 @@ export function ProductEvalButton({
 
   return (
     <>
-      <button
+      <Button
+        variant="outline"
+        size="sm"
         onClick={() => setOpen(true)}
-        className="flex items-center gap-1 rounded px-2 py-1 text-xs hover:bg-surface-subtle transition-colors"
-        style={{
-          color: "var(--color-primary)",
-          border: "1px solid var(--color-border)",
-        }}
+        className="h-auto gap-1 px-2 py-1 text-xs hover:bg-surface-subtle"
+        style={{ color: "var(--color-primary)" }}
       >
         <BarChart3 className="size-3" />
         評価
-      </button>
+      </Button>
 
       <SimpleDialog
         open={open}

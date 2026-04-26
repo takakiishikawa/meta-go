@@ -10,6 +10,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
+import { Button } from "@takaki/go-design-system";
 import type {
   DeploymentRow,
   DeploymentState,
@@ -209,10 +210,12 @@ export function DeploymentsTable({ rows }: { rows: DeploymentRow[] }) {
         {STATE_TABS.map((tab) => {
           const active = stateFilter === tab.key;
           return (
-            <button
+            <Button
               key={tab.key}
+              variant="ghost"
+              size="sm"
               onClick={() => setStateFilter(tab.key)}
-              className={`relative -mb-px flex items-center gap-1.5 border-b-2 px-3 pb-2 pt-1 text-sm font-medium transition-colors ${
+              className={`relative -mb-px h-auto rounded-none border-b-2 px-3 pb-2 pt-1 text-sm font-medium hover:bg-transparent ${
                 active
                   ? "border-primary text-foreground"
                   : "border-transparent text-muted-foreground hover:text-foreground"
@@ -228,7 +231,7 @@ export function DeploymentsTable({ rows }: { rows: DeploymentRow[] }) {
               >
                 {stateCounts[tab.key]}
               </span>
-            </button>
+            </Button>
           );
         })}
       </div>
@@ -236,34 +239,38 @@ export function DeploymentsTable({ rows }: { rows: DeploymentRow[] }) {
       {/* product chip filter */}
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-xs text-muted-foreground">プロダクト:</span>
-        <button
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={() => setProductFilter("all")}
-          className={`rounded-full border px-2.5 py-0.5 text-xs transition-colors ${
+          className={`h-auto rounded-full border px-2.5 py-0.5 text-xs ${
             productFilter === "all"
-              ? "border-primary bg-primary text-primary-foreground"
+              ? "border-primary bg-primary text-primary-foreground hover:bg-primary"
               : "border-border bg-muted/40 text-muted-foreground hover:text-foreground"
           }`}
         >
           全て
-        </button>
+        </Button>
         {products.map((p) => {
           const active = productFilter === p.id;
           return (
-            <button
+            <Button
               key={p.id}
+              variant="ghost"
+              size="sm"
               onClick={() => setProductFilter(p.id)}
-              className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs transition-colors ${
+              className={`h-auto gap-1 rounded-full border px-2.5 py-0.5 text-xs ${
                 active
-                  ? "border-primary bg-primary text-primary-foreground"
+                  ? "border-primary bg-primary text-primary-foreground hover:bg-primary"
                   : "border-border bg-muted/40 text-muted-foreground hover:text-foreground"
               }`}
             >
               <span
                 className="size-1.5 shrink-0 rounded-full"
-                style={{ backgroundColor: p.color ?? "#6B7280" }}
+                style={{ backgroundColor: p.color ?? "var(--color-text-secondary)" }}
               />
               {p.name}
-            </button>
+            </Button>
           );
         })}
       </div>
@@ -378,25 +385,29 @@ export function DeploymentsTable({ rows }: { rows: DeploymentRow[] }) {
             {filtered.length}
           </span>
           <div className="flex items-center gap-2">
-            <button
+            <Button
+              variant="outline"
+              size="icon"
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={safePage === 1}
-              className="rounded-md border border-border p-1.5 hover:bg-muted/40 disabled:opacity-40 transition-colors"
+              className="size-8"
               aria-label="Previous page"
             >
               <ChevronLeft className="size-4 text-muted-foreground" />
-            </button>
+            </Button>
             <span className="text-sm text-muted-foreground">
               {safePage} / {totalPages}
             </span>
-            <button
+            <Button
+              variant="outline"
+              size="icon"
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={safePage === totalPages}
-              className="rounded-md border border-border p-1.5 hover:bg-muted/40 disabled:opacity-40 transition-colors"
+              className="size-8"
               aria-label="Next page"
             >
               <ChevronRight className="size-4 text-muted-foreground" />
-            </button>
+            </Button>
           </div>
         </div>
       )}

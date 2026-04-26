@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@takaki/go-design-system";
 import { X } from "lucide-react";
 import { useEffect } from "react";
 
@@ -33,15 +34,18 @@ export function SimpleDialog({
       <div className="relative z-10 w-full max-w-2xl rounded-lg border border-border bg-surface border border-border flex flex-col max-h-[85vh]">
         <div className="flex items-start justify-between gap-4 px-6 py-4 border-b border-border shrink-0">
           <h2 className="text-base font-semibold text-foreground">{title}</h2>
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={onClose}
-            className="shrink-0 rounded p-1 hover:bg-surface-subtle transition-colors"
+            className="size-7 shrink-0"
+            aria-label="Close dialog"
           >
             <X
               className="size-4"
               style={{ color: "var(--color-text-secondary)" }}
             />
-          </button>
+          </Button>
         </div>
         <div className="overflow-y-auto px-6 py-4">{children}</div>
       </div>

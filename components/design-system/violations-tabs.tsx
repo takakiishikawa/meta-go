@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Badge } from "@takaki/go-design-system";
+import { Badge, Button } from "@takaki/go-design-system";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 export interface ViolationItem {
@@ -67,13 +67,15 @@ export function DesignSystemViolationsTabs({
           const isActive = active === tab.key;
           const count = counts[tab.key] ?? 0;
           return (
-            <button
+            <Button
               key={tab.key}
+              variant="ghost"
+              size="sm"
               onClick={() => {
                 setActive(tab.key);
                 setPage(1);
               }}
-              className={`relative -mb-px flex items-center gap-1.5 border-b-2 px-3 pb-2 pt-1 text-sm font-medium transition-colors ${
+              className={`relative -mb-px h-auto rounded-none border-b-2 px-3 pb-2 pt-1 text-sm font-medium hover:bg-transparent ${
                 isActive
                   ? "border-primary text-foreground"
                   : "border-transparent text-muted-foreground hover:text-foreground"
@@ -89,7 +91,7 @@ export function DesignSystemViolationsTabs({
               >
                 {count}
               </span>
-            </button>
+            </Button>
           );
         })}
       </div>
@@ -130,7 +132,8 @@ export function DesignSystemViolationsTabs({
                         className="size-2 rounded-full shrink-0"
                         style={{
                           backgroundColor:
-                            item.products?.primary_color || "#6B7280",
+                            item.products?.primary_color ||
+                            "var(--color-text-secondary)",
                         }}
                       />
                       <span className="text-sm text-foreground whitespace-nowrap">
@@ -167,23 +170,29 @@ export function DesignSystemViolationsTabs({
 
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-2">
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             disabled={safePage === 1}
-            className="rounded-md p-1.5 hover:bg-surface-subtle disabled:opacity-40 transition-colors"
+            className="size-8"
+            aria-label="Previous page"
           >
             <ChevronLeft className="size-4 text-muted-foreground" />
-          </button>
+          </Button>
           <span className="text-sm text-muted-foreground">
             {safePage} / {totalPages}
           </span>
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
             disabled={safePage === totalPages}
-            className="rounded-md p-1.5 hover:bg-surface-subtle disabled:opacity-40 transition-colors"
+            className="size-8"
+            aria-label="Next page"
           >
             <ChevronRight className="size-4 text-muted-foreground" />
-          </button>
+          </Button>
         </div>
       )}
     </div>
