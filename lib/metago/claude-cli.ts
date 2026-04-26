@@ -29,6 +29,54 @@ function stripFences(text: string): string {
     .trim();
 }
 
+/**
+ * 文字列が「コードの先頭らしくない」場合 true。
+ * Claude が patches[].newContent に narration や markdown fence を混入させる
+ * 事故 (2026-04-26 大規模デプロイ失敗) を二度と起こさないためのガード。
+ */
+function looksLikeNarration(content: string): boolean {
+  const first =
+    (content.split("\n").find((l) => l.trim().length > 0) ?? "").trim();
+  if (!first) return false;
+  // markdown fence
+  if (/^```/.test(first)) return true;
+  // 典型的な英文ナレーション開始語
+  if (
+    /^(The|I'|I will\b|Here\b|Here's|Let me\b|Looking\b|Now I\b|Sure\b|First,|This is\b|Based on\b|To fix\b|This file\b|No\b|There\b|It looks\b|Since\b|Given\b)/.test(
+      first,
+    )
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Claude が返した JSON のうち、patches 配列があればその newContent を検査し、
+ * narration / markdown fence で始まるものを除外する。
+ */
+function sanitizePatches<T>(parsed: T): T {
+  const obj = parsed as any;
+  if (!obj || !Array.isArray(obj.patches)) return parsed;
+  const before = obj.patches.length;
+  obj.patches = obj.patches.filter((p: any) => {
+    if (typeof p?.newContent !== "string") return false;
+    if (looksLikeNarration(p.newContent)) {
+      console.warn(
+        `  ⚠️  reject patch for ${p?.file ?? "<unknown>"}: looks like narration / fence`,
+      );
+      return false;
+    }
+    return true;
+  });
+  if (obj.patches.length < before) {
+    console.warn(
+      `  Filtered ${before - obj.patches.length} narration-injected patch(es)`,
+    );
+  }
+  return parsed;
+}
+
 function isRateLimitMessage(s: string): boolean {
   return /rate.?limit|429|too many requests/i.test(s);
 }
@@ -94,8 +142,9 @@ export async function runClaudeForJSON<T = unknown>(
 ): Promise<T> {
   const raw = await runClaudeCLI(prompt, options);
   const cleaned = stripFences(raw);
+  let parsed: T;
   try {
-    return JSON.parse(cleaned) as T;
+    parsed = JSON.parse(cleaned) as T;
   } catch {
     const m = cleaned.match(/\{[\s\S]*\}/);
     if (!m) {
@@ -103,8 +152,9 @@ export async function runClaudeForJSON<T = unknown>(
         `Claude response was not valid JSON: ${raw.slice(0, 500)}`,
       );
     }
-    return JSON.parse(m[0]) as T;
+    parsed = JSON.parse(m[0]) as T;
   }
+  return sanitizePatches(parsed);
 }
 
 /**
