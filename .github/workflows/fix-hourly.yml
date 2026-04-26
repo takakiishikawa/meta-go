@@ -46,7 +46,6 @@ jobs:
         run: npx tsx scripts/fix/deploy.ts
         env:
           TARGET_REPO: ${{ inputs.target_repo || matrix.repo }}
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           GH_PAT: ${{ secrets.GH_PAT }}
           GITHUB_TOKEN: ${{ secrets.GH_PAT }}
           GITHUB_OWNER: ${{ secrets.GITHUB_OWNER }}

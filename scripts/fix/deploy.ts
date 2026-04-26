@@ -1,20 +1,23 @@
 /**
  * deploy FIX
  *
- * 各Goプロダクトの最新Vercel deploymentを確認し、失敗していたら
- * build log + 失敗commitの内容を Claude に渡して修正PRを作成・即マージする。
+ * 各Goプロダクトの最新 main commit の Vercel status を GitHub commit-status API
+ * で確認し、failure の場合だけ runner 上で `npm ci && npm run build` を再実行
+ * してエラーを再現、build log を Claude に渡してパッチを受け取る。
+ *
+ * パッチ適用後にもう一度 build して通ることを検証してから L1 PR を即マージ。
  *
  * ループ防止:
  *   - 同じ commit_sha に対する 24h以内の試行が >= 3 なら諦め
  *   - execution_logs の category='deploy-fix' で履歴管理
  *
- * 認証: CLAUDE_CODE_OAUTH_TOKEN (Claude Code Max プラン) + VERCEL_TOKEN
+ * 認証: CLAUDE_CODE_OAUTH_TOKEN (Claude Code Max プラン) のみ
  *
  * 環境変数:
  *   TARGET_REPO  — 対象リポジトリ名 (省略時は全Go)
  */
 
-import { execSync } from "child_process";
+import { execSync, spawnSync } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
 import {
@@ -23,90 +26,79 @@ import {
   createBranchAndCommit,
   createAndMergePR,
   cleanup,
+  GITHUB_TOKEN,
+  GITHUB_OWNER,
 } from "../../lib/github/git-operations";
 import { GO_REPOS, REPO_TO_SLUG, getSupabase } from "../../lib/metago/items";
 import { runClaudeForJSON } from "../../lib/metago/claude-cli";
 
 const supabase = getSupabase();
 
-const VERCEL_TOKEN = process.env.VERCEL_TOKEN;
 const MAX_ATTEMPTS_PER_COMMIT = 3;
+const MAX_BUILD_RETRIES = 2;
 const ATTEMPT_WINDOW_MS = 24 * 60 * 60 * 1000;
-const FAILED_STATES = new Set(["ERROR", "CANCELED"]);
+const BUILD_TIMEOUT_MS = 8 * 60 * 1000;
 
-// product slug → Vercel project 名
-const VERCEL_PROJECT_MAP: Record<string, string> = {
-  nativego: "native-go",
-  carego: "care-go",
-  kenyakugo: "kenyaku-go",
-  cookgo: "cook-go",
-  physicalgo: "physical-go",
-  taskgo: "task-go",
-  designsystem: "go-design-system",
-};
+// Vercel未deployのリポは対象外
+const DEPLOY_TARGET_REPOS = new Set([
+  "native-go",
+  "care-go",
+  "kenyaku-go",
+  "cook-go",
+  "physical-go",
+  "task-go",
+  "go-design-system",
+]);
 
-interface VercelDeployment {
-  uid: string;
-  url: string;
-  state: string;
-  createdAt: number;
-  meta?: {
-    githubCommitSha?: string;
-    githubCommitRef?: string;
-    githubCommitMessage?: string;
-  };
+interface CommitStatus {
+  state: string; // "success" | "failure" | "pending" | "error"
+  context: string;
+  description: string;
+  target_url: string;
+  updated_at: string;
 }
 
-async function vercelFetch<T = any>(p: string): Promise<T | null> {
-  if (!VERCEL_TOKEN) return null;
-  const res = await fetch(`https://api.vercel.com${p}`, {
-    headers: { Authorization: `Bearer ${VERCEL_TOKEN}` },
+async function ghFetch<T = any>(p: string): Promise<T | null> {
+  const res = await fetch(`https://api.github.com${p}`, {
+    headers: {
+      Authorization: `Bearer ${GITHUB_TOKEN}`,
+      Accept: "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2022-11-28",
+    },
   });
   if (!res.ok) {
-    console.warn(`  Vercel API ${p} → ${res.status}`);
+    console.warn(`  GitHub API ${p} → ${res.status}`);
     return null;
   }
   return (await res.json()) as T;
 }
 
-async function getLatestDeployment(
-  vercelProject: string,
-): Promise<VercelDeployment | null> {
-  const data = await vercelFetch<{ deployments: VercelDeployment[] }>(
-    `/v6/deployments?projectId=${vercelProject}&limit=1&target=production`,
+/** main HEAD のVercel statusを取得。failureならcommit SHAも返す */
+async function getLatestVercelFailure(
+  repo: string,
+): Promise<{ commitSha: string; description: string } | null> {
+  const head = await ghFetch<{ sha: string }>(
+    `/repos/${GITHUB_OWNER}/${repo}/commits/main`,
   );
-  // production が無ければ全 target
-  if (!data?.deployments?.length) {
-    const fallback = await vercelFetch<{ deployments: VercelDeployment[] }>(
-      `/v6/deployments?projectId=${vercelProject}&limit=1`,
-    );
-    return fallback?.deployments?.[0] ?? null;
-  }
-  return data.deployments[0];
-}
+  if (!head?.sha) return null;
 
-async function getBuildLog(deploymentId: string): Promise<string> {
-  const data = await vercelFetch<any[]>(
-    `/v3/deployments/${deploymentId}/events?limit=500`,
+  const statuses = await ghFetch<CommitStatus[]>(
+    `/repos/${GITHUB_OWNER}/${repo}/commits/${head.sha}/statuses`,
   );
-  if (!Array.isArray(data)) return "";
-  const lines: string[] = [];
-  for (const ev of data) {
-    const txt: string =
-      typeof ev?.payload?.text === "string"
-        ? ev.payload.text
-        : typeof ev?.text === "string"
-          ? ev.text
-          : "";
-    if (!txt) continue;
-    const isError =
-      ev?.type === "stderr" ||
-      ev?.type === "error" ||
-      /error|failed|failure|cannot|missing/i.test(txt);
-    if (isError) lines.push(txt);
-  }
-  // 末尾10KBに丸める（大きすぎるとClaudeのcontextを圧迫）
-  return lines.join("\n").slice(-10_000);
+  if (!Array.isArray(statuses)) return null;
+
+  // 同contextは複数返ることがあるので最新を取る
+  const vercel = statuses
+    .filter((s) => s.context === "Vercel")
+    .sort(
+      (a, b) =>
+        new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
+    )[0];
+
+  if (!vercel) return null;
+  if (vercel.state !== "failure" && vercel.state !== "error") return null;
+
+  return { commitSha: head.sha, description: vercel.description };
 }
 
 async function countRecentAttempts(
@@ -143,161 +135,274 @@ async function logAttempt(
     });
 }
 
-function listSourceFiles(repoDir: string, limit: number): string[] {
+interface BuildResult {
+  ok: boolean;
+  log: string;
+}
+
+/**
+ * runner上で `npm ci && npm run build` を実行して結果を返す。
+ * 失敗の場合は最後の30KBのstdout/stderrを log として返す。
+ */
+function runBuild(repoDir: string): BuildResult {
+  const env = { ...process.env, CI: "1", FORCE_COLOR: "0" };
+
+  // npm ci
+  const ci = spawnSync(
+    "npm",
+    ["ci", "--include=dev", "--legacy-peer-deps", "--no-audit", "--no-fund"],
+    {
+      cwd: repoDir,
+      env,
+      timeout: BUILD_TIMEOUT_MS,
+      maxBuffer: 32 * 1024 * 1024,
+      encoding: "utf-8",
+    },
+  );
+  if (ci.status !== 0) {
+    const log = `=== npm ci failed (exit ${ci.status}) ===\n${(ci.stdout ?? "") + (ci.stderr ?? "")}`;
+    return { ok: false, log: log.slice(-30_000) };
+  }
+
+  const build = spawnSync("npm", ["run", "build"], {
+    cwd: repoDir,
+    env,
+    timeout: BUILD_TIMEOUT_MS,
+    maxBuffer: 32 * 1024 * 1024,
+    encoding: "utf-8",
+  });
+  const combined =
+    (build.stdout ?? "") + (build.stderr ? `\n[STDERR]\n${build.stderr}` : "");
+  if (build.status !== 0) {
+    return {
+      ok: false,
+      log: `=== npm run build failed (exit ${build.status}) ===\n${combined.slice(-30_000)}`,
+    };
+  }
+  return { ok: true, log: "" };
+}
+
+function listRelevantSourceFiles(
+  repoDir: string,
+  buildLog: string,
+  limit = 30,
+): string[] {
+  // build log中のファイルパスを最優先
+  const mentionedFiles = new Set<string>();
+  const re = /\.\/([\w./()@\-[\]]+\.(?:tsx?|jsx?|mjs|cjs|json|css))/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(buildLog))) {
+    mentionedFiles.add(m[1]);
+  }
+
+  const files: string[] = [];
+  for (const f of mentionedFiles) {
+    if (fs.existsSync(path.join(repoDir, f))) files.push(f);
+    if (files.length >= limit) return files;
+  }
+
+  // 不足分は find で補充
   try {
-    const out = execSync(
-      `find . -type f \\( -name "*.ts" -o -name "*.tsx" -o -name "*.json" \\) ` +
+    const found = execSync(
+      `find . -type f \\( -name "*.ts" -o -name "*.tsx" \\) ` +
         `-not -path "./node_modules/*" -not -path "./.next/*" -not -path "./dist/*" -not -path "./out/*" ` +
         `| head -${limit}`,
       { cwd: repoDir, stdio: "pipe" },
     )
       .toString()
-      .trim();
-    return out.split("\n").filter(Boolean);
-  } catch {
-    return [];
-  }
+      .trim()
+      .split("\n")
+      .filter(Boolean);
+    for (const f of found) {
+      const rel = f.replace(/^\.\//, "");
+      if (!files.includes(rel)) files.push(rel);
+      if (files.length >= limit) break;
+    }
+  } catch {}
+  return files;
 }
 
-async function fixForProduct(product: { id: string; name: string; display_name: string }) {
-  const repo = GO_REPOS[product.name];
-  const vercelProject = VERCEL_PROJECT_MAP[product.name];
-  if (!repo || !vercelProject) {
-    console.log(`  ⏭  ${product.name}: repo / vercel mapping なし`);
-    return;
-  }
-
-  console.log(`\n🔍 [DEPLOY-FIX] ${product.display_name} (${repo})`);
-
-  const latest = await getLatestDeployment(vercelProject);
-  if (!latest) {
-    console.log(`  deployment 取得失敗`);
-    return;
-  }
-
-  if (!FAILED_STATES.has(latest.state)) {
-    console.log(`  ✅ 最新 deploy は ${latest.state} — 修正不要`);
-    return;
-  }
-
-  const commitSha = latest.meta?.githubCommitSha;
-  if (!commitSha) {
-    console.log(`  ⏭  失敗 deploy だが commit SHA 不明 — スキップ`);
-    return;
-  }
-
-  const branchRef = latest.meta?.githubCommitRef ?? "unknown";
-  if (branchRef !== "main" && branchRef !== "master") {
-    console.log(`  ⏭  非main branch (${branchRef}) — スキップ`);
-    return;
-  }
-
-  const attempts = await countRecentAttempts(product.id, commitSha);
-  if (attempts >= MAX_ATTEMPTS_PER_COMMIT) {
-    console.log(
-      `  ⛔ commit ${commitSha.slice(0, 7)}: ${attempts}/${MAX_ATTEMPTS_PER_COMMIT} 試行済み — 諦め`,
-    );
-    await logAttempt(
-      product.id,
-      "abandoned",
-      {
-        commit_sha: commitSha,
-        deployment_id: latest.uid,
-        reason: "max_attempts_exceeded",
-        attempts,
-      },
-      `Deploy fix abandoned: ${commitSha.slice(0, 7)}`,
-    );
-    return;
-  }
-
-  console.log(
-    `  💥 失敗 deploy: ${latest.uid} (${latest.state}) commit=${commitSha.slice(0, 7)} (試行 ${attempts}/${MAX_ATTEMPTS_PER_COMMIT})`,
-  );
-
-  const buildLog = await getBuildLog(latest.uid);
-  if (!buildLog) {
-    console.log(`  ⚠️  build log 取得失敗 — スキップ`);
-    return;
-  }
-
-  let repoDir: string | null = null;
-  try {
-    repoDir = cloneRepo(repo);
-
-    const files = listSourceFiles(repoDir, 30);
-    const sections: string[] = [];
-    let totalChars = 0;
-    for (const f of files) {
-      try {
-        const content = fs.readFileSync(path.join(repoDir, f), "utf-8");
-        if (totalChars + content.length > 50_000) break;
-        sections.push(`=== ${f} ===\n${content}`);
-        totalChars += content.length;
-      } catch {}
-    }
-
-    const prompt = `You are a senior engineer. The Vercel deployment for "${product.display_name}" failed.
+function buildClaudePrompt(
+  productName: string,
+  commitSha: string,
+  buildLog: string,
+  fileSections: string[],
+): string {
+  return `You are a senior engineer. The Vercel deployment for "${productName}" failed.
 
 **Failed commit**: ${commitSha}
-**Failed branch**: ${branchRef}
-**Vercel state**: ${latest.state}
 
 **Build error log (tail)**:
 \`\`\`
 ${buildLog}
 \`\`\`
 
-**Source files**:
-${sections.join("\n\n")}
+**Source files** (the ones referenced by the error first):
+${fileSections.join("\n\n")}
 
-Analyze the build error and fix the source files so that \`npm run build\` succeeds. Common causes:
-- TypeScript errors (TS2307: Cannot find module, TS2322 type mismatch, etc.)
-- Missing import or wrong path
-- Missing dependency (but do NOT add packages — only fix code)
-- Wrong "use client" placement
-- Import from a server-only module in a client component (or vice versa)
+Analyze the build error and patch the source files so that \`npm run build\` succeeds.
+
+Common causes seen in this codebase:
+- A previous Claude run accidentally wrote its own English narration as the first line of a .tsx file (e.g. "The fix is clear..."). DELETE that line entirely.
+- TypeScript errors (TS2307: Cannot find module, TS2322 type mismatch).
+- Wrong / missing import path.
+- Misplaced \`"use client"\` (must be the very first line, before any import).
+- Server-only API used inside a Client Component (or vice versa).
 
 Constraints:
-- Do NOT modify package.json or package-lock.json
-- Do NOT change application logic or remove features
-- If you cannot determine the fix with confidence, return an empty patches array
-- Only include files you actually changed
+- Do NOT modify package.json or package-lock.json.
+- Do NOT change application logic or remove features.
+- If you cannot determine the fix with confidence, return an empty patches array.
+- Only include files you actually changed.
 
-Return JSON:
+Return ONLY valid JSON, no surrounding prose, no markdown fences:
 {
   "patches": [{ "file": "relative/path.tsx", "newContent": "..." }],
   "summary": "日本語で変更内容の要約（200文字以内）"
+}`;
 }
 
-Return ONLY the JSON.`;
+async function fixForProduct(product: {
+  id: string;
+  name: string;
+  display_name: string;
+}) {
+  const repo = GO_REPOS[product.name];
+  if (!repo || !DEPLOY_TARGET_REPOS.has(repo)) {
+    console.log(`  ⏭  ${product.name}: deploy-fix 対象外`);
+    return;
+  }
 
-    console.log(`  🤖 Claude に修正依頼...`);
-    const result = await runClaudeForJSON<{
-      patches: Array<{ file: string; newContent: string }>;
-      summary: string;
-    }>(prompt);
+  console.log(`\n🔍 [DEPLOY-FIX] ${product.display_name} (${repo})`);
 
-    let patchCount = 0;
-    for (const patch of result.patches ?? []) {
-      const fullPath = path.join(repoDir, patch.file);
-      if (!fs.existsSync(fullPath)) continue;
-      fs.writeFileSync(fullPath, patch.newContent, "utf-8");
-      patchCount++;
-    }
+  const failure = await getLatestVercelFailure(repo);
+  if (!failure) {
+    console.log(`  ✅ Vercel status は failure ではない — skip`);
+    return;
+  }
 
-    if (patchCount === 0 || !hasChanges(repoDir)) {
-      console.log(`  ⚠️  Claudeが有効な修正を返さなかった`);
+  const { commitSha } = failure;
+  const attempts = await countRecentAttempts(product.id, commitSha);
+  if (attempts >= MAX_ATTEMPTS_PER_COMMIT) {
+    console.log(
+      `  ⛔ ${commitSha.slice(0, 7)}: ${attempts}/${MAX_ATTEMPTS_PER_COMMIT} — 諦め`,
+    );
+    await logAttempt(
+      product.id,
+      "abandoned",
+      { commit_sha: commitSha, reason: "max_attempts_exceeded", attempts },
+      `Deploy fix abandoned: ${commitSha.slice(0, 7)}`,
+    );
+    return;
+  }
+
+  console.log(
+    `  💥 commit ${commitSha.slice(0, 7)} (試行 ${attempts + 1}/${MAX_ATTEMPTS_PER_COMMIT})`,
+  );
+
+  let repoDir: string | null = null;
+  try {
+    repoDir = cloneRepo(repo);
+
+    console.log(`  🔨 ローカル build で再現...`);
+    let build = runBuild(repoDir);
+    if (build.ok) {
+      console.log(`  ⚠️  ローカル build は成功 — Vercel固有の問題かtransient`);
       await logAttempt(
         product.id,
         "failed",
         {
           commit_sha: commitSha,
-          deployment_id: latest.uid,
-          reason: "no_patches",
+          reason: "local_build_passed_so_no_action",
         },
-        `Deploy fix attempted: ${commitSha.slice(0, 7)} (no patches)`,
+        `Deploy fix skipped: local build OK ${commitSha.slice(0, 7)}`,
       );
+      return;
+    }
+
+    let summary = "";
+    let totalPatchCount = 0;
+    let success = false;
+
+    for (let retry = 0; retry < MAX_BUILD_RETRIES + 1; retry++) {
+      const files = listRelevantSourceFiles(repoDir, build.log, 30);
+      const sections: string[] = [];
+      let totalChars = 0;
+      for (const f of files) {
+        try {
+          const content = fs.readFileSync(path.join(repoDir, f), "utf-8");
+          if (totalChars + content.length > 50_000) break;
+          sections.push(`=== ${f} ===\n${content}`);
+          totalChars += content.length;
+        } catch {}
+      }
+
+      const prompt = buildClaudePrompt(
+        product.display_name,
+        commitSha,
+        build.log,
+        sections,
+      );
+
+      console.log(`  🤖 Claude に修正依頼... (retry ${retry})`);
+      const result = await runClaudeForJSON<{
+        patches: Array<{ file: string; newContent: string }>;
+        summary: string;
+      }>(prompt);
+
+      let patchCount = 0;
+      for (const patch of result.patches ?? []) {
+        const fullPath = path.join(repoDir, patch.file);
+        if (!fs.existsSync(fullPath)) continue;
+        // 安全策: 1行目が明らかに会話文に見えるpatchは弾く
+        const first = patch.newContent.split("\n")[0].trim();
+        if (
+          /^(The|I'll|Here|Let me|This|Sure|Now|First|Looking)/.test(first) &&
+          !first.startsWith("//") &&
+          !first.startsWith('"use')
+        ) {
+          console.log(
+            `  ⚠️  patch for ${patch.file} の1行目が会話文っぽい — 弾く`,
+          );
+          continue;
+        }
+        fs.writeFileSync(fullPath, patch.newContent, "utf-8");
+        patchCount++;
+      }
+
+      if (patchCount === 0) {
+        console.log(`  ⚠️  有効な patch なし`);
+        break;
+      }
+      totalPatchCount += patchCount;
+      summary = result.summary || summary;
+
+      console.log(`  🔨 修正後 build 検証...`);
+      build = runBuild(repoDir);
+      if (build.ok) {
+        success = true;
+        break;
+      }
+      console.log(`  ❌ build まだ失敗 — retry`);
+    }
+
+    if (!success) {
+      console.log(`  ⛔ 修正失敗 — PR は作成しない`);
+      await logAttempt(
+        product.id,
+        "failed",
+        {
+          commit_sha: commitSha,
+          reason: success === false ? "build_still_failing" : "no_patches",
+          patch_count: totalPatchCount,
+        },
+        `Deploy fix attempt failed: ${commitSha.slice(0, 7)}`,
+      );
+      return;
+    }
+
+    if (!hasChanges(repoDir)) {
+      console.log(`  ⚠️  changes 無し — skip`);
       return;
     }
 
@@ -307,25 +412,21 @@ Return ONLY the JSON.`;
       branch,
       `fix(deploy): Vercelデプロイ失敗修正 [MetaGo L1]`,
     );
-    if (!pushed) {
-      console.log(`  ⚠️  branch push に失敗`);
-      return;
-    }
+    if (!pushed) return;
 
     const pr = await createAndMergePR(repo, {
       title: `🤖 [MetaGo L1] Vercelデプロイ修正 — ${product.display_name}`,
       body: [
         `MetaGo + Claude による Vercel デプロイ失敗の自動修復です。`,
         ``,
-        `**失敗 deployment**: \`${latest.uid}\` (state: \`${latest.state}\`)`,
         `**失敗 commit**: \`${commitSha}\``,
-        `**branch**: \`${branchRef}\``,
         `**試行**: ${attempts + 1} / ${MAX_ATTEMPTS_PER_COMMIT}`,
+        `**修正後ローカルビルド**: ✅ 成功確認済み`,
         ``,
         `**変更内容**`,
-        result.summary ?? "(no summary)",
+        summary || "(no summary)",
         ``,
-        `修正ファイル数: ${patchCount} 件`,
+        `修正ファイル数: ${totalPatchCount} 件`,
       ].join("\n"),
       head: branch,
       labels: ["metago-auto-merge"],
@@ -336,10 +437,9 @@ Return ONLY the JSON.`;
       "merged",
       {
         commit_sha: commitSha,
-        deployment_id: latest.uid,
         pr_url: pr.url,
-        summary: result.summary,
-        patch_count: patchCount,
+        summary,
+        patch_count: totalPatchCount,
       },
       `Deploy fix merged: ${commitSha.slice(0, 7)} → PR #${pr.number}`,
     );
@@ -350,11 +450,7 @@ Return ONLY the JSON.`;
     await logAttempt(
       product.id,
       "failed",
-      {
-        commit_sha: commitSha,
-        deployment_id: latest.uid,
-        error: String(e).slice(0, 500),
-      },
+      { commit_sha: commitSha, error: String(e).slice(0, 500) },
       `Deploy fix error: ${commitSha.slice(0, 7)}`,
     );
   } finally {
@@ -363,11 +459,6 @@ Return ONLY the JSON.`;
 }
 
 async function main() {
-  if (!VERCEL_TOKEN) {
-    console.error("❌ VERCEL_TOKEN が未設定");
-    process.exit(1);
-  }
-
   console.log("🚀 [FIX] deploy (L1)");
 
   const { data: products } = await supabase
@@ -381,7 +472,6 @@ async function main() {
 
   for (const product of products) {
     if (targetSlug && product.name !== targetSlug) continue;
-    if (!VERCEL_PROJECT_MAP[product.name]) continue; // meta-go等は対象外
     await fixForProduct(product);
   }
 
