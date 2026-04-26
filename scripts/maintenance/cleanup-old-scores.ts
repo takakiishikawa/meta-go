@@ -1,6 +1,9 @@
 /**
  * Retention 用バッチ: scores_history の古い行を削除する。
- * 既存の metago.cleanup_old_scores(retention_days) RPC を呼び出すだけ。
+ *
+ * 旧実装は metago.cleanup_old_scores(retention_days) RPC を呼んでいたが、
+ * 該当 migration が本番に未適用で PGRST202 を吐いていた。
+ * SERVICE_ROLE_KEY なら直接 DELETE できるので RPC 依存を外す。
  *
  * 環境変数:
  *   SCORES_RETENTION_DAYS — 削除閾値 (default 90)
@@ -21,15 +24,23 @@ async function main() {
   }
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-  const { data, error } = await supabase
+  const cutoff = new Date(
+    Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000,
+  ).toISOString();
+
+  const { data, error, count } = await supabase
     .schema("metago")
-    .rpc("cleanup_old_scores", { retention_days: RETENTION_DAYS });
+    .from("scores_history")
+    .delete({ count: "exact" })
+    .lt("collected_at", cutoff)
+    .select("id");
 
   if (error) {
     console.error("cleanup_old_scores failed:", error);
     process.exit(1);
   }
-  console.log(`✓ Deleted ${data ?? 0} rows older than ${RETENTION_DAYS} days`);
+  const deleted = count ?? data?.length ?? 0;
+  console.log(`✓ Deleted ${deleted} rows older than ${RETENTION_DAYS} days`);
 }
 
 main().catch((e) => {
