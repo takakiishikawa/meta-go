@@ -30,6 +30,20 @@ import { runClaudeForText } from "../../lib/metago/claude-cli";
 
 const supabase = getSupabase();
 
+function countTscErrors(repoDir: string): number {
+  try {
+    execSync("npx tsc --noEmit", {
+      cwd: repoDir,
+      stdio: "pipe",
+      timeout: 120_000,
+    });
+    return 0;
+  } catch (e: any) {
+    const out = e.stdout?.toString() ?? "";
+    return out.split("\n").filter((l: string) => l.includes(": error TS")).length;
+  }
+}
+
 async function fixTscErrors(repoDir: string): Promise<void> {
   let tscOutput = "";
   try {
@@ -125,8 +139,20 @@ async function fixForRepo(product: any, repo: string) {
       });
     } catch {}
 
-    // TSC
+    // TSC (ESLint/Prettier 後で残ったエラーを Claude で修正)
+    const tscBefore = countTscErrors(repoDir);
     await fixTscErrors(repoDir);
+    const tscAfter = countTscErrors(repoDir);
+
+    // 退行ガード: TSC エラーが増えたら narration 混入や誤修正の可能性
+    // (2026-04-26 PR #17 がチャート2ファイルを説明文で上書きした事故対策)
+    if (tscAfter > tscBefore) {
+      console.warn(
+        `  ⚠️  TSC errors increased ${tscBefore} → ${tscAfter}, reverting all changes`,
+      );
+      execSync("git checkout -- .", { cwd: repoDir, stdio: "pipe" });
+      return;
+    }
 
     if (!hasChanges(repoDir)) {
       console.log("  修正なし");

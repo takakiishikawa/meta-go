@@ -30,26 +30,33 @@ function stripFences(text: string): string {
 }
 
 /**
- * 文字列が「コードの先頭らしくない」場合 true。
- * Claude が patches[].newContent に narration や markdown fence を混入させる
- * 事故 (2026-04-26 大規模デプロイ失敗) を二度と起こさないためのガード。
+ * 文字列が「TypeScript/TSX ソースの先頭としてあり得ない」場合 true。
+ * Claude が patches[].newContent や ファイル全置換テキストに
+ * narration / markdown を混入させる事故 (2026-04-26 大規模デプロイ失敗) を
+ * 二度と起こさないためのガード。
+ *
+ * 戦略: ブラックリスト(narration starter words)だけでは漏れる(実際 PR#17 の
+ * "All errors fixed..." は当時のリストに無かった)。
+ * 有効なコードは先頭非空行が以下のいずれかに必ずなるので、それ以外は narration とみなす:
+ *   - import / export / type / interface / const / let / var / function / class /
+ *     enum / namespace / declare / async / await / return / void / public / abstract / readonly
+ *   - "use client" / 'use client' / "use server" などのディレクティブ
+ *   - // または /* で始まるコメント
+ *   - @ で始まるデコレータ
+ *   - { や ( で始まる式
+ *   - shebang #!
  */
 function looksLikeNarration(content: string): boolean {
   const first = (
     content.split("\n").find((l) => l.trim().length > 0) ?? ""
   ).trim();
-  if (!first) return false;
+  if (!first) return true; // 空応答は narration 扱い (=書き込み禁止)
   // markdown fence
   if (/^```/.test(first)) return true;
-  // 典型的な英文ナレーション開始語
-  if (
-    /^(The|I'|I will\b|Here\b|Here's|Let me\b|Looking\b|Now I\b|Sure\b|First,|This is\b|Based on\b|To fix\b|This file\b|No\b|There\b|It looks\b|Since\b|Given\b)/.test(
-      first,
-    )
-  ) {
-    return true;
-  }
-  return false;
+  // 有効なコード先頭パターン (whitelist)
+  const validStart =
+    /^(import\b|export\b|type\b|interface\b|const\b|let\b|var\b|function\b|async\b|class\b|enum\b|namespace\b|declare\b|abstract\b|public\b|private\b|protected\b|readonly\b|return\b|void\b|"use |'use |\/\/|\/\*|@|\{|\(|#!)/;
+  return !validStart.test(first);
 }
 
 /**
@@ -161,11 +168,20 @@ export async function runClaudeForJSON<T = unknown>(
 /**
  * Claude CLI をテキスト応答前提で呼び出し、フェンスを剥がした文字列を返す。
  * (例: ファイル全体の修正内容を直接受け取りたい場合)
+ *
+ * 現在の caller は全てコード(TS/TSX)書き換え用途なので、narration が混入していたら
+ * throw してファイル書き込みを caller の catch に任せる。
  */
 export async function runClaudeForText(
   prompt: string,
   options: ClaudeCliOptions = {},
 ): Promise<string> {
   const raw = await runClaudeCLI(prompt, options);
-  return stripFences(raw);
+  const stripped = stripFences(raw);
+  if (looksLikeNarration(stripped)) {
+    throw new Error(
+      `Claude returned narration instead of code. First 200 chars: ${stripped.slice(0, 200).replace(/\n/g, " ")}`,
+    );
+  }
+  return stripped;
 }
