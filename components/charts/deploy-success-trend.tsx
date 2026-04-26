@@ -1,8 +1,8 @@
 "use client";
 
 import {
-  BarChart,
-  Bar,
+  LineChart,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -47,7 +47,7 @@ export function DeploySuccessTrendChart({
   return (
     <div className="w-full" style={{ height }}>
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart
+        <LineChart
           data={data}
           margin={{ top: 8, right: 12, left: 0, bottom: 0 }}
         >
@@ -76,17 +76,19 @@ export function DeploySuccessTrendChart({
             wrapperStyle={{ fontSize: 11, paddingTop: 4 }}
             iconType="circle"
           />
-          {products.map((p, i) => (
-            <Bar
+          {products.map((p) => (
+            <Line
               key={p.id}
+              type="monotone"
               dataKey={p.id}
               name={p.name}
-              stackId="success"
-              fill={p.color}
-              radius={i === products.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
+              stroke={p.color}
+              strokeWidth={2}
+              dot={{ r: 3 }}
+              activeDot={{ r: 5 }}
             />
           ))}
-        </BarChart>
+        </LineChart>
       </ResponsiveContainer>
     </div>
   );
