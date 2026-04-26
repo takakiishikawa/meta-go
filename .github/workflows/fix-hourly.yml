@@ -1,0 +1,55 @@
+name: Fix Hourly (deploy self-heal)
+
+# 毎時、各Goプロダクトの最新Vercel deployment を確認し、失敗していれば
+# Claude にbuild log + 該当ソースを渡して自動修正PRを作成・即マージする。
+# 同じcommitに対して 24h以内 3回 を上限にループ防止。
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_repo:
+        description: '特定リポだけ実行する場合のリポ名 (省略時は全Go)'
+        required: false
+        type: string
+  schedule:
+    - cron: '0 * * * *'  # every hour
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  deploy-fix:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        repo:
+          - native-go
+          - care-go
+          - kenyaku-go
+          - cook-go
+          - physical-go
+          - task-go
+          - go-design-system
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm ci
+
+      - name: Install Claude CLI
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Deploy self-heal for ${{ matrix.repo }}
+        run: npx tsx scripts/fix/deploy.ts
+        env:
+          TARGET_REPO: ${{ inputs.target_repo || matrix.repo }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          GH_PAT: ${{ secrets.GH_PAT }}
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+          GITHUB_OWNER: ${{ secrets.GITHUB_OWNER }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
