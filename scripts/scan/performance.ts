@@ -18,6 +18,7 @@ import {
   getSupabase,
   saveScore,
   upsertItem,
+  markStaleItemsResolved,
 } from "../../lib/metago/items";
 
 const supabase = getSupabase();
@@ -103,6 +104,7 @@ async function scanProduct(product: any) {
 
   console.log(`\n⚡ [SCAN] performance: ${product.display_name} → ${url}`);
 
+  const scanStartedAt = new Date();
   const metrics = runLighthouse(url);
   if (!metrics) {
     console.log(`  計測不能、スキップ`);
@@ -143,7 +145,17 @@ async function scanProduct(product: any) {
     });
   }
 
-  console.log(`  ${issues.length} issues found`);
+  const resolved = await markStaleItemsResolved(
+    supabase,
+    "quality_items",
+    product.id,
+    scanStartedAt,
+    ["Performance"],
+  );
+
+  console.log(
+    `  ${issues.length} issues found${resolved > 0 ? `, ${resolved} resolved` : ""}`,
+  );
 }
 
 // designsystem は public な showcase のみで計測ターゲットが薄い。

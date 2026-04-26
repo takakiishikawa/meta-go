@@ -88,6 +88,46 @@ export async function upsertItem(
   }
 }
 
+/**
+ * 当該 scan 実行で再検出されなかった items を fixed に遷移させる。
+ *
+ * scan は最新の所見を upsertItem で書き込む際に last_seen_at を now() に更新する。
+ * scanStartedAt より前の last_seen_at を持つ state IN ('new','fixing') の行は、
+ * 今回の scan では検出されなかった = 解消済み とみなせる。
+ *
+ * categories を渡すと、その category 集合内のみを対象にする(scan が部分的に成功した
+ * 場合、評価できなかった category の行を誤って fixed にしないため)。
+ *
+ * 呼び出し側の前提: scanStartedAt は scan 開始時刻(upsertItem の前に決定する)。
+ */
+export async function markStaleItemsResolved(
+  supabase: SupabaseClient,
+  table: ItemTable,
+  productId: string,
+  scanStartedAt: Date,
+  categories?: string[],
+): Promise<number> {
+  let q = supabase
+    .schema("metago")
+    .from(table)
+    .update({ state: "fixed", resolved_at: new Date().toISOString() })
+    .eq("product_id", productId)
+    .in("state", ["new", "fixing"])
+    .lt("last_seen_at", scanStartedAt.toISOString())
+    .select("id");
+
+  if (categories && categories.length > 0) {
+    q = q.in("category", categories);
+  }
+
+  const { data, error } = await q;
+  if (error) {
+    console.warn(`  mark stale failed (${table}):`, error.message);
+    return 0;
+  }
+  return data?.length ?? 0;
+}
+
 // ────────────────────────────────────────────────
 // FIX: pending items のピック (state='new' を 'fixing' に遷移)
 // ────────────────────────────────────────────────

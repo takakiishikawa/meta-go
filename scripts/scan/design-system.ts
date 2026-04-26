@@ -17,6 +17,7 @@ import {
   getSupabase,
   saveScore,
   upsertItem,
+  markStaleItemsResolved,
 } from "../../lib/metago/items";
 
 const supabase = getSupabase();
@@ -231,6 +232,7 @@ function checkDesignTokensUsage(repoDir: string): boolean {
 async function scanRepo(product: any, repo: string) {
   console.log(`\n🎨 [SCAN] design-system: ${product.display_name} (${repo})`);
   let repoDir: string | null = null;
+  const scanStartedAt = new Date();
 
   try {
     repoDir = cloneRepo(repo);
@@ -314,8 +316,15 @@ async function scanRepo(product: any, repo: string) {
     const score = Math.max(0, 100 - totalPenalty);
     await saveScore(supabase, product.id, "design_system", score);
 
+    const resolved = await markStaleItemsResolved(
+      supabase,
+      "design_system_items",
+      product.id,
+      scanStartedAt,
+    );
+
     console.log(
-      `  ✓ ${violationsByKey.size} 種類の違反 (合計 ${totalCount} 箇所), score: ${score}`,
+      `  ✓ ${violationsByKey.size} 種類の違反 (合計 ${totalCount} 箇所), score: ${score}${resolved > 0 ? `, ${resolved} resolved` : ""}`,
     );
   } catch (e) {
     console.error(`  ❌ Failed: ${repo}`, e);

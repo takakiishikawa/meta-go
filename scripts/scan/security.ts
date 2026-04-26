@@ -18,6 +18,7 @@ import {
   getSupabase,
   saveScore,
   upsertItem,
+  markStaleItemsResolved,
 } from "../../lib/metago/items";
 
 const supabase = getSupabase();
@@ -202,6 +203,7 @@ function calcScore(findings: SecurityFinding[]): number {
 async function scanRepo(product: any, repo: string) {
   console.log(`\n🔒 [SCAN] security: ${product.display_name} (${repo})`);
   let repoDir: string | null = null;
+  const scanStartedAt = new Date();
 
   try {
     repoDir = cloneRepo(repo);
@@ -228,7 +230,16 @@ async function scanRepo(product: any, repo: string) {
 
     await saveScore(supabase, product.id, "security", score);
 
-    console.log(`  ✓ ${allFindings.length} findings, score: ${score}`);
+    const resolved = await markStaleItemsResolved(
+      supabase,
+      "security_items",
+      product.id,
+      scanStartedAt,
+    );
+
+    console.log(
+      `  ✓ ${allFindings.length} findings, score: ${score}${resolved > 0 ? `, ${resolved} resolved` : ""}`,
+    );
   } catch (e) {
     console.error(`  ❌ Failed: ${repo}`, e);
     await supabase

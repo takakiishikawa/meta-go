@@ -22,6 +22,7 @@ import {
   getSupabase,
   saveScore,
   upsertItem,
+  markStaleItemsResolved,
 } from "../../lib/metago/items";
 
 const supabase = getSupabase();
@@ -94,6 +95,7 @@ interface Violation {
 async function scanRepo(product: any, repo: string) {
   console.log(`\n📦 [SCAN] tech-stack: ${product.display_name} (${repo})`);
   let repoDir: string | null = null;
+  const scanStartedAt = new Date();
 
   try {
     repoDir = cloneRepo(repo);
@@ -218,7 +220,17 @@ async function scanRepo(product: any, repo: string) {
     const score = Math.max(0, 100 - totalPenalty);
     await saveScore(supabase, product.id, "tech_stack", score);
 
-    console.log(`  ✓ ${violations.length} violations, score: ${score}`);
+    const resolved = await markStaleItemsResolved(
+      supabase,
+      "quality_items",
+      product.id,
+      scanStartedAt,
+      ["tech-stack"],
+    );
+
+    console.log(
+      `  ✓ ${violations.length} violations, score: ${score}${resolved > 0 ? `, ${resolved} resolved` : ""}`,
+    );
   } catch (e) {
     console.error(`  ❌ Failed: ${repo}`, e);
     await supabase

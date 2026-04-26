@@ -21,6 +21,7 @@ import {
   getSupabase,
   saveScore,
   upsertItem,
+  markStaleItemsResolved,
 } from "../../lib/metago/items";
 import { runClaudeForJSON } from "../../lib/metago/claude-cli";
 
@@ -258,6 +259,7 @@ ${sourceCode}
 async function scanRepo(product: any, repo: string) {
   console.log(`\n🔍 [SCAN] code-quality: ${product.display_name} (${repo})`);
   let repoDir: string | null = null;
+  const scanStartedAt = new Date();
 
   try {
     repoDir = cloneRepo(repo);
@@ -300,8 +302,20 @@ async function scanRepo(product: any, repo: string) {
 
     await saveScore(supabase, product.id, "quality", evaluation.overallScore);
 
+    const evaluatedCategories = evaluation.axes
+      .map((a) => QUALITY_AXES.find((q) => q.id === a.axisId)?.name)
+      .filter((c): c is string => Boolean(c));
+
+    const resolved = await markStaleItemsResolved(
+      supabase,
+      "quality_items",
+      product.id,
+      scanStartedAt,
+      evaluatedCategories,
+    );
+
     console.log(
-      `  ✅ score: ${evaluation.overallScore}点、findings: ${evaluation.axes.reduce((s, a) => s + a.findings.length, 0)}件`,
+      `  ✅ score: ${evaluation.overallScore}点、findings: ${evaluation.axes.reduce((s, a) => s + a.findings.length, 0)}件${resolved > 0 ? `, ${resolved} resolved` : ""}`,
     );
   } catch (e) {
     console.error(`  ❌ Failed: ${repo}`, e);
