@@ -231,18 +231,21 @@ export async function saveScore(
   category: string,
   score: number,
 ): Promise<void> {
-  // 同 product × category の古いスコアを削除して最新だけ保持
-  await supabase
-    .schema("metago")
-    .from("scores_history")
-    .delete()
-    .eq("product_id", productId)
-    .eq("category", category);
-
+  // 1日1行/product/category の制約 (uniq_scores_history_product_cat_day) に
+  // 沿って upsert。同日内の再scanでは score / collected_at を上書きする。
+  // day 列は collected_at から自動算出される generated column なので渡さない。
   const { error } = await supabase
     .schema("metago")
     .from("scores_history")
-    .insert({ product_id: productId, category, score });
+    .upsert(
+      {
+        product_id: productId,
+        category,
+        score,
+        collected_at: new Date().toISOString(),
+      },
+      { onConflict: "product_id,category,day" },
+    );
 
   if (error) console.warn(`  saveScore failed:`, error.message);
 }
