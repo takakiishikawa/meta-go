@@ -87,12 +87,22 @@ async function ghFetch(
       });
       return res;
     } catch (e: any) {
+      const transientCodes = new Set([
+        "UND_ERR_SOCKET",
+        "ECONNRESET",
+        "EPIPE",
+        "ETIMEDOUT",
+        "EAI_AGAIN",
+        "UND_ERR_CONNECT_TIMEOUT",
+        "UND_ERR_HEADERS_TIMEOUT",
+      ]);
+      const causeCode = e?.cause?.code ?? e?.code;
       const isSocketError =
-        e?.cause?.code === "UND_ERR_SOCKET" || e?.cause?.code === "ECONNRESET";
+        typeof causeCode === "string" && transientCodes.has(causeCode);
       if (attempt < retries && isSocketError) {
         const wait = attempt * 3000;
         console.warn(
-          `  Network error on attempt ${attempt}/${retries} (${e?.cause?.code}), retrying in ${wait / 1000}s...`,
+          `  Network error on attempt ${attempt}/${retries} (${causeCode}), retrying in ${wait / 1000}s...`,
         );
         await new Promise((r) => setTimeout(r, wait));
         continue;
