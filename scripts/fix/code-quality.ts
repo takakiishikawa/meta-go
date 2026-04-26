@@ -40,7 +40,8 @@ function countTscErrors(repoDir: string): number {
     return 0;
   } catch (e: any) {
     const out = e.stdout?.toString() ?? "";
-    return out.split("\n").filter((l: string) => l.includes(": error TS")).length;
+    return out.split("\n").filter((l: string) => l.includes(": error TS"))
+      .length;
   }
 }
 

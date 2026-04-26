@@ -267,7 +267,9 @@ export function DeploymentsTable({ rows }: { rows: DeploymentRow[] }) {
             >
               <span
                 className="size-1.5 shrink-0 rounded-full"
-                style={{ backgroundColor: p.color ?? "var(--color-text-secondary)" }}
+                style={{
+                  backgroundColor: p.color ?? "var(--color-text-secondary)",
+                }}
               />
               {p.name}
             </Button>
