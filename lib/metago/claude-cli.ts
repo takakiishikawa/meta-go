@@ -35,8 +35,9 @@ function stripFences(text: string): string {
  * 事故 (2026-04-26 大規模デプロイ失敗) を二度と起こさないためのガード。
  */
 function looksLikeNarration(content: string): boolean {
-  const first =
-    (content.split("\n").find((l) => l.trim().length > 0) ?? "").trim();
+  const first = (
+    content.split("\n").find((l) => l.trim().length > 0) ?? ""
+  ).trim();
   if (!first) return false;
   // markdown fence
   if (/^```/.test(first)) return true;
