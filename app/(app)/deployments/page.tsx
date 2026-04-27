@@ -6,6 +6,11 @@ import {
   dailyCounts,
   summarize,
 } from "@/lib/metago/github-deployments";
+import {
+  summarize as summarizeIssues,
+  execLogToSummarizable,
+} from "@/lib/metago/delivery-stats";
+import { IssueStatsBanner } from "@/components/delivery/issue-stats-banner";
 import { DeploymentsTable } from "@/components/deployments/deployments-table";
 import {
   DeploySuccessTrendChart,
@@ -134,12 +139,27 @@ export default async function DeploymentsPage() {
     return sum + row;
   }, 0);
 
+  // Deploy fix の execution_logs を issue 単位で集計 (failed/abandoned=未対応, merged=解決)
+  const { data: deployLogRows } = await supabase
+    .schema("metago")
+    .from("execution_logs")
+    .select("state, created_at")
+    .eq("category", "deploy-fix")
+    .limit(10000);
+  const deployIssueStats = summarizeIssues(
+    execLogToSummarizable(
+      (deployLogRows ?? []) as { state: string; created_at: string }[],
+    ),
+  );
+
   return (
     <>
       <PageHeader
         title="Deployments"
         description={`Vercel への全デプロイと結果（直近 ${STATUS_WINDOW_HOURS}h、7日分のbudget可視化）`}
       />
+
+      <IssueStatsBanner stats={deployIssueStats} noun="デプロイ問題" />
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
         <StatCard

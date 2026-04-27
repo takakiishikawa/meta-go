@@ -4,6 +4,8 @@ import { ScoreDonut } from "@/components/score/score-donut";
 import { PerformanceTable } from "@/components/performance/performance-table";
 import { MultiProductTrendChart } from "@/components/charts/multi-product-trend";
 import { buildTrend } from "@/lib/metago/score-trend";
+import { summarize } from "@/lib/metago/delivery-stats";
+import { IssueStatsBanner } from "@/components/delivery/issue-stats-banner";
 import { Gauge } from "lucide-react";
 
 export default async function PerformancePage() {
@@ -17,6 +19,7 @@ export default async function PerformancePage() {
     { data: weekAgoMetrics },
     { data: products },
     { data: trendMetrics },
+    { data: perfIssueRows },
   ] = await Promise.all([
     supabase
       .schema("metago")
@@ -39,6 +42,13 @@ export default async function PerformancePage() {
       .from("performance_metrics")
       .select("product_id, score, measured_at")
       .order("measured_at", { ascending: true }),
+    // Performance issue 集計用 — quality_items の category=Performance 行を読む
+    supabase
+      .schema("metago")
+      .from("quality_items")
+      .select("state, created_at, resolved_at")
+      .in("category", ["Performance", "パフォーマンス"])
+      .limit(10000),
   ]);
 
   const allProducts = products ?? [];
@@ -111,6 +121,11 @@ export default async function PerformancePage() {
       <PageHeader
         title="パフォーマンス"
         description="Core Web Vitals とバンドルサイズの測定結果"
+      />
+
+      <IssueStatsBanner
+        stats={summarize(perfIssueRows ?? [])}
+        noun="issue"
       />
 
       <div className="flex items-center gap-4 rounded-lg border border-border bg-surface p-4 w-fit">

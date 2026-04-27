@@ -7,6 +7,8 @@ import { DesignSystemViolationsTabs } from "@/components/design-system/violation
 import { MultiProductTrendChart } from "@/components/charts/multi-product-trend";
 import { buildTrend } from "@/lib/metago/score-trend";
 import { isResolved } from "@/lib/metago/items";
+import { summarize } from "@/lib/metago/delivery-stats";
+import { IssueStatsBanner } from "@/components/delivery/issue-stats-banner";
 import { Palette } from "lucide-react";
 
 // 計測対象外プロダクト (scanner 側 SKIP_PRODUCTS と同期)
@@ -104,6 +106,7 @@ export default async function DesignSystemPage() {
       : null;
 
   const openItems = allItems.filter((i) => !isResolved(i.state));
+  const issueStats = summarize(allItems);
 
   const byCategory: Record<string, number> = {};
   for (const item of allItems) {
@@ -131,6 +134,8 @@ export default async function DesignSystemPage() {
         title="デザインシステム"
         description="go-design-system準拠率と違反一覧"
       />
+
+      <IssueStatsBanner stats={issueStats} noun="違反" />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="flex items-center gap-4 rounded-lg border border-border bg-surface p-4">

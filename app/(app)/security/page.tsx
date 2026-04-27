@@ -8,6 +8,8 @@ import { ScoreDelta } from "@/components/score/score-delta";
 import { MultiProductTrendChart } from "@/components/charts/multi-product-trend";
 import { buildTrend } from "@/lib/metago/score-trend";
 import { isResolved } from "@/lib/metago/items";
+import { summarize } from "@/lib/metago/delivery-stats";
+import { IssueStatsBanner } from "@/components/delivery/issue-stats-banner";
 
 const GO_COLORS: Record<string, string> = {
   nativego: "#0052CC",
@@ -103,6 +105,7 @@ export default async function SecurityPage() {
     (i) => i.severity === "critical",
   ).length;
   const highCount = openItems.filter((i) => i.severity === "high").length;
+  const issueStats = summarize(allItems);
 
   const trendSeries = allProducts.map((p) => ({
     id: p.id,
@@ -120,6 +123,8 @@ export default async function SecurityPage() {
         title="セキュリティ"
         description="脆弱性と依存関係のセキュリティ問題"
       />
+
+      <IssueStatsBanner stats={issueStats} noun="脆弱性" />
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <div className="flex items-center gap-4 rounded-lg border border-border bg-surface p-4">
