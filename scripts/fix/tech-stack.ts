@@ -240,21 +240,31 @@ async function fixForProduct(product: any, repo: string) {
       labels: ["metago-auto-merge"],
     });
 
-    await supabase
-      .schema("metago")
-      .from("quality_items")
-      .update({
-        state: "fixed",
-        pr_url: pr.url,
-        resolved_at: new Date().toISOString(),
-        error_message: null,
-      })
-      .in(
-        "id",
+    // 直接マージ完了時のみ fixed に。auto-merge 待ちは failed で進める。
+    if (pr.merged) {
+      await supabase
+        .schema("metago")
+        .from("quality_items")
+        .update({
+          state: "fixed",
+          pr_url: pr.url,
+          resolved_at: new Date().toISOString(),
+          error_message: null,
+        })
+        .in(
+          "id",
+          items.map((i) => i.id),
+        );
+      console.log(`  ✅ merged: ${pr.url}`);
+    } else {
+      await markItemFailed(
+        supabase,
+        "quality_items",
         items.map((i) => i.id),
+        `auto-merge pending: ${pr.url}`,
       );
-
-    console.log(`  ✅ ${pr.url}`);
+      console.log(`  ⏳ auto-merge pending: ${pr.url}`);
+    }
   } catch (e) {
     console.error(`  ❌ Failed: ${repo}`, e);
     await markItemFailed(
