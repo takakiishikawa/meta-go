@@ -36,6 +36,11 @@ import {
   UserMenu,
 } from "@takaki/go-design-system";
 import { createClient } from "@/lib/supabase/client";
+import type {
+  DeliveryHref,
+  DeliveryStats,
+  MenuStats,
+} from "@/lib/metago/delivery-stats";
 
 const GO_APPS = [
   { name: "MetaGo", url: "https://metago.vercel.app/", color: "#1E3A8A" },
@@ -101,7 +106,40 @@ const navGroups = [
   },
 ];
 
-export function MetaGoSidebar() {
+function formatDelta(n: number): string {
+  if (n === 0) return "±0";
+  return n > 0 ? `+${n}` : `${n}`;
+}
+
+function MenuStatsLine({ stats }: { stats: MenuStats }) {
+  // 「未対応 N (+Δ7d) / 解決 N (+Δ7d)」を sidebar 1 行に詰めるため、
+  // 各値は等幅っぽく見える小さい text にする。
+  return (
+    <span
+      className="text-[10px] leading-tight text-muted-foreground tabular-nums"
+      style={{ marginLeft: "1.5rem" }}
+    >
+      未対応 {stats.open}
+      {stats.newLast7d > 0 && (
+        <span className="text-warning"> ({formatDelta(stats.newLast7d)})</span>
+      )}
+      <span> / </span>
+      解決 {stats.resolved}
+      {stats.resolvedLast7d > 0 && (
+        <span className="text-success">
+          {" "}
+          ({formatDelta(stats.resolvedLast7d)})
+        </span>
+      )}
+    </span>
+  );
+}
+
+export function MetaGoSidebar({
+  deliveryStats,
+}: {
+  deliveryStats?: DeliveryStats;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const [displayName, setDisplayName] = React.useState("");
@@ -154,19 +192,29 @@ export function MetaGoSidebar() {
             <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {group.items.map((item) => (
-                  <SidebarMenuItem key={item.href}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={pathname === item.href}
-                    >
-                      <Link href={item.href}>
-                        <item.icon className="h-4 w-4 shrink-0" />
-                        {item.title}
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
+                {group.items.map((item) => {
+                  const stats = deliveryStats?.[item.href as DeliveryHref];
+                  return (
+                    <SidebarMenuItem key={item.href}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={pathname === item.href}
+                        className={stats ? "h-auto py-2" : undefined}
+                      >
+                        <Link
+                          href={item.href}
+                          className="flex flex-col items-stretch gap-0.5"
+                        >
+                          <span className="flex items-center gap-2">
+                            <item.icon className="h-4 w-4 shrink-0" />
+                            {item.title}
+                          </span>
+                          {stats && <MenuStatsLine stats={stats} />}
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
