@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Badge, Button } from "@takaki/go-design-system";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { isResolved } from "@/lib/metago/items";
 
 export interface ViolationItem {
   id: string;
@@ -156,7 +157,7 @@ export function DesignSystemViolationsTabs({
                   </td>
                   <td className="px-4 py-3">
                     <Badge
-                      variant={item.state === "done" ? "default" : "outline"}
+                      variant={isResolved(item.state) ? "default" : "outline"}
                     >
                       {item.state}
                     </Badge>

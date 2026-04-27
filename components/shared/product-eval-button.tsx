@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Badge, Button } from "@takaki/go-design-system";
 import { SimpleDialog } from "@/components/ui/simple-dialog";
 import { BarChart3 } from "lucide-react";
+import { isResolved } from "@/lib/metago/items";
 
 export interface EvalItem {
   id: string;
@@ -23,7 +24,7 @@ function getScoreLabel(score: number | null): string {
 }
 
 function getSummary(items: EvalItem[], score: number | null): string {
-  const open = items.filter((i) => i.state !== "done");
+  const open = items.filter((i) => !isResolved(i.state));
   const label = getScoreLabel(score);
   if (open.length === 0) {
     return `評価: ${label}（${score ?? "—"}点）。現在検出されている問題はありません。`;
@@ -42,7 +43,7 @@ export function ProductEvalButton({
   productName: string;
 }) {
   const [open, setOpen] = useState(false);
-  const openItems = items.filter((i) => i.state !== "done");
+  const openItems = items.filter((i) => !isResolved(i.state));
 
   const byCategory: Record<string, EvalItem[]> = {};
   for (const item of openItems) {

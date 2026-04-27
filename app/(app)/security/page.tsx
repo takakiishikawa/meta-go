@@ -7,6 +7,7 @@ import { SeverityCell } from "@/components/security/severity-cell";
 import { ScoreDelta } from "@/components/score/score-delta";
 import { MultiProductTrendChart } from "@/components/charts/multi-product-trend";
 import { buildTrend } from "@/lib/metago/score-trend";
+import { isResolved } from "@/lib/metago/items";
 
 const GO_COLORS: Record<string, string> = {
   nativego: "#0052CC",
@@ -96,7 +97,7 @@ export default async function SecurityPage() {
       ? Math.round(scoreValues.reduce((a, b) => a + b, 0) / scoreValues.length)
       : null;
 
-  const openItems = allItems.filter((i) => i.state !== "done");
+  const openItems = allItems.filter((i) => !isResolved(i.state));
   const criticalCount = openItems.filter(
     (i) => i.severity === "critical",
   ).length;

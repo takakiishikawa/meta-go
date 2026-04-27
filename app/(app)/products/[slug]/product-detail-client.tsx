@@ -20,6 +20,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import { isResolved } from "@/lib/metago/items";
 
 interface ProductDetailClientProps {
   product: any;
@@ -221,12 +222,12 @@ export function ProductDetailClient({
               />
             </Section>
             <Section
-              title={`セキュリティ (${securityItems.filter((i) => i.state !== "done").length}件未対応)`}
+              title={`セキュリティ (${securityItems.filter((i) => !isResolved(i.state)).length}件未対応)`}
             >
               <SecurityTable items={securityItems} />
             </Section>
             <Section
-              title={`依存関係 (${dependencyItems.filter((i) => i.state !== "done").length}件未対応)`}
+              title={`依存関係 (${dependencyItems.filter((i) => !isResolved(i.state)).length}件未対応)`}
             >
               <DepTable items={dependencyItems} />
             </Section>
@@ -370,7 +371,7 @@ function ItemTable({ items, columns }: { items: any[]; columns: string[] }) {
                 <Badge variant="outline">{item.category}</Badge>
               </td>
               <td className="px-4 py-2">
-                <Badge variant={item.state === "done" ? "default" : "outline"}>
+                <Badge variant={isResolved(item.state) ? "default" : "outline"}>
                   {item.state}
                 </Badge>
               </td>
@@ -408,7 +409,7 @@ function SecurityTable({ items }: { items: any[] }) {
                 </span>
               </td>
               <td className="px-4 py-2">
-                <Badge variant={item.state === "done" ? "default" : "outline"}>
+                <Badge variant={isResolved(item.state) ? "default" : "outline"}>
                   {item.state}
                 </Badge>
               </td>
