@@ -6,6 +6,7 @@ import { ProductEvalButton } from "@/components/shared/product-eval-button";
 import { ScoreDelta } from "@/components/score/score-delta";
 import { MultiProductTrendChart } from "@/components/charts/multi-product-trend";
 import { buildTrend } from "@/lib/metago/score-trend";
+import { isResolved } from "@/lib/metago/items";
 import { Code2 } from "lucide-react";
 
 const PAGE_SIZE = 20;
@@ -19,7 +20,13 @@ const GO_COLORS: Record<string, string> = {
   taskgo: "#00B8D9",
 };
 
-const STATE_LABELS: Record<string, string> = { new: "未対応", done: "完了" };
+const STATE_LABELS: Record<string, string> = {
+  new: "未対応",
+  fixing: "修正中",
+  fixed: "完了",
+  failed: "失敗",
+  done: "完了",
+};
 
 export default async function QualityPage({
   searchParams,
@@ -92,9 +99,12 @@ export default async function QualityPage({
   const openCount: Record<string, number> = {};
   const doneCount: Record<string, number> = {};
   for (const item of allItems) {
-    if (item.state === "new")
+    if (item.state === "new") {
       openCount[item.product_id] = (openCount[item.product_id] ?? 0) + 1;
-    else doneCount[item.product_id] = (doneCount[item.product_id] ?? 0) + 1;
+    } else if (isResolved(item.state)) {
+      doneCount[item.product_id] = (doneCount[item.product_id] ?? 0) + 1;
+    }
+    // 'fixing' / 'failed' はどちらにも数えない (中途状態 / 試行失敗は別バケツ)
   }
 
   const itemsByProduct: Record<string, typeof allItems> = {};
@@ -161,7 +171,7 @@ export default async function QualityPage({
         </div>
         <div className="rounded-lg border border-border bg-surface p-4">
           <div className="text-2xl font-semibold text-foreground">
-            {allItems.filter((i) => i.state === "done").length}
+            {allItems.filter((i) => isResolved(i.state)).length}
           </div>
           <div
             style={{
@@ -344,7 +354,7 @@ export default async function QualityPage({
                     </td>
                     <td className="px-4 py-3">
                       <Badge
-                        variant={item.state === "done" ? "default" : "outline"}
+                        variant={isResolved(item.state) ? "default" : "outline"}
                       >
                         {STATE_LABELS[item.state] ?? item.state}
                       </Badge>

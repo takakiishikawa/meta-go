@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button } from "@takaki/go-design-system";
 import { SimpleDialog } from "@/components/ui/simple-dialog";
+import { isResolved } from "@/lib/metago/items";
 
 interface SeverityItem {
   id: string;
@@ -83,7 +84,7 @@ export function SeverityCell({
                       color,
                     }}
                   >
-                    {item.state === "done" ? "✓ 対応済" : severity}
+                    {isResolved(item.state) ? "✓ 対応済" : severity}
                   </span>
                   <span className="text-sm font-medium text-foreground">
                     {item.title}

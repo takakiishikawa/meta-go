@@ -6,6 +6,7 @@ import { ScoreDelta } from "@/components/score/score-delta";
 import { DesignSystemViolationsTabs } from "@/components/design-system/violations-tabs";
 import { MultiProductTrendChart } from "@/components/charts/multi-product-trend";
 import { buildTrend } from "@/lib/metago/score-trend";
+import { isResolved } from "@/lib/metago/items";
 import { Palette } from "lucide-react";
 
 // 計測対象外プロダクト (scanner 側 SKIP_PRODUCTS と同期)
@@ -81,9 +82,12 @@ export default async function DesignSystemPage() {
   const openCount: Record<string, number> = {};
   const doneCount: Record<string, number> = {};
   for (const item of allItems) {
-    if (item.state === "new")
+    if (item.state === "new") {
       openCount[item.product_id] = (openCount[item.product_id] ?? 0) + 1;
-    else doneCount[item.product_id] = (doneCount[item.product_id] ?? 0) + 1;
+    } else if (isResolved(item.state)) {
+      doneCount[item.product_id] = (doneCount[item.product_id] ?? 0) + 1;
+    }
+    // 'fixing' / 'failed' は中途状態のためどちらにも数えない
   }
 
   const itemsByProduct: Record<string, typeof allItems> = {};
@@ -98,7 +102,7 @@ export default async function DesignSystemPage() {
       ? Math.round(scoreValues.reduce((a, b) => a + b, 0) / scoreValues.length)
       : null;
 
-  const openItems = allItems.filter((i) => i.state !== "done");
+  const openItems = allItems.filter((i) => !isResolved(i.state));
 
   const byCategory: Record<string, number> = {};
   for (const item of allItems) {

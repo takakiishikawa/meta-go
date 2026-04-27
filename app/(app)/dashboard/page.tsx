@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { DashboardClient, type TrendByProduct } from "./dashboard-client";
+import { isResolved } from "@/lib/metago/items";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -91,7 +92,9 @@ export default async function DashboardPage() {
   const detectedLast7Days = allDetectionItems.filter(
     (i) => i.created_at >= sevenDaysAgo,
   ).length;
-  const openIssues = allDetectionItems.filter((i) => i.state !== "done").length;
+  const openIssues = allDetectionItems.filter(
+    (i) => !isResolved(i.state),
+  ).length;
   const mergedLast7Days = (recentMergedLogs ?? []).length;
 
   return (

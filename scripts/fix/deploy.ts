@@ -307,15 +307,19 @@ async function fixForProduct(product: {
     console.log(`  🔨 ローカル build で再現...`);
     let build = runBuild(repoDir);
     if (build.ok) {
-      console.log(`  ⚠️  ローカル build は成功 — Vercel固有の問題かtransient`);
+      // ローカル build が通る = Vercel 環境固有 (env var 不足 / Node version 差 /
+      // build cache 等) → コード修正で直る問題ではないので Claude を呼ばずに
+      // abandoned として記録 (人間 escalate 相当)。failed で積み続けるとログが
+      // 偽の失敗で埋まり真の問題が見えなくなる。
+      console.log(`  ⚠️  ローカル build は成功 — Vercel固有 — escalate to human`);
       await logAttempt(
         product.id,
-        "failed",
+        "abandoned",
         {
           commit_sha: commitSha,
-          reason: "local_build_passed_so_no_action",
+          reason: "vercel_specific_needs_human",
         },
-        `Deploy fix skipped: local build OK ${commitSha.slice(0, 7)}`,
+        `Deploy fix abandoned (Vercel-specific): ${commitSha.slice(0, 7)}`,
       );
       return;
     }

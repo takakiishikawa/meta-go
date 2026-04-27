@@ -21,10 +21,14 @@ import {
   type PackageRow,
   type ProductSummary,
 } from "./dependency-tables";
+import { isResolved } from "@/lib/metago/items";
 
 const STATE_LABELS: Record<string, string> = {
   new: "未対応",
+  fixing: "修正中",
   in_progress: "対応中",
+  fixed: "完了",
+  failed: "失敗",
   done: "完了",
 };
 
@@ -162,12 +166,12 @@ export default async function DependencyPage() {
     0,
   );
   const majorCount = allItems.filter(
-    (i) => i.update_type === "major" && i.state !== "done",
+    (i) => i.update_type === "major" && !isResolved(i.state),
   ).length;
   const minorCount = allItems.filter(
-    (i) => i.update_type === "minor" && i.state !== "done",
+    (i) => i.update_type === "minor" && !isResolved(i.state),
   ).length;
-  const pendingCount = allItems.filter((i) => i.state !== "done").length;
+  const pendingCount = allItems.filter((i) => !isResolved(i.state)).length;
 
   return (
     <>
@@ -314,7 +318,7 @@ export default async function DependencyPage() {
                       <TableCell className="px-4 py-2.5">
                         <Badge
                           variant={
-                            item.state === "done" ? "default" : "outline"
+                            isResolved(item.state) ? "default" : "outline"
                           }
                         >
                           {STATE_LABELS[item.state] ?? item.state}
