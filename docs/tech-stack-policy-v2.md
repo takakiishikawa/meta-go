@@ -58,13 +58,19 @@ MetaGoが中央から自動チェック・修正PRを作成する。
 ### Layer 4: プロダクト固有
 各goの独自要件のみ。MetaGoの承認が必要。
 
+### AI 用途のパッケージ
+
+| パッケージ | 用途 |
+|-----------|------|
+| `@anthropic-ai/sdk` | テキスト生成（チャット、構造化出力など） |
+| `openai` | 音声文字起こし(STT, Whisper) **専用**。テキスト生成には使わない |
+
 ### 禁止パッケージ
 即刻削除。
 
 | パッケージ | 理由 |
 |-----------|------|
-| `openai` | Anthropic統一方針（`@anthropic-ai/sdk`に移行） |
-| `ai` | 同上 |
+| `ai` | AI SDK 抽象化ライブラリ。本シリーズではプロバイダ SDK を直接使う方針 |
 | `@ai-sdk/*` | 同上 |
 
 ---
@@ -116,10 +122,6 @@ DS のバンドルが `recharts` を直 import するため、アプリコード
 **理由**: 標準ユーティリティの統一でgoシリーズ全体の品質を均一化。
 **実施**: zod / date-fns / react-hook-form / @hookform/resolvers が欠損している場合に追加。
 **対象外**: `go-design-system`（peerDeps として既に列挙済み。consumer 側の責務）。
-
-### 5. openai削除
-**理由**: AI SDKは@anthropic-ai/sdkに統一。openaiとの混在は禁止。
-**実施**: package.jsonから削除 + コードの書き換え（可能な場合）。
 
 ---
 

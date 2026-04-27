@@ -4,10 +4,13 @@
  * 技術スタック2.0 policy 準拠チェック → quality_items に category='tech-stack' でUPSERT
  *
  * 検出対象:
- *  - 禁止package (openai, ai, @ai-sdk/*) を依存に含む
+ *  - 禁止package (ai, @ai-sdk/*) を依存に含む
  *  - Layer 1 (Radix UI / sonner / next-themes / clsx / tailwind-merge) を直接import
  *    （DS経由で使うべき）
  *  - shadcn/ui の素ファイルがコピーされている (components/ui/*.tsx)
+ *
+ * 備考:
+ *  - openai は許可。テキスト生成は @anthropic-ai/sdk、音声文字起こし(STT, Whisper)は openai SDK を使用する
  *
  * 環境変数:
  *   TARGET_REPO  — 対象リポジトリ名
@@ -31,12 +34,8 @@ const SKIP_PRODUCTS = new Set(["designsystem"]);
 
 // ── policy 定義 ─────────────────────────────────────
 
-const FORBIDDEN_PACKAGES = [
-  "openai",
-  "ai",
-  "@ai-sdk/anthropic",
-  "@ai-sdk/openai",
-];
+// openai は STT (Whisper) 用に許可。テキスト生成は @anthropic-ai/sdk を使う
+const FORBIDDEN_PACKAGES = ["ai", "@ai-sdk/anthropic", "@ai-sdk/openai"];
 
 const LAYER1_DIRECT_IMPORT_FORBIDDEN = [
   "@radix-ui/",

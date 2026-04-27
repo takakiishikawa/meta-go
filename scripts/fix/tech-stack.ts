@@ -83,13 +83,14 @@ async function fixTechStack(
 | Layer 2 (全go共通) | @supabase/*, zod, date-fns, react-hook-form, @vercel/analytics |
 | Layer 3 (機能) | @dnd-kit/*, react-dropzone etc. (per-feature) |
 | Layer 4 (固有) | product-specific only |
-| **禁止** | openai, ai, @ai-sdk/* — use @anthropic-ai/sdk only |
+| AI 用途 | テキスト生成は @anthropic-ai/sdk、音声文字起こし(STT, Whisper)は openai SDK |
+| **禁止** | ai, @ai-sdk/* (AI SDK 抽象化ライブラリは使用しない) |
 
 ## Violations to fix
 ${items.map((i) => `- ${i.title}: ${i.description}`).join("\n")}
 
 ## Fix strategy
-1. **禁止package**: Remove from package.json dependencies. If used in code, rewrite to use @anthropic-ai/sdk. If you can't safely rewrite, skip the file.
+1. **禁止package**: Remove from package.json dependencies. If used in code, rewrite to use @anthropic-ai/sdk (for text generation) or remove the dependency. **Do NOT remove openai — it is allowed for Whisper STT.** If you can't safely rewrite, skip the file.
 2. **Layer1直import**: Replace direct imports of @radix-ui/*, sonner, next-themes, clsx, tailwind-merge with imports from "@takaki/go-design-system". The DS exports equivalents (e.g., Button, Toaster, useTheme, cn).
 3. **shadcn/ui素ファイル**: Delete components/ui/*.tsx files that are shadcn copies. Update imports across the codebase to import from "@takaki/go-design-system" instead.
 

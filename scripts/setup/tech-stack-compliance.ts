@@ -5,8 +5,10 @@
  *   TARGET_REPO    — 対象リポジトリ名 (matrix で注入)
  *   TARGET_REPOS   — "all" または カンマ区切り (例: "native-go,care-go")
  *   TARGET_FIXES   — "all" または カンマ区切り
- *                    Phase 1: recharts-dynamic, vercel-analytics, remove-unused, layer2-missing, remove-openai
+ *                    Phase 1: recharts-dynamic, vercel-analytics, remove-unused, layer2-missing
  *                    Phase 2a: layer1-violations
+ *
+ *  ※ openai は許可（Whisper STT 用途）。テキスト生成は @anthropic-ai/sdk を使用する
  *   DRY_RUN        — "true" の場合、PR を作成せずログのみ
  *
  * PR は L1 として createAndMergePR で即マージされる。
@@ -449,66 +451,6 @@ ${relFiles.map((f) => `- ${f}`).join("\n")}
   return { changed, details };
 }
 
-// ── Fix 6: openai 削除 ────────────────────────────────────────
-
-async function removeOpenAI(repoDir: string): Promise<boolean> {
-  if (TARGET_REPO === "go-design-system") {
-    console.log(`  ⏭  go-design-system: openai 削除対象外`);
-    return false;
-  }
-  const pkgPath = path.join(repoDir, "package.json");
-  if (!fs.existsSync(pkgPath)) return false;
-
-  const pkg = readJson(pkgPath);
-  const hasOpenAI =
-    pkg.dependencies?.["openai"] || pkg.devDependencies?.["openai"];
-  if (!hasOpenAI) {
-    console.log(`  ⏭  openai: package.json に存在しない`);
-    return false;
-  }
-
-  console.log(`  🔧 openai を削除`);
-  if (pkg.dependencies?.["openai"]) delete pkg.dependencies["openai"];
-  if (pkg.devDependencies?.["openai"]) delete pkg.devDependencies["openai"];
-  writeJson(pkgPath, pkg);
-
-  // openai を使っているファイルを @anthropic-ai/sdk に書き換え
-  const tsFiles = findFiles(repoDir, [".tsx", ".ts"]);
-  const openaiFiles = tsFiles.filter((f) =>
-    hasImport(fs.readFileSync(f, "utf-8"), "openai"),
-  );
-
-  if (openaiFiles.length === 0) return true;
-
-  const relFiles = openaiFiles.map((f) => path.relative(repoDir, f));
-  console.log(`  🔧 openai → @anthropic-ai/sdk: ${relFiles.join(", ")}`);
-
-  if (DRY_RUN) {
-    console.log(
-      `  [DRY RUN] openai コード書き換え予定: ${relFiles.join(", ")}`,
-    );
-    return true;
-  }
-
-  const prompt = `以下のファイルの openai SDK の使用を @anthropic-ai/sdk に書き換えてください。
-
-対象ファイル:
-${relFiles.map((f) => `- ${f}`).join("\n")}
-
-変換ルール:
-1. \`import OpenAI from 'openai'\` → \`import Anthropic from '@anthropic-ai/sdk'\`
-2. \`new OpenAI({ apiKey: ... })\` → \`new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })\`
-3. \`openai.chat.completions.create(...)\` → \`anthropic.messages.create(...)\`
-4. モデル名は claude-sonnet-4-6 を使用
-5. messages 構造を Anthropic のフォーマット（role/content の配列）に変換
-6. 書き換えが困難な箇所は \`// TODO: openai → anthropic 移行が必要\` コメントを残して import のみ削除
-
-各ファイルをすべて変換してください。`;
-
-  runClaude(repoDir, prompt);
-  return true;
-}
-
 // ── package-lock.json 更新 ────────────────────────────────────
 
 function updatePackageLock(repoDir: string) {
@@ -620,16 +562,7 @@ async function run() {
       }
     }
 
-    // Fix 5: openai 削除 (TypeScript + Claude CLI for code rewrite)
-    if (shouldFix("remove-openai")) {
-      const changed = await removeOpenAI(tmpDir);
-      if (changed) {
-        appliedFixes.push("✅ openai 削除");
-        packageJsonChanged = true;
-      }
-    }
-
-    // Fix 6 (Phase 2a): Layer 1 違反解消 (TypeScript + Claude CLI)
+    // Fix 5 (Phase 2a): Layer 1 違反解消 (TypeScript + Claude CLI)
     if (shouldFix("layer1-violations")) {
       const result = await fixLayer1Violations(tmpDir);
       if (result.changed) {
@@ -662,7 +595,6 @@ async function run() {
       !shouldFix("vercel-analytics") &&
       !shouldFix("remove-unused") &&
       !shouldFix("layer2-missing") &&
-      !shouldFix("remove-openai") &&
       TARGET_FIXES !== "all";
 
     const branch = isLayer1Only
@@ -689,7 +621,6 @@ async function run() {
       ["vercel-analytics", "@vercel/analytics 導入"],
       ["remove-unused", "未使用依存削除"],
       ["layer2-missing", "Layer 2 欠損補充"],
-      ["remove-openai", "openai 削除"],
       ["layer1-violations", "Layer 1直接importの解消"],
     ]
       .map(([, label]) => {

@@ -300,19 +300,23 @@ export const PACKAGE_DESCRIPTIONS: Record<string, PackageInfo> = {
     layer: "layer4-specific",
   },
 
-  // ── 禁止パッケージ ─────────────────────────────────────────
+  // ── AI: STT (Whisper) 用途。テキスト生成は @anthropic-ai/sdk を使う ─
   openai: {
-    description: "⚠️ 禁止：Anthropic統一方針のため使用不可",
+    description: "音声文字起こし(STT, Whisper) 用 SDK。テキスト生成には使わない",
     category: "AI",
-    layer: "forbidden",
+    layer: "layer4-specific",
   },
+
+  // ── 禁止パッケージ ─────────────────────────────────────────
   ai: {
-    description: "⚠️ 禁止：@anthropic-ai/sdk に統一すること",
+    description:
+      "⚠️ 禁止：AI SDK 抽象化ライブラリ。プロバイダ SDK を直接使うこと",
     category: "AI",
     layer: "forbidden",
   },
   "@ai-sdk/openai": {
-    description: "⚠️ 禁止：@anthropic-ai/sdk に統一すること",
+    description:
+      "⚠️ 禁止：AI SDK 抽象化ライブラリ。プロバイダ SDK を直接使うこと",
     category: "AI",
     layer: "forbidden",
   },
@@ -356,7 +360,7 @@ export const LAYER_CONFIG = {
   },
   forbidden: {
     label: "❌ 方針違反パッケージ",
-    note: "openai など。Anthropic統一方針に違反。即刻削除してください。",
+    note: "ai / @ai-sdk/* など。AI SDK 抽象化ライブラリは使わずプロバイダ SDK を直接使う。即刻削除してください。",
     color: "#DC2626",
     bg: "#FEF2F2",
     border: "#FECACA",
