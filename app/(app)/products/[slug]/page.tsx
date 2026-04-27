@@ -34,25 +34,29 @@ export default async function ProductDetailPage({
       .from("quality_items")
       .select("*")
       .eq("product_id", product.id)
-      .order("created_at", { ascending: false }),
+      .order("created_at", { ascending: false })
+      .limit(10000),
     supabase
       .schema("metago")
       .from("security_items")
       .select("*")
       .eq("product_id", product.id)
-      .order("created_at", { ascending: false }),
+      .order("created_at", { ascending: false })
+      .limit(10000),
     supabase
       .schema("metago")
       .from("dependency_items")
       .select("*")
       .eq("product_id", product.id)
-      .order("created_at", { ascending: false }),
+      .order("created_at", { ascending: false })
+      .limit(10000),
     supabase
       .schema("metago")
       .from("design_system_items")
       .select("*")
       .eq("product_id", product.id)
-      .order("created_at", { ascending: false }),
+      .order("created_at", { ascending: false })
+      .limit(10000),
     supabase
       .schema("metago")
       .from("performance_metrics")
