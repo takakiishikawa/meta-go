@@ -302,7 +302,8 @@ export const PACKAGE_DESCRIPTIONS: Record<string, PackageInfo> = {
 
   // ── AI: STT (Whisper) 用途。テキスト生成は @anthropic-ai/sdk を使う ─
   openai: {
-    description: "音声文字起こし(STT, Whisper) 用 SDK。テキスト生成には使わない",
+    description:
+      "音声文字起こし(STT, Whisper) 用 SDK。テキスト生成には使わない",
     category: "AI",
     layer: "layer4-specific",
   },

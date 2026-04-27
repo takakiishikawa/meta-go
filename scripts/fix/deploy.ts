@@ -311,7 +311,9 @@ async function fixForProduct(product: {
       // build cache 等) → コード修正で直る問題ではないので Claude を呼ばずに
       // abandoned として記録 (人間 escalate 相当)。failed で積み続けるとログが
       // 偽の失敗で埋まり真の問題が見えなくなる。
-      console.log(`  ⚠️  ローカル build は成功 — Vercel固有 — escalate to human`);
+      console.log(
+        `  ⚠️  ローカル build は成功 — Vercel固有 — escalate to human`,
+      );
       await logAttempt(
         product.id,
         "abandoned",
