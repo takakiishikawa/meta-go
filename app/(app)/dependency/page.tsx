@@ -22,6 +22,8 @@ import {
   type ProductSummary,
 } from "./dependency-tables";
 import { isResolved } from "@/lib/metago/items";
+import { summarize } from "@/lib/metago/delivery-stats";
+import { IssueStatsBanner } from "@/components/delivery/issue-stats-banner";
 
 const STATE_LABELS: Record<string, string> = {
   new: "未対応",
@@ -173,6 +175,7 @@ export default async function DependencyPage() {
     (i) => i.update_type === "minor" && !isResolved(i.state),
   ).length;
   const pendingCount = allItems.filter((i) => !isResolved(i.state)).length;
+  const issueStats = summarize(allItems);
 
   return (
     <>
@@ -180,6 +183,8 @@ export default async function DependencyPage() {
         title="依存・技術スタック"
         description="各プロダクトの技術スタックとパッケージ更新状況"
       />
+
+      <IssueStatsBanner stats={issueStats} noun="更新" />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard

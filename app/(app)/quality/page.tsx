@@ -7,6 +7,8 @@ import { ScoreDelta } from "@/components/score/score-delta";
 import { MultiProductTrendChart } from "@/components/charts/multi-product-trend";
 import { buildTrend } from "@/lib/metago/score-trend";
 import { isResolved } from "@/lib/metago/items";
+import { summarize } from "@/lib/metago/delivery-stats";
+import { IssueStatsBanner } from "@/components/delivery/issue-stats-banner";
 import { Code2 } from "lucide-react";
 
 const PAGE_SIZE = 20;
@@ -124,6 +126,7 @@ export default async function QualityPage({
 
   const totalPages = Math.ceil(allItems.length / PAGE_SIZE);
   const pagedItems = allItems.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const issueStats = summarize(allItems);
 
   const trendSeries = allProducts.map((p) => ({
     id: p.id,
@@ -141,6 +144,8 @@ export default async function QualityPage({
         title="コード品質"
         description="goシリーズ全体のコード品質スコアと問題点一覧"
       />
+
+      <IssueStatsBanner stats={issueStats} />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="flex items-center gap-4 rounded-lg border border-border bg-surface p-4">
