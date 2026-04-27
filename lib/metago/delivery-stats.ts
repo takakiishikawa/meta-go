@@ -50,10 +50,12 @@ export function summarize<T extends SummarizableRow>(rows: T[]): MenuStats {
  *   それ以外          → new   (open 扱い)
  * resolved_at 列は無いので merged 行は created_at を流用する。
  */
-export function execLogToSummarizable(rows: {
-  state: string;
-  created_at: string;
-}[]): SummarizableRow[] {
+export function execLogToSummarizable(
+  rows: {
+    state: string;
+    created_at: string;
+  }[],
+): SummarizableRow[] {
   return rows.map((r) => ({
     state: r.state === "merged" ? "fixed" : "new",
     created_at: r.created_at,

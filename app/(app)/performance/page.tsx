@@ -123,10 +123,7 @@ export default async function PerformancePage() {
         description="Core Web Vitals とバンドルサイズの測定結果"
       />
 
-      <IssueStatsBanner
-        stats={summarize(perfIssueRows ?? [])}
-        noun="issue"
-      />
+      <IssueStatsBanner stats={summarize(perfIssueRows ?? [])} noun="issue" />
 
       <div className="flex items-center gap-4 rounded-lg border border-border bg-surface p-4 w-fit">
         <ScoreDonut score={avgScore} size={72} />

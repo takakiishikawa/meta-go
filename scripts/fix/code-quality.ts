@@ -193,7 +193,9 @@ async function fixForRepo(product: any, repo: string) {
         pr_url: pr.url,
       });
 
-    console.log(pr.merged ? `  ✅ merged: ${pr.url}` : `  ⏳ pending: ${pr.url}`);
+    console.log(
+      pr.merged ? `  ✅ merged: ${pr.url}` : `  ⏳ pending: ${pr.url}`,
+    );
   } catch (e) {
     console.error(`  ❌ Failed: ${repo}`, e);
     await supabase
