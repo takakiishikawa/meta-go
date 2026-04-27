@@ -12,7 +12,6 @@ export default async function DashboardPage() {
     { data: products },
     { data: scoresHistory },
     { data: pendingApprovals },
-    { data: recentMergedLogs },
     { data: qualityItems },
     { data: securityItems },
     { data: designItems },
@@ -32,26 +31,20 @@ export default async function DashboardPage() {
       .order("created_at", { ascending: false }),
     supabase
       .schema("metago")
-      .from("execution_logs")
-      .select("id, state, created_at")
-      .eq("state", "merged")
-      .gte("created_at", sevenDaysAgo),
-    supabase
-      .schema("metago")
       .from("quality_items")
-      .select("id, state, created_at"),
+      .select("id, state, created_at, resolved_at"),
     supabase
       .schema("metago")
       .from("security_items")
-      .select("id, state, created_at"),
+      .select("id, state, created_at, resolved_at"),
     supabase
       .schema("metago")
       .from("design_system_items")
-      .select("id, state, created_at"),
+      .select("id, state, created_at, resolved_at"),
     supabase
       .schema("metago")
       .from("dependency_items")
-      .select("id, state, created_at"),
+      .select("id, state, created_at, resolved_at"),
   ]);
 
   const allScores = scoresHistory ?? [];
@@ -95,7 +88,12 @@ export default async function DashboardPage() {
   const openIssues = allDetectionItems.filter(
     (i) => !isResolved(i.state),
   ).length;
-  const mergedLast7Days = (recentMergedLogs ?? []).length;
+  // PR 単位ではなく **issue (item) 単位** で集計する。1 PR で複数 item を解決する
+  // ことがあり、PR 数で語ると検知/未解決の単位と齟齬が出る。
+  const resolvedLast7Days = allDetectionItems.filter(
+    (i) =>
+      isResolved(i.state) && i.resolved_at && i.resolved_at >= sevenDaysAgo,
+  ).length;
 
   return (
     <DashboardClient
@@ -105,7 +103,7 @@ export default async function DashboardPage() {
       weekAgoByPC={Object.fromEntries(weekAgoByPC)}
       trendByProduct={trendByProduct}
       kpi={{
-        mergedLast7Days,
+        resolvedLast7Days,
         detectedLast7Days,
         openIssues,
       }}

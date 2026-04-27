@@ -59,7 +59,7 @@ interface DashboardClientProps {
   weekAgoByPC: Record<string, number>;
   trendByProduct: TrendByProduct;
   kpi: {
-    mergedLast7Days: number;
+    resolvedLast7Days: number;
     detectedLast7Days: number;
     openIssues: number;
   };
@@ -190,27 +190,27 @@ export function DashboardClient({
         }
       />
 
-      {/* Global KPI strip */}
+      {/* Global KPI strip — 全て issue (item) 単位で統一 */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <KpiCard
           icon={<GitMerge className="size-4" />}
-          label="直近1週間でマージ済み"
-          value={kpi.mergedLast7Days}
-          sublabel="改善されたPR数"
+          label="直近1週間で解決済み"
+          value={kpi.resolvedLast7Days}
+          sublabel="解決された issue 数"
           accent="#36B37E"
         />
         <KpiCard
           icon={<Activity className="size-4" />}
           label="直近1週間で検知"
           value={kpi.detectedLast7Days}
-          sublabel="新たに検知された問題"
+          sublabel="新たに検知された issue 数"
           accent="#0052CC"
         />
         <KpiCard
           icon={<AlertTriangle className="size-4" />}
           label="未解決の問題"
           value={kpi.openIssues}
-          sublabel="残タスクの総数"
+          sublabel="残 issue の総数"
           accent="#FF8B00"
         />
       </div>
