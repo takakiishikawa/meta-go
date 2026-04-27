@@ -22,6 +22,11 @@ export type ItemTable =
 export const MAX_FIX_ATTEMPTS = 3;
 export const DEFAULT_BATCH_SIZE = 10;
 
+// "done" はレガシー、"fixed" が現行。両方を解決済み扱いするための共通ヘルパ。
+export function isResolved(state: string | null | undefined): boolean {
+  return state === "fixed" || state === "done";
+}
+
 // ────────────────────────────────────────────────
 // Supabase client
 // ────────────────────────────────────────────────
@@ -84,7 +89,10 @@ export async function upsertItem(
     .upsert(row, { onConflict: conflictTarget, ignoreDuplicates: false });
 
   if (error) {
-    console.warn(`  upsert failed (${table}):`, error.message);
+    // サイレント失敗を許さない: scan で 1 行落ちると次の markStaleItemsResolved
+    // と整合が取れなくなり ghost 行を生む。throw して呼び出し側 (scanRepo の
+    // try/catch) で execution_logs に記録させる。
+    throw new Error(`upsertItem failed (${table}): ${error.message}`);
   }
 }
 
@@ -122,8 +130,9 @@ export async function markStaleItemsResolved(
 
   const { data, error } = await q;
   if (error) {
-    console.warn(`  mark stale failed (${table}):`, error.message);
-    return 0;
+    throw new Error(
+      `markStaleItemsResolved failed (${table}): ${error.message}`,
+    );
   }
   return data?.length ?? 0;
 }
@@ -166,12 +175,18 @@ export async function pickAndLockItems(
 ): Promise<PendingItem[]> {
   const limit = options.limit ?? DEFAULT_BATCH_SIZE;
 
+  // severity 列は security_items にのみ存在する。design_system_items / quality_items
+  // で severity を select すると Postgres は 42703 を返し、PostgREST 経由では
+  // data=null で error 付きになる。共通の select を使うと design-system fix が
+  // サイレントに毎回 0 件となり詰まるため、テーブル別に分岐する。
+  const baseCols = `id, product_id, category, title, description, attempt_count, level, products(name, display_name, github_repo)`;
+  const cols =
+    table === "security_items" ? `${baseCols}, severity` : baseCols;
+
   let query = supabase
     .schema("metago")
     .from(table)
-    .select(
-      `id, product_id, category, title, description, attempt_count, level, severity, products(name, display_name, github_repo)`,
-    )
+    .select(cols)
     .eq("state", "new")
     .lt("attempt_count", MAX_FIX_ATTEMPTS)
     .order("created_at", { ascending: true })
@@ -181,8 +196,7 @@ export async function pickAndLockItems(
 
   const { data, error } = await query;
   if (error) {
-    console.error(`  fetch pending failed (${table}):`, error.message);
-    return [];
+    throw new Error(`pickAndLockItems failed (${table}): ${error.message}`);
   }
 
   const items = (data ?? []) as unknown as PendingItem[];
@@ -287,7 +301,9 @@ export async function saveScore(
       { onConflict: "product_id,category,day" },
     );
 
-  if (error) console.warn(`  saveScore failed:`, error.message);
+  if (error) {
+    throw new Error(`saveScore failed: ${error.message}`);
+  }
 }
 
 // ────────────────────────────────────────────────
