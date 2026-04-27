@@ -99,7 +99,8 @@ export default async function DependencyPage() {
       .schema("metago")
       .from("dependency_items")
       .select("*, products(display_name, primary_color)")
-      .order("created_at", { ascending: false }),
+      .order("created_at", { ascending: false })
+      .limit(10000),
   ]);
 
   const allProducts: ProductSummary[] = products ?? [];

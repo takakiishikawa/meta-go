@@ -37,7 +37,8 @@ export default async function SecurityPage() {
       .schema("metago")
       .from("security_items")
       .select(`*, products(name, display_name, primary_color)`)
-      .order("created_at", { ascending: false }),
+      .order("created_at", { ascending: false })
+      .limit(10000),
     supabase
       .schema("metago")
       .from("scores_history")

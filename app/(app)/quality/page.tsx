@@ -53,7 +53,10 @@ export default async function QualityPage({
       .from("quality_items")
       .select(`*, products(name, display_name, primary_color)`)
       .not("category", "in", '("Performance","パフォーマンス")')
-      .order("created_at", { ascending: false }),
+      .order("created_at", { ascending: false })
+      // PostgREST のデフォルト上限 1000 を明示的に超える値で指定。指定しないと
+      // 古い 'fixed' / 'failed' 行が ORDER 末尾で切り落とされて UI に出ない。
+      .limit(10000),
     supabase
       .schema("metago")
       .from("scores_history")

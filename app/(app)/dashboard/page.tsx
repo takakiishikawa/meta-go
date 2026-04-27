@@ -32,19 +32,23 @@ export default async function DashboardPage() {
     supabase
       .schema("metago")
       .from("quality_items")
-      .select("id, state, created_at, resolved_at"),
+      .select("id, state, created_at, resolved_at")
+      .limit(10000),
     supabase
       .schema("metago")
       .from("security_items")
-      .select("id, state, created_at, resolved_at"),
+      .select("id, state, created_at, resolved_at")
+      .limit(10000),
     supabase
       .schema("metago")
       .from("design_system_items")
-      .select("id, state, created_at, resolved_at"),
+      .select("id, state, created_at, resolved_at")
+      .limit(10000),
     supabase
       .schema("metago")
       .from("dependency_items")
-      .select("id, state, created_at, resolved_at"),
+      .select("id, state, created_at, resolved_at")
+      .limit(10000),
   ]);
 
   const allScores = scoresHistory ?? [];
