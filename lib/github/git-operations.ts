@@ -186,15 +186,28 @@ async function enableAutoMerge(prNodeId: string) {
   });
 }
 
-/** L1 の標準フロー: PR 作成 → 即マージ */
+/** L1 の標準フロー: PR 作成 → 即マージ。
+ *
+ * 戻り値の merged は **直接マージが完了したか** を表す。
+ * - true:  直接 squash merge 完了 (PR は merged 状態)
+ * - false: 直接 merge できず auto-merge を待機中 (CI 通過まで未確定)
+ *
+ * 呼び出し側は merged=false のとき markItemFixed してはならない (ゴースト fixed の原因)。
+ */
+export type CreateAndMergeResult = PullRequest & { merged: boolean };
+
 export async function createAndMergePR(
   repo: string,
   opts: Parameters<typeof createPR>[1],
-): Promise<PullRequest> {
+): Promise<CreateAndMergeResult> {
   const pr = await createPR(repo, opts);
-  await mergePR(repo, pr);
-  console.log(`✓ L1 PR merged: ${pr.url}`);
-  return pr;
+  const merged = await mergePR(repo, pr);
+  if (merged) {
+    console.log(`✓ L1 PR merged: ${pr.url}`);
+  } else {
+    console.log(`⏳ L1 PR auto-merge pending: ${pr.url}`);
+  }
+  return { ...pr, merged };
 }
 
 /** open PR 一覧取得 */

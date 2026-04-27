@@ -438,16 +438,21 @@ async function fixForProduct(product: {
       labels: ["metago-auto-merge"],
     });
 
+    // 実マージ結果を反映 (ゴースト merged 防止)
     await logAttempt(
       product.id,
-      "merged",
+      pr.merged ? "merged" : "failed",
       {
         commit_sha: commitSha,
         pr_url: pr.url,
         summary,
         patch_count: totalPatchCount,
+        merged: pr.merged,
+        ...(pr.merged ? {} : { reason: "auto_merge_pending" }),
       },
-      `Deploy fix merged: ${commitSha.slice(0, 7)} → PR #${pr.number}`,
+      pr.merged
+        ? `Deploy fix merged: ${commitSha.slice(0, 7)} → PR #${pr.number}`
+        : `Deploy fix auto-merge pending: ${commitSha.slice(0, 7)} → PR #${pr.number}`,
     );
 
     console.log(`  ✓ L1 PR merged: ${pr.url}`);

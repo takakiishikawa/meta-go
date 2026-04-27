@@ -100,8 +100,12 @@ export async function upsertItem(
  * 当該 scan 実行で再検出されなかった items を fixed に遷移させる。
  *
  * scan は最新の所見を upsertItem で書き込む際に last_seen_at を now() に更新する。
- * scanStartedAt より前の last_seen_at を持つ state IN ('new','fixing') の行は、
- * 今回の scan では検出されなかった = 解消済み とみなせる。
+ * scanStartedAt より前の last_seen_at を持つ state IN ('new','fixing','failed') の
+ * 行は、今回の scan では検出されなかった = 解消済み とみなせる。
+ *
+ * 'failed' を含めるのは、L1 PR の auto-merge pending を一旦 failed に落とす
+ * 運用のため。後で auto-merge が fired して違反が code から消えると、再 scan で
+ * 検出されないので 'failed' → 'fixed' に救済する。人間が手動で直した場合も同様。
  *
  * categories を渡すと、その category 集合内のみを対象にする(scan が部分的に成功した
  * 場合、評価できなかった category の行を誤って fixed にしないため)。
@@ -120,7 +124,7 @@ export async function markStaleItemsResolved(
     .from(table)
     .update({ state: "fixed", resolved_at: new Date().toISOString() })
     .eq("product_id", productId)
-    .in("state", ["new", "fixing"])
+    .in("state", ["new", "fixing", "failed"])
     .lt("last_seen_at", scanStartedAt.toISOString())
     .select("id");
 
@@ -213,8 +217,9 @@ export async function pickAndLockItems(
     .in("id", ids);
 
   if (lockErr) {
-    console.warn(`  lock failed (${table}):`, lockErr.message);
-    return [];
+    throw new Error(
+      `pickAndLockItems lock failed (${table}): ${lockErr.message}`,
+    );
   }
 
   return items;

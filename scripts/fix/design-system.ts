@@ -194,14 +194,26 @@ async function fixForProduct(product: any, repo: string) {
       labels: ["metago-auto-merge"],
     });
 
-    // 全itemをfixed状態に
-    await markItemFixed(
-      supabase,
-      "design_system_items",
-      items.map((i: PendingItem) => i.id),
-      pr.url,
-    );
-    console.log(`  ✅ ${items.length}件 fixed → ${pr.url}`);
+    // 直接マージ完了時のみ fixed に。auto-merge 待ちは markItemFailed で
+    // attempt_count を進める (CI 通って後に auto-merge fired した場合は
+    // 次の scan の markStaleItemsResolved で 'failed'→'fixed' に救済される)。
+    if (pr.merged) {
+      await markItemFixed(
+        supabase,
+        "design_system_items",
+        items.map((i: PendingItem) => i.id),
+        pr.url,
+      );
+      console.log(`  ✅ ${items.length}件 fixed → ${pr.url}`);
+    } else {
+      await markItemFailed(
+        supabase,
+        "design_system_items",
+        items.map((i: PendingItem) => i.id),
+        `auto-merge pending: ${pr.url}`,
+      );
+      console.log(`  ⏳ ${items.length}件 auto-merge 待機中 → ${pr.url}`);
+    }
   } catch (e) {
     console.error(`  ❌ Fix failed: ${repo}`, e);
     await markItemFailed(

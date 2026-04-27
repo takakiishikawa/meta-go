@@ -177,6 +177,7 @@ async function fixForRepo(product: any, repo: string) {
       labels: ["metago-auto-merge"],
     });
 
+    // execution_logs の state は実マージ結果を反映させる (ゴースト merged を防ぐ)
     await supabase
       .schema("metago")
       .from("execution_logs")
@@ -184,13 +185,15 @@ async function fixForRepo(product: any, repo: string) {
         product_id: product.id,
         category: "code-quality-fix",
         title: `ESLint/Prettier/TSC 修正PR: ${product.display_name}`,
-        description: `Auto-merged: ${pr.url}`,
+        description: pr.merged
+          ? `Auto-merged: ${pr.url}`
+          : `auto-merge pending: ${pr.url}`,
         level: "L1",
-        state: "merged",
+        state: pr.merged ? "merged" : "pending",
         pr_url: pr.url,
       });
 
-    console.log(`  ✅ ${pr.url}`);
+    console.log(pr.merged ? `  ✅ merged: ${pr.url}` : `  ⏳ pending: ${pr.url}`);
   } catch (e) {
     console.error(`  ❌ Failed: ${repo}`, e);
     await supabase

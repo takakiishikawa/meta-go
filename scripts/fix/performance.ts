@@ -226,15 +226,24 @@ async function fixForProduct(product: any, repo: string) {
         },
       });
 
-    // L1: PRは即マージ済みなので items を fixed に遷移
-    await markItemFixed(
-      supabase,
-      "quality_items",
-      items.map((i) => i.id),
-      pr.url,
-    );
-
-    console.log(`  ✓ L1 PR merged: ${pr.url}`);
+    // 直接マージ完了時のみ fixed に。auto-merge 待ちは failed で進める。
+    if (pr.merged) {
+      await markItemFixed(
+        supabase,
+        "quality_items",
+        items.map((i) => i.id),
+        pr.url,
+      );
+      console.log(`  ✓ L1 PR merged: ${pr.url}`);
+    } else {
+      await markItemFailed(
+        supabase,
+        "quality_items",
+        items.map((i) => i.id),
+        `auto-merge pending: ${pr.url}`,
+      );
+      console.log(`  ⏳ L1 PR auto-merge pending: ${pr.url}`);
+    }
   } catch (e) {
     console.error(`  ❌ Failed: ${repo}`, e);
     await markItemFailed(
