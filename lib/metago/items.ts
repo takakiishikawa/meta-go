@@ -180,8 +180,7 @@ export async function pickAndLockItems(
   // data=null で error 付きになる。共通の select を使うと design-system fix が
   // サイレントに毎回 0 件となり詰まるため、テーブル別に分岐する。
   const baseCols = `id, product_id, category, title, description, attempt_count, level, products(name, display_name, github_repo)`;
-  const cols =
-    table === "security_items" ? `${baseCols}, severity` : baseCols;
+  const cols = table === "security_items" ? `${baseCols}, severity` : baseCols;
 
   let query = supabase
     .schema("metago")
