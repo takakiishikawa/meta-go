@@ -46,3 +46,11 @@ jobs:
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+      # tech_stack_items / dependency_items から依存スコア (更新性 + 共通化) を算出。
+      # github-data.ts の後に置くこと。clone不要なので軽量。
+      - name: Dependencies score (更新性 + 共通化)
+        run: npx tsx scripts/scan/dependencies.ts
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

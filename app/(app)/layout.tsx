@@ -55,6 +55,7 @@ export default async function AppRootLayout({
     security: avg("security"),
     design_system: avg("design_system"),
     performance: avg("performance"),
+    dependencies: avg("dependencies"),
   };
 
   return (

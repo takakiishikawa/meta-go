@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS metago.products (
 CREATE TABLE IF NOT EXISTS metago.scores_history (
   id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   product_id   UUID NOT NULL REFERENCES metago.products(id) ON DELETE CASCADE,
-  category     TEXT NOT NULL CHECK (category IN ('quality','security','design_system','performance')),
+  category     TEXT NOT NULL CHECK (category IN ('quality','security','design_system','performance','tech_stack','dependencies')),
   score        INTEGER NOT NULL CHECK (score BETWEEN 0 AND 100),
   collected_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );

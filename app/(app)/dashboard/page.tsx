@@ -63,7 +63,12 @@ export default async function DashboardPage() {
 
   const allScores = scoresHistory ?? [];
 
-  type Cat = "quality" | "security" | "design_system" | "performance";
+  type Cat =
+    | "quality"
+    | "security"
+    | "design_system"
+    | "performance"
+    | "dependencies";
 
   // 過去全期間のトレンド: product_id × date(YYYY-MM-DD) → カテゴリ毎に最新値
   const trendByProduct: TrendByProduct = {};
