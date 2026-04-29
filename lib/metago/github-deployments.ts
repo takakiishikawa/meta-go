@@ -8,6 +8,7 @@
  */
 
 const GITHUB_OWNER = process.env.GITHUB_OWNER || "takakiishikawa";
+const GH_TOKEN = process.env.GH_PAT || process.env.GITHUB_TOKEN || "";
 
 export type DeploymentState =
   | "success"
@@ -61,7 +62,7 @@ interface GhCommit {
 }
 
 const HEADERS = {
-  Authorization: `Bearer ${process.env.GITHUB_TOKEN ?? ""}`,
+  Authorization: `Bearer ${GH_TOKEN}`,
   Accept: "application/vnd.github+json",
   "X-GitHub-Api-Version": "2022-11-28",
 };
@@ -225,7 +226,7 @@ export async function fetchAllDeployments(
   countWindowHours = 168, // 7日: chart用
   statusWindowHours = 48, // 48h: table+成功/失敗 集計用
 ): Promise<DeploymentRow[]> {
-  if (!process.env.GITHUB_TOKEN) {
+  if (!GH_TOKEN) {
     return [];
   }
   const now = Date.now();

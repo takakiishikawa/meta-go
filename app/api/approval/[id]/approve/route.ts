@@ -41,7 +41,7 @@ export async function POST(
         {
           method: "PUT",
           headers: {
-            Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
+            Authorization: `Bearer ${process.env.GH_PAT || process.env.GITHUB_TOKEN || ""}`,
             Accept: "application/vnd.github+json",
             "Content-Type": "application/json",
           },
