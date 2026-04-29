@@ -72,7 +72,23 @@ const GO_APPS = [
   },
 ];
 
-const navGroups = [
+export interface SidebarScores {
+  quality: number | null;
+  security: number | null;
+  design_system: number | null;
+  performance: number | null;
+}
+
+type ScoreKey = keyof SidebarScores;
+
+interface NavItem {
+  title: string;
+  href: string;
+  icon: typeof LayoutDashboard;
+  scoreKey?: ScoreKey;
+}
+
+const navGroups: { label: string; items: NavItem[] }[] = [
   {
     label: "Overview",
     items: [
@@ -83,11 +99,31 @@ const navGroups = [
   {
     label: "Delivery",
     items: [
-      { title: "Code Quality", href: "/quality", icon: Code2 },
-      { title: "Security", href: "/security", icon: ShieldCheck },
+      {
+        title: "Code Quality",
+        href: "/quality",
+        icon: Code2,
+        scoreKey: "quality",
+      },
+      {
+        title: "Security",
+        href: "/security",
+        icon: ShieldCheck,
+        scoreKey: "security",
+      },
       { title: "Dependencies", href: "/dependency", icon: Package },
-      { title: "Design System", href: "/design-system", icon: Palette },
-      { title: "Performance", href: "/performance", icon: Gauge },
+      {
+        title: "Design System",
+        href: "/design-system",
+        icon: Palette,
+        scoreKey: "design_system",
+      },
+      {
+        title: "Performance",
+        href: "/performance",
+        icon: Gauge,
+        scoreKey: "performance",
+      },
       { title: "Deployments", href: "/deployments", icon: Rocket },
     ],
   },
@@ -101,7 +137,13 @@ const navGroups = [
   },
 ];
 
-export function MetaGoSidebar() {
+function scoreColor(score: number): string {
+  if (score >= 80) return "#36B37E";
+  if (score >= 60) return "#FF8B00";
+  return "#FF5630";
+}
+
+export function MetaGoSidebar({ scores }: { scores?: SidebarScores }) {
   const pathname = usePathname();
   const router = useRouter();
   const [displayName, setDisplayName] = React.useState("");
@@ -154,19 +196,34 @@ export function MetaGoSidebar() {
             <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {group.items.map((item) => (
-                  <SidebarMenuItem key={item.href}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={pathname === item.href}
-                    >
-                      <Link href={item.href}>
-                        <item.icon className="h-4 w-4 shrink-0" />
-                        {item.title}
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
+                {group.items.map((item) => {
+                  const score =
+                    item.scoreKey && scores ? scores[item.scoreKey] : null;
+                  return (
+                    <SidebarMenuItem key={item.href}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={pathname === item.href}
+                      >
+                        <Link
+                          href={item.href}
+                          className="flex w-full items-center gap-2"
+                        >
+                          <item.icon className="h-4 w-4 shrink-0" />
+                          <span className="flex-1 truncate">{item.title}</span>
+                          {score !== null && (
+                            <span
+                              className="ml-auto text-xs font-semibold tabular-nums"
+                              style={{ color: scoreColor(score) }}
+                            >
+                              {score}
+                            </span>
+                          )}
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>

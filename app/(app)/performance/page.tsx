@@ -1,11 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { EmptyState, PageHeader } from "@takaki/go-design-system";
-import { ScoreDonut } from "@/components/score/score-donut";
 import { PerformanceTable } from "@/components/performance/performance-table";
 import { MultiProductTrendChart } from "@/components/charts/multi-product-trend";
 import { buildTrend } from "@/lib/metago/score-trend";
-import { summarize } from "@/lib/metago/delivery-stats";
-import { IssueStatsBanner } from "@/components/delivery/issue-stats-banner";
+import { IssueTrendSection } from "@/components/delivery/issue-trend-section";
 import { Gauge } from "lucide-react";
 
 export default async function PerformancePage() {
@@ -52,8 +50,8 @@ export default async function PerformancePage() {
   ]);
 
   const allProducts = products ?? [];
-  // 計測対象外プロダクト (Lighthouse が public URL を取れない / そもそも対象外)
-  const PERF_EXCLUDED = new Set(["designsystem", "metago"]);
+  // 計測対象外プロダクト (DS本体は public showcase のみで計測対象が薄い)
+  const PERF_EXCLUDED = new Set(["designsystem"]);
   // Performance は measured_at だが buildTrend は collected_at 前提なので変換
   const trendRows = (trendMetrics ?? []).map((r) => ({
     product_id: r.product_id,
@@ -95,14 +93,6 @@ export default async function PerformancePage() {
       m.score !== null && prev !== null ? m.score - prev : null;
   }
 
-  const avgScore =
-    latest.length > 0
-      ? Math.round(
-          latest.reduce((a: number, b) => a + ((b as any).score ?? 0), 0) /
-            latest.length,
-        )
-      : null;
-
   const exempt = allProducts
     .filter((p) => PERF_EXCLUDED.has(p.name))
     .map((p) => ({
@@ -110,10 +100,7 @@ export default async function PerformancePage() {
       name: p.name,
       display_name: p.display_name,
       primary_color: p.primary_color,
-      reason:
-        p.name === "metago"
-          ? "管理アプリ (login wall)"
-          : "デザインシステム本体",
+      reason: "デザインシステム本体",
     }));
 
   return (
@@ -123,24 +110,7 @@ export default async function PerformancePage() {
         description="Core Web Vitals とバンドルサイズの測定結果"
       />
 
-      <IssueStatsBanner stats={summarize(perfIssueRows ?? [])} noun="issue" />
-
-      <div className="flex items-center gap-4 rounded-lg border border-border bg-surface p-4 w-fit">
-        <ScoreDonut score={avgScore} size={72} />
-        <div>
-          <div className="text-2xl font-semibold text-foreground">
-            {avgScore ?? "—"}
-          </div>
-          <div
-            style={{
-              fontSize: "var(--text-sm)",
-              color: "var(--color-text-secondary)",
-            }}
-          >
-            全go平均スコア
-          </div>
-        </div>
-      </div>
+      <IssueTrendSection items={perfIssueRows ?? []} />
 
       {allProducts.length > 0 && (
         <div className="rounded-lg border border-border bg-surface p-4">
@@ -152,7 +122,11 @@ export default async function PerformancePage() {
               全期間 / プロダクト別 ({trendData.length}日分)
             </span>
           </div>
-          <MultiProductTrendChart data={trendData} products={trendSeries} />
+          <MultiProductTrendChart
+            data={trendData}
+            products={trendSeries}
+            height={520}
+          />
         </div>
       )}
 

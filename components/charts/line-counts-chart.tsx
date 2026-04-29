@@ -11,25 +11,37 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
-export interface IssueTrendPoint {
-  date: string; // MM-DD label
-  detected: number;
-  resolved: number;
+export interface LineCountsPoint {
+  date: string;
+  [key: string]: string | number;
+}
+
+export interface LineCountsSeries {
+  key: string;
+  name: string;
+  color: string;
 }
 
 interface Props {
-  data: IssueTrendPoint[];
+  data: LineCountsPoint[];
+  series: LineCountsSeries[];
   height?: number;
+  emptyMessage?: string;
 }
 
-export function IssueTrendChart({ data, height = 240 }: Props) {
+export function LineCountsChart({
+  data,
+  series,
+  height = 240,
+  emptyMessage = "履歴がまだありません",
+}: Props) {
   if (data.length === 0) {
     return (
       <div
         className="flex items-center justify-center text-sm text-muted-foreground"
         style={{ height }}
       >
-        履歴がまだありません
+        {emptyMessage}
       </div>
     );
   }
@@ -65,22 +77,17 @@ export function IssueTrendChart({ data, height = 240 }: Props) {
             wrapperStyle={{ fontSize: 11, paddingTop: 4 }}
             iconType="circle"
           />
-          <Line
-            type="monotone"
-            dataKey="detected"
-            name="新規検知"
-            stroke="#0052CC"
-            strokeWidth={2}
-            dot={false}
-          />
-          <Line
-            type="monotone"
-            dataKey="resolved"
-            name="解決"
-            stroke="#36B37E"
-            strokeWidth={2}
-            dot={false}
-          />
+          {series.map((s) => (
+            <Line
+              key={s.key}
+              type="monotone"
+              dataKey={s.key}
+              name={s.name}
+              stroke={s.color}
+              strokeWidth={2}
+              dot={false}
+            />
+          ))}
         </LineChart>
       </ResponsiveContainer>
     </div>

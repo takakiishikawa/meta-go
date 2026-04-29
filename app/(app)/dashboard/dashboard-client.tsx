@@ -2,23 +2,16 @@
 
 import Link from "next/link";
 import { useMemo } from "react";
-import {
-  AlertCircle,
-  Clock,
-  ArrowUpRight,
-  GitMerge,
-  Activity,
-  Rocket,
-} from "lucide-react";
+import { AlertCircle, Clock, ArrowUpRight, GitMerge, Activity } from "lucide-react";
 import { Badge, EmptyState, PageHeader } from "@takaki/go-design-system";
 import {
   MultiProductTrendChart,
   type TrendPoint as MultiTrendPoint,
 } from "@/components/charts/multi-product-trend";
 import {
-  IssueTrendChart,
-  type IssueTrendPoint,
-} from "@/components/charts/issue-trend-chart";
+  LineCountsChart,
+  type LineCountsPoint,
+} from "@/components/charts/line-counts-chart";
 
 interface Product {
   id: string;
@@ -51,8 +44,8 @@ interface DashboardClientProps {
   products: Product[];
   pendingApprovals: ApprovalItem[];
   trendByProduct: TrendByProduct;
-  issueTrend: IssueTrendPoint[];
-  deployStats: { success: number; failure: number; pending: number };
+  issueTrend: LineCountsPoint[];
+  deployTrend: LineCountsPoint[];
   kpi: {
     resolvedLast7Days: number;
     resolvedDelta: number;
@@ -77,7 +70,7 @@ export function DashboardClient({
   pendingApprovals,
   trendByProduct,
   issueTrend,
-  deployStats,
+  deployTrend,
   kpi,
 }: DashboardClientProps) {
   const hasData = products.length > 0;
@@ -142,9 +135,6 @@ export function DashboardClient({
     [products],
   );
 
-  const deployTotal =
-    deployStats.success + deployStats.failure + deployStats.pending;
-
   return (
     <>
       <PageHeader
@@ -164,14 +154,13 @@ export function DashboardClient({
         }
       />
 
-      {/* KPI: 直近7日の検知 / 解決 (前7日比) */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      {/* KPI: 直近7日の検知 / 解決 (前7日比) — 横並び・コンパクト */}
+      <div className="flex flex-wrap gap-3">
         <KpiCard
           icon={<GitMerge className="size-4" />}
           label="直近7日に解決"
           value={kpi.resolvedLast7Days}
           delta={kpi.resolvedDelta}
-          sublabel="解決された issue 数 / 前7日比"
           accent="#36B37E"
         />
         <KpiCard
@@ -179,7 +168,6 @@ export function DashboardClient({
           label="直近7日に検知"
           value={kpi.detectedLast7Days}
           delta={kpi.detectedDelta}
-          sublabel="新規検知された issue 数 / 前7日比"
           accent="#0052CC"
         />
       </div>
@@ -191,79 +179,55 @@ export function DashboardClient({
         />
       ) : (
         <>
-          {/* Issue trend (検知 vs 解決) */}
-          <div className="rounded-lg border border-border bg-surface p-4">
-            <div className="mb-3 flex items-baseline justify-between">
-              <span className="text-sm font-semibold text-foreground">
-                issue 検知 / 解決 推移
-              </span>
-              <span className="text-xs text-muted-foreground">
-                過去 {issueTrend.length} 日 / 全カテゴリ合算
-              </span>
-            </div>
-            <IssueTrendChart data={issueTrend} height={260} />
+          {/* Issue trend + Deploy trend を 2 列で並べる (直近 7 日) */}
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <ChartCard title="issue 検知 / 解決 推移" caption="直近 7 日 / 全カテゴリ合算">
+              <LineCountsChart
+                data={issueTrend}
+                height={260}
+                series={[
+                  { key: "detected", name: "新規検知", color: "#0052CC" },
+                  { key: "resolved", name: "解決", color: "#36B37E" },
+                ]}
+              />
+            </ChartCard>
+            <ChartCard
+              title="デプロイ 成功 / 失敗 推移"
+              caption="直近 7 日 / 全プロダクト合算"
+              actions={
+                <Link
+                  href="/deployments"
+                  className="flex items-center gap-1 text-xs"
+                  style={{ color: "var(--color-primary)" }}
+                >
+                  詳細
+                  <ArrowUpRight className="size-3" />
+                </Link>
+              }
+            >
+              <LineCountsChart
+                data={deployTrend}
+                height={260}
+                series={[
+                  { key: "success", name: "成功", color: "#36B37E" },
+                  { key: "failure", name: "失敗", color: "#FF5630" },
+                ]}
+                emptyMessage="デプロイ履歴を取得できませんでした"
+              />
+            </ChartCard>
           </div>
 
-          {/* Deploy summary */}
-          <div className="rounded-lg border border-border bg-surface p-4">
-            <div className="mb-3 flex items-baseline justify-between">
-              <span className="text-sm font-semibold text-foreground">
-                デプロイ
-              </span>
-              <Link
-                href="/deployments"
-                className="flex items-center gap-1 text-xs"
-                style={{ color: "var(--color-primary)" }}
-              >
-                詳細
-                <ArrowUpRight className="size-3" />
-              </Link>
-            </div>
-            {deployTotal === 0 ? (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Rocket className="size-4" />
-                直近7日のデプロイは観測されていません
-              </div>
-            ) : (
-              <div className="grid grid-cols-3 gap-3">
-                <DeployStat
-                  label="成功"
-                  value={deployStats.success}
-                  accent="#36B37E"
-                />
-                <DeployStat
-                  label="失敗"
-                  value={deployStats.failure}
-                  accent="#FF5630"
-                />
-                <DeployStat
-                  label="進行中"
-                  value={deployStats.pending}
-                  accent="#0052CC"
-                />
-              </div>
-            )}
-            <div className="mt-2 text-xs text-muted-foreground">
-              直近7日 / 全プロダクト合算
-            </div>
-          </div>
-
-          {/* All-products score trend */}
-          <div className="rounded-lg border border-border bg-surface p-4">
-            <div className="mb-3 flex items-baseline justify-between">
-              <span className="text-sm font-semibold text-foreground">
-                総合スコア推移
-              </span>
-              <span className="text-xs text-muted-foreground">
-                全期間 / 4カテゴリの平均 ({overviewTrend.length}日分)
-              </span>
-            </div>
+          {/* All-products score trend — 縦幅 2 倍 */}
+          <ChartCard
+            title="総合スコア推移"
+            caption={`全期間 / 4カテゴリの平均 (${overviewTrend.length}日分)`}
+          >
             <MultiProductTrendChart
               data={overviewTrend}
               products={overviewSeries}
-              height={260}
+              height={520}
             />
-          </div>
+          </ChartCard>
 
           {/* Recent Approvals */}
           {pendingApprovals.length > 0 && (
@@ -322,66 +286,67 @@ function KpiCard({
   label,
   value,
   delta,
-  sublabel,
   accent,
 }: {
   icon: React.ReactNode;
   label: string;
   value: number;
   delta: number;
-  sublabel: string;
   accent: string;
 }) {
   return (
-    <div className="overflow-hidden rounded-lg border border-border bg-surface">
-      <div className="h-1" style={{ backgroundColor: accent }} />
-      <div className="p-4">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <span
-              className="inline-flex size-7 items-center justify-center rounded-md"
-              style={{ backgroundColor: accent + "1A", color: accent }}
-            >
-              {icon}
-            </span>
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              {label}
-            </span>
-          </div>
+    <div className="flex items-center gap-3 rounded-lg border border-border bg-surface px-4 py-3">
+      <span
+        className="inline-flex size-8 shrink-0 items-center justify-center rounded-md"
+        style={{ backgroundColor: accent + "1A", color: accent }}
+      >
+        {icon}
+      </span>
+      <div className="flex flex-col">
+        <span className="text-xs text-muted-foreground">{label}</span>
+        <div className="flex items-baseline gap-2">
+          <span className="text-2xl font-semibold text-foreground tabular-nums">
+            {value}
+          </span>
           <span
             className="text-xs font-semibold tabular-nums"
             style={{ color: accent }}
           >
-            {formatDelta(delta)} / 7d
+            {formatDelta(delta)} vs 前7日
           </span>
         </div>
-        <div className="mt-2 text-3xl font-semibold text-foreground tabular-nums">
-          {value}
-        </div>
-        <div className="mt-0.5 text-xs text-muted-foreground">{sublabel}</div>
       </div>
     </div>
   );
 }
 
-function DeployStat({
-  label,
-  value,
-  accent,
+function ChartCard({
+  title,
+  caption,
+  actions,
+  children,
 }: {
-  label: string;
-  value: number;
-  accent: string;
+  title: string;
+  caption?: string;
+  actions?: React.ReactNode;
+  children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-md border border-border p-3">
-      <div
-        className="text-2xl font-semibold tabular-nums"
-        style={{ color: value > 0 ? accent : "var(--color-foreground)" }}
-      >
-        {value}
+    <div className="rounded-lg border border-border bg-surface p-4">
+      <div className="mb-3 flex items-baseline justify-between gap-3">
+        <span className="text-sm font-semibold text-foreground">{title}</span>
+        {actions ? (
+          actions
+        ) : caption ? (
+          <span className="text-xs text-muted-foreground">{caption}</span>
+        ) : null}
       </div>
-      <div className="text-xs text-muted-foreground">{label}</div>
+      {actions && caption && (
+        <div className="-mt-2 mb-2 text-xs text-muted-foreground">
+          {caption}
+        </div>
+      )}
+      {children}
     </div>
   );
 }

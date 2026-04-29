@@ -158,10 +158,8 @@ async function scanProduct(product: any) {
   );
 }
 
-// designsystem は public な showcase のみで計測ターゲットが薄い。
-// metago は login wall 内なので Lighthouse がランディング相当しか取れず数値が
-// 全社プロダクトと比較不能なので除外。
-const SKIP_PRODUCTS = new Set(["designsystem", "metago"]);
+// designsystem は public な showcase のみで計測ターゲットが薄いので除外。
+const SKIP_PRODUCTS = new Set(["designsystem"]);
 
 async function main() {
   console.log("🚀 [SCAN] performance (Lighthouse)");

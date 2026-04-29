@@ -31,18 +31,6 @@ DELETE FROM metago.scores_history
 WHERE product_id = (SELECT id FROM metago.products WHERE name = 'designsystem')
   AND category = 'design_system';
 
--- metago は login wall 内の管理アプリ。design_system と performance は計測対象外
--- (scanner 側でも SKIP_PRODUCTS に含めているので今後は記録されない)
-DELETE FROM metago.scores_history
-WHERE product_id = (SELECT id FROM metago.products WHERE name = 'metago')
-  AND category IN ('design_system', 'performance');
-
-DELETE FROM metago.performance_metrics
-WHERE product_id = (SELECT id FROM metago.products WHERE name = 'metago');
-
-DELETE FROM metago.design_system_items
-WHERE product_id = (SELECT id FROM metago.products WHERE name = 'metago');
-
 -- ============================================================
 -- psf_metrics_definitions
 -- ============================================================

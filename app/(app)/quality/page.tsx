@@ -2,13 +2,11 @@ import { createClient } from "@/lib/supabase/server";
 import { Badge, EmptyState, PageHeader } from "@takaki/go-design-system";
 import { ScoreDonut } from "@/components/score/score-donut";
 import { Pagination } from "@/components/ui/pagination";
-import { ProductEvalButton } from "@/components/shared/product-eval-button";
 import { ScoreDelta } from "@/components/score/score-delta";
 import { MultiProductTrendChart } from "@/components/charts/multi-product-trend";
 import { buildTrend } from "@/lib/metago/score-trend";
 import { isResolved } from "@/lib/metago/items";
-import { summarize } from "@/lib/metago/delivery-stats";
-import { IssueStatsBanner } from "@/components/delivery/issue-stats-banner";
+import { IssueTrendSection } from "@/components/delivery/issue-trend-section";
 import { Code2 } from "lucide-react";
 
 const PAGE_SIZE = 20;
@@ -112,21 +110,8 @@ export default async function QualityPage({
     // 'fixing' / 'failed' はどちらにも数えない (中途状態 / 試行失敗は別バケツ)
   }
 
-  const itemsByProduct: Record<string, typeof allItems> = {};
-  for (const item of allItems) {
-    if (!itemsByProduct[item.product_id]) itemsByProduct[item.product_id] = [];
-    itemsByProduct[item.product_id].push(item);
-  }
-
-  const scoreValues = Object.values(latestScore);
-  const avgScore =
-    scoreValues.length > 0
-      ? Math.round(scoreValues.reduce((a, b) => a + b, 0) / scoreValues.length)
-      : null;
-
   const totalPages = Math.ceil(allItems.length / PAGE_SIZE);
   const pagedItems = allItems.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-  const issueStats = summarize(allItems);
 
   const trendSeries = allProducts.map((p) => ({
     id: p.id,
@@ -145,24 +130,7 @@ export default async function QualityPage({
         description="goシリーズ全体のコード品質スコアと問題点一覧"
       />
 
-      <IssueStatsBanner stats={issueStats} />
-
-      <div className="flex w-fit items-center gap-4 rounded-lg border border-border bg-surface p-4">
-        <ScoreDonut score={avgScore} size={72} />
-        <div>
-          <div className="text-2xl font-semibold text-foreground">
-            {avgScore ?? "—"}
-          </div>
-          <div
-            style={{
-              fontSize: "var(--text-sm)",
-              color: "var(--color-text-secondary)",
-            }}
-          >
-            全go平均スコア
-          </div>
-        </div>
-      </div>
+      <IssueTrendSection items={allItems} />
 
       {allProducts.length > 0 && (
         <div className="rounded-lg border border-border bg-surface p-4">
@@ -174,7 +142,11 @@ export default async function QualityPage({
               全期間 / プロダクト別 ({trendData.length}日分)
             </span>
           </div>
-          <MultiProductTrendChart data={trendData} products={trendSeries} />
+          <MultiProductTrendChart
+            data={trendData}
+            products={trendSeries}
+            height={520}
+          />
         </div>
       )}
 
@@ -188,7 +160,7 @@ export default async function QualityPage({
           <table className="w-full">
             <thead>
               <tr className="border-b border-border">
-                {["プロダクト", "スコア", "評価", "未対応", "解決済み"].map(
+                {["プロダクト", "スコア", "未対応", "解決済み"].map(
                   (h) => (
                     <th
                       key={h}
@@ -209,7 +181,6 @@ export default async function QualityPage({
                 const prev = weekAgoScore[product.id] ?? null;
                 const delta =
                   score !== null && prev !== null ? score - prev : null;
-                const productItems = itemsByProduct[product.id] ?? [];
                 return (
                   <tr
                     key={product.id}
@@ -236,13 +207,6 @@ export default async function QualityPage({
                           <ScoreDelta delta={delta} />
                         </div>
                       </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <ProductEvalButton
-                        items={productItems}
-                        score={score}
-                        productName={product.display_name}
-                      />
                     </td>
                     <td className="px-4 py-3">
                       <span className="text-sm text-foreground">

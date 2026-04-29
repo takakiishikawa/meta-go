@@ -22,9 +22,8 @@ import {
 
 const supabase = getSupabase();
 
-// designsystem 自身は計測対象外。
-// metago は管理アプリで login wall 内なので公開向けデザイン規約は適用外。
-const SKIP_PRODUCTS = new Set(["designsystem", "metago"]);
+// designsystem 自身は計測対象外 (DS本体は自分自身を測れない)。
+const SKIP_PRODUCTS = new Set(["designsystem"]);
 
 // ── 違反ルール定義 ──────────────────────────────────────
 

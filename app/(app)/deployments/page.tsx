@@ -6,11 +6,8 @@ import {
   dailyCounts,
   summarize,
 } from "@/lib/metago/github-deployments";
-import {
-  summarize as summarizeIssues,
-  execLogToSummarizable,
-} from "@/lib/metago/delivery-stats";
-import { IssueStatsBanner } from "@/components/delivery/issue-stats-banner";
+import { execLogToSummarizable } from "@/lib/metago/delivery-stats";
+import { IssueTrendSection } from "@/components/delivery/issue-trend-section";
 import { DeploymentsTable } from "@/components/deployments/deployments-table";
 import {
   DeploySuccessTrendChart,
@@ -146,10 +143,8 @@ export default async function DeploymentsPage() {
     .select("state, created_at")
     .eq("category", "deploy-fix")
     .limit(10000);
-  const deployIssueStats = summarizeIssues(
-    execLogToSummarizable(
-      (deployLogRows ?? []) as { state: string; created_at: string }[],
-    ),
+  const deployIssueItems = execLogToSummarizable(
+    (deployLogRows ?? []) as { state: string; created_at: string }[],
   );
 
   return (
@@ -159,7 +154,7 @@ export default async function DeploymentsPage() {
         description={`Vercel への全デプロイと結果（直近 ${STATUS_WINDOW_HOURS}h、7日分のbudget可視化）`}
       />
 
-      <IssueStatsBanner stats={deployIssueStats} noun="デプロイ問題" />
+      <IssueTrendSection items={deployIssueItems} noun="デプロイ問題" />
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
         <StatCard

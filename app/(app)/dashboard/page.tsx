@@ -1,27 +1,22 @@
 import { createClient } from "@/lib/supabase/server";
 import { DashboardClient, type TrendByProduct } from "./dashboard-client";
 import { isResolved } from "@/lib/metago/items";
-import {
-  fetchAllDeployments,
-  summarize as summarizeDeploys,
-} from "@/lib/metago/github-deployments";
-import type { IssueTrendPoint } from "@/components/charts/issue-trend-chart";
+import { fetchAllDeployments } from "@/lib/metago/github-deployments";
+import type { LineCountsPoint } from "@/components/charts/line-counts-chart";
 
-const ISSUE_TREND_DAYS = 30;
-const DEPLOY_WINDOW_HOURS = 168; // 7日
+const ISSUE_TREND_DAYS = 7;
+const DEPLOY_TREND_DAYS = 7;
+const DEPLOY_WINDOW_HOURS = DEPLOY_TREND_DAYS * 24;
 const TZ = "Asia/Tokyo";
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 export default async function DashboardPage() {
   const supabase = await createClient();
 
   const now = Date.now();
-  const sevenDaysAgo = new Date(
-    now - 7 * 24 * 60 * 60 * 1000,
-  ).toISOString();
-  const fourteenDaysAgo = new Date(
-    now - 14 * 24 * 60 * 60 * 1000,
-  ).toISOString();
-  const trendStartMs = now - ISSUE_TREND_DAYS * 24 * 60 * 60 * 1000;
+  const sevenDaysAgo = new Date(now - 7 * DAY_MS).toISOString();
+  const fourteenDaysAgo = new Date(now - 14 * DAY_MS).toISOString();
+  const trendStartMs = now - ISSUE_TREND_DAYS * DAY_MS;
 
   const [
     { data: products },
@@ -69,9 +64,8 @@ export default async function DashboardPage() {
   const allScores = scoresHistory ?? [];
 
   type Cat = "quality" | "security" | "design_system" | "performance";
-  const CATS: Cat[] = ["quality", "security", "design_system", "performance"];
 
-  // 過去30日のトレンド: product_id × date(YYYY-MM-DD) → カテゴリ毎に最新値
+  // 過去全期間のトレンド: product_id × date(YYYY-MM-DD) → カテゴリ毎に最新値
   const trendByProduct: TrendByProduct = {};
   for (const row of allScores) {
     const date = row.collected_at.slice(0, 10);
@@ -81,7 +75,6 @@ export default async function DashboardPage() {
     trendByProduct[row.product_id][date][row.category as Cat] = row.score;
   }
 
-  // 全カテゴリの item を合算
   const allDetectionItems = [
     ...(qualityItems ?? []),
     ...(securityItems ?? []),
@@ -108,7 +101,7 @@ export default async function DashboardPage() {
       i.resolved_at < sevenDaysAgo,
   ).length;
 
-  // 過去30日の日次 detected / resolved
+  // 直近 7 日の日次 detected / resolved
   const fmtKey = new Intl.DateTimeFormat("en-CA", {
     timeZone: TZ,
     year: "numeric",
@@ -120,36 +113,36 @@ export default async function DashboardPage() {
     month: "2-digit",
     day: "2-digit",
   });
-  const trendBuckets = new Map<
+  const issueBuckets = new Map<
     string,
     { detected: number; resolved: number }
   >();
   const today = new Date();
   for (let i = ISSUE_TREND_DAYS - 1; i >= 0; i--) {
-    const d = new Date(today.getTime() - i * 24 * 60 * 60 * 1000);
-    trendBuckets.set(fmtKey.format(d), { detected: 0, resolved: 0 });
+    const d = new Date(today.getTime() - i * DAY_MS);
+    issueBuckets.set(fmtKey.format(d), { detected: 0, resolved: 0 });
   }
   for (const item of allDetectionItems) {
     const createdMs = new Date(item.created_at).getTime();
     if (createdMs >= trendStartMs) {
       const k = fmtKey.format(new Date(item.created_at));
-      const b = trendBuckets.get(k);
+      const b = issueBuckets.get(k);
       if (b) b.detected++;
     }
     if (isResolved(item.state) && item.resolved_at) {
       const resolvedMs = new Date(item.resolved_at).getTime();
       if (resolvedMs >= trendStartMs) {
         const k = fmtKey.format(new Date(item.resolved_at));
-        const b = trendBuckets.get(k);
+        const b = issueBuckets.get(k);
         if (b) b.resolved++;
       }
     }
   }
-  const issueTrend: IssueTrendPoint[] = [];
+  const issueTrend: LineCountsPoint[] = [];
   for (let i = ISSUE_TREND_DAYS - 1; i >= 0; i--) {
-    const d = new Date(today.getTime() - i * 24 * 60 * 60 * 1000);
+    const d = new Date(today.getTime() - i * DAY_MS);
     const k = fmtKey.format(d);
-    const v = trendBuckets.get(k) ?? { detected: 0, resolved: 0 };
+    const v = issueBuckets.get(k) ?? { detected: 0, resolved: 0 };
     issueTrend.push({
       date: fmtLabel.format(d),
       detected: v.detected,
@@ -157,22 +150,43 @@ export default async function DashboardPage() {
     });
   }
 
-  // デプロイ集計 (直近7日)
-  let deployStats = { success: 0, failure: 0, pending: 0 };
+  // 直近 7 日の日次デプロイ成功 / 失敗
+  const deployBuckets = new Map<string, { success: number; failure: number }>();
+  for (let i = DEPLOY_TREND_DAYS - 1; i >= 0; i--) {
+    const d = new Date(today.getTime() - i * DAY_MS);
+    deployBuckets.set(fmtKey.format(d), { success: 0, failure: 0 });
+  }
   try {
     const deployRows = await fetchAllDeployments(
       products ?? [],
       DEPLOY_WINDOW_HOURS,
       DEPLOY_WINDOW_HOURS,
     );
-    const sum = summarizeDeploys(deployRows);
-    deployStats = {
-      success: sum.success,
-      failure: sum.failure + sum.rateLimited,
-      pending: sum.pending,
-    };
+    for (const r of deployRows) {
+      const k = fmtKey.format(new Date(r.createdAt));
+      const b = deployBuckets.get(k);
+      if (!b) continue;
+      if (r.state === "success") b.success++;
+      else if (
+        r.state === "failure" ||
+        r.state === "error" ||
+        r.state === "rate_limited"
+      )
+        b.failure++;
+    }
   } catch {
     // GITHUB_TOKEN が未設定 / fetch 失敗時は 0 のまま
+  }
+  const deployTrend: LineCountsPoint[] = [];
+  for (let i = DEPLOY_TREND_DAYS - 1; i >= 0; i--) {
+    const d = new Date(today.getTime() - i * DAY_MS);
+    const k = fmtKey.format(d);
+    const v = deployBuckets.get(k) ?? { success: 0, failure: 0 };
+    deployTrend.push({
+      date: fmtLabel.format(d),
+      success: v.success,
+      failure: v.failure,
+    });
   }
 
   return (
@@ -181,7 +195,7 @@ export default async function DashboardPage() {
       pendingApprovals={pendingApprovals ?? []}
       trendByProduct={trendByProduct}
       issueTrend={issueTrend}
-      deployStats={deployStats}
+      deployTrend={deployTrend}
       kpi={{
         resolvedLast7Days,
         resolvedDelta: resolvedLast7Days - resolvedPrev7Days,

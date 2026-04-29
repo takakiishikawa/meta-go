@@ -7,9 +7,7 @@ import { SeverityCell } from "@/components/security/severity-cell";
 import { ScoreDelta } from "@/components/score/score-delta";
 import { MultiProductTrendChart } from "@/components/charts/multi-product-trend";
 import { buildTrend } from "@/lib/metago/score-trend";
-import { isResolved } from "@/lib/metago/items";
-import { summarize } from "@/lib/metago/delivery-stats";
-import { IssueStatsBanner } from "@/components/delivery/issue-stats-banner";
+import { IssueTrendSection } from "@/components/delivery/issue-trend-section";
 
 const GO_COLORS: Record<string, string> = {
   nativego: "#0052CC",
@@ -94,19 +92,6 @@ export default async function SecurityPage() {
     itemsByProduct[item.product_id].push(item);
   }
 
-  const scoreValues = Object.values(latestScore);
-  const avgScore =
-    scoreValues.length > 0
-      ? Math.round(scoreValues.reduce((a, b) => a + b, 0) / scoreValues.length)
-      : null;
-
-  const openItems = allItems.filter((i) => !isResolved(i.state));
-  const criticalCount = openItems.filter(
-    (i) => i.severity === "critical",
-  ).length;
-  const highCount = openItems.filter((i) => i.severity === "high").length;
-  const issueStats = summarize(allItems);
-
   const trendSeries = allProducts.map((p) => ({
     id: p.id,
     name: p.display_name,
@@ -124,77 +109,7 @@ export default async function SecurityPage() {
         description="脆弱性と依存関係のセキュリティ問題"
       />
 
-      <IssueStatsBanner stats={issueStats} noun="脆弱性" />
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="flex items-center gap-4 rounded-lg border border-border bg-surface p-4">
-          <ScoreDonut score={avgScore} size={64} />
-          <div>
-            <div className="text-2xl font-semibold text-foreground">
-              {avgScore ?? "—"}
-            </div>
-            <div
-              style={{
-                fontSize: "var(--text-sm)",
-                color: "var(--color-text-secondary)",
-              }}
-            >
-              全go平均スコア
-            </div>
-          </div>
-        </div>
-        <div
-          className="rounded-lg border border-border p-4"
-          style={{
-            borderColor: criticalCount > 0 ? "#FF563033" : undefined,
-            backgroundColor:
-              criticalCount > 0 ? "#FF563008" : "var(--color-surface)",
-          }}
-        >
-          <div
-            className="text-2xl font-semibold"
-            style={{
-              color: criticalCount > 0 ? "#FF5630" : "var(--color-foreground)",
-            }}
-          >
-            {criticalCount}
-          </div>
-          <div
-            className="text-sm"
-            style={{
-              color:
-                criticalCount > 0 ? "#FF5630" : "var(--color-text-secondary)",
-            }}
-          >
-            Critical
-          </div>
-        </div>
-        <div
-          className="rounded-lg border border-border p-4"
-          style={{
-            borderColor: highCount > 0 ? "#FF8B0033" : undefined,
-            backgroundColor:
-              highCount > 0 ? "#FF8B0008" : "var(--color-surface)",
-          }}
-        >
-          <div
-            className="text-2xl font-semibold"
-            style={{
-              color: highCount > 0 ? "#FF8B00" : "var(--color-foreground)",
-            }}
-          >
-            {highCount}
-          </div>
-          <div
-            className="text-sm"
-            style={{
-              color: highCount > 0 ? "#FF8B00" : "var(--color-text-secondary)",
-            }}
-          >
-            High
-          </div>
-        </div>
-      </div>
+      <IssueTrendSection items={allItems} noun="脆弱性" />
 
       {allProducts.length > 0 && (
         <div className="rounded-lg border border-border bg-surface p-4">
@@ -206,7 +121,11 @@ export default async function SecurityPage() {
               全期間 / プロダクト別 ({trendData.length}日分)
             </span>
           </div>
-          <MultiProductTrendChart data={trendData} products={trendSeries} />
+          <MultiProductTrendChart
+            data={trendData}
+            products={trendSeries}
+            height={520}
+          />
         </div>
       )}
 
