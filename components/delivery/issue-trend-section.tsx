@@ -1,11 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import {
-  Card,
-  ToggleGroup,
-  ToggleGroupItem,
-} from "@takaki/go-design-system";
+import { Card, ToggleGroup, ToggleGroupItem } from "@takaki/go-design-system";
 import {
   LineCountsChart,
   type LineCountsPoint,
@@ -31,10 +27,7 @@ function isResolvedState(state: string | null): boolean {
   return state === "fixed" || state === "done";
 }
 
-function buildBuckets(
-  items: Item[],
-  days: number | null,
-): LineCountsPoint[] {
+function buildBuckets(items: Item[], days: number | null): LineCountsPoint[] {
   const fmtKey = new Intl.DateTimeFormat("en-CA", {
     timeZone: TZ,
     year: "numeric",

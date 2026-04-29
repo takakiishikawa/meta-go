@@ -86,12 +86,7 @@ export default async function QualityPage({
         </Card>
       )}
 
-      <IssueList
-        items={allItems}
-        noun="問題"
-        page={page}
-        basePath="/quality"
-      />
+      <IssueList items={allItems} noun="問題" page={page} basePath="/quality" />
     </>
   );
 }

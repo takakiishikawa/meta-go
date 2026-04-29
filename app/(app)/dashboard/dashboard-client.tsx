@@ -2,7 +2,13 @@
 
 import Link from "next/link";
 import { useMemo } from "react";
-import { AlertCircle, Clock, ArrowUpRight, GitMerge, Activity } from "lucide-react";
+import {
+  AlertCircle,
+  Clock,
+  ArrowUpRight,
+  GitMerge,
+  Activity,
+} from "lucide-react";
 import {
   Badge,
   Button,
@@ -191,7 +197,10 @@ export function DashboardClient({
         <>
           {/* Issue trend + Deploy trend を 2 列で並べる (直近 7 日) */}
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <ChartCard title="issue 検知 / 解決 推移" caption="直近 7 日 / 全カテゴリ合算">
+            <ChartCard
+              title="issue 検知 / 解決 推移"
+              caption="直近 7 日 / 全カテゴリ合算"
+            >
               <LineCountsChart
                 data={issueTrend}
                 height={260}
