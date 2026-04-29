@@ -31,8 +31,6 @@ import {
 
 const supabase = getSupabase();
 
-const SKIP_PRODUCTS = new Set(["designsystem"]);
-
 interface FilePatchTarget {
   file: string;
   content: string;
@@ -240,7 +238,6 @@ async function main() {
   const targetSlug = targetRepo ? REPO_TO_SLUG[targetRepo] : null;
 
   for (const product of products) {
-    if (SKIP_PRODUCTS.has(product.name)) continue;
     if (targetSlug && product.name !== targetSlug) continue;
     const repo = GO_REPOS[product.name];
     if (!repo) continue;

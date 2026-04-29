@@ -23,8 +23,13 @@ import {
 
 const supabase = getSupabase();
 
-// designsystem 自身は計測対象外 (DS本体は自分自身を測れない)。
-const SKIP_PRODUCTS = new Set(["designsystem"]);
+// designsystem は src/ がDS本体 (=計測対象外。<button> や生 Tailwind カラーが
+// 定義として大量にあるため自分自身を測ると false positive だらけになる)。
+// showcase/ は @takaki/go-design-system を消費する Next.js 製プロダクトなので
+// 他goと同じ基準で計測する。
+const SCAN_SUBDIRS: Record<string, string[]> = {
+  designsystem: ["showcase"],
+};
 
 // ── 違反ルール定義 ──────────────────────────────────────
 
@@ -209,22 +214,33 @@ function findTsxFiles(dir: string): string[] {
   return result;
 }
 
-function checkDesignTokensUsage(repoDir: string): boolean {
-  const layoutPaths = [
-    path.join(repoDir, "app", "layout.tsx"),
-    path.join(repoDir, "app", "layout.ts"),
-    path.join(repoDir, "src", "app", "layout.tsx"),
-  ];
-  for (const p of layoutPaths) {
-    if (!fs.existsSync(p)) continue;
-    const content = fs.readFileSync(p, "utf-8");
-    if (
-      content.includes("DesignTokens") ||
-      content.includes("go-design-system")
-    )
-      return true;
+function checkDesignTokensUsage(scanRoots: string[]): boolean {
+  for (const root of scanRoots) {
+    const layoutPaths = [
+      path.join(root, "app", "layout.tsx"),
+      path.join(root, "app", "layout.ts"),
+      path.join(root, "src", "app", "layout.tsx"),
+    ];
+    for (const p of layoutPaths) {
+      if (!fs.existsSync(p)) continue;
+      const content = fs.readFileSync(p, "utf-8");
+      if (
+        content.includes("DesignTokens") ||
+        content.includes("go-design-system")
+      )
+        return true;
+    }
   }
   return false;
+}
+
+function getScanRoots(productName: string, repoDir: string): string[] {
+  const subs = SCAN_SUBDIRS[productName];
+  if (!subs?.length) return [repoDir];
+  const roots = subs
+    .map((s) => path.join(repoDir, s))
+    .filter((p) => fs.existsSync(p));
+  return roots.length > 0 ? roots : [repoDir];
 }
 
 // ── メイン ────────────────────────────────────────────────
@@ -236,11 +252,18 @@ async function scanRepo(product: any, repo: string) {
 
   try {
     repoDir = cloneRepo(repo);
+    const root = repoDir;
 
-    const files = findTsxFiles(repoDir);
-    console.log(`  📂 ${files.length} files`);
+    const scanRoots = getScanRoots(product.name, root);
+    const files = scanRoots.flatMap(findTsxFiles);
+    if (scanRoots.length === 1 && scanRoots[0] === root) {
+      console.log(`  📂 ${files.length} files`);
+    } else {
+      const rels = scanRoots.map((r) => path.relative(root, r) || ".");
+      console.log(`  📂 ${files.length} files (scoped: ${rels.join(", ")})`);
+    }
 
-    const usesDesignTokens = checkDesignTokensUsage(repoDir);
+    const usesDesignTokens = checkDesignTokensUsage(scanRoots);
 
     // 違反集計
     const violationsByKey = new Map<
@@ -303,12 +326,16 @@ async function scanRepo(product: any, repo: string) {
     // DesignTokens未使用
     if (!usesDesignTokens) {
       totalPenalty += 10;
+      const scopePrefix =
+        scanRoots.length === 1 && scanRoots[0] === repoDir
+          ? ""
+          : `${path.relative(repoDir, scanRoots[0])}/`;
+      const layoutRel = `${scopePrefix}app/layout.tsx`;
       await upsertItem(supabase, "design_system_items", {
         product_id: product.id,
         category: "設定/DesignTokens未使用",
-        title: "設定/DesignTokens未使用: app/layout.tsx",
-        description:
-          "app/layout.tsx で<DesignTokens>コンポーネントが見つかりません",
+        title: `設定/DesignTokens未使用: ${layoutRel}`,
+        description: `${layoutRel} で<DesignTokens>コンポーネントが見つかりません`,
         level: "L1",
       });
     }
@@ -363,7 +390,6 @@ async function main() {
   const targetSlug = targetRepo ? REPO_TO_SLUG[targetRepo] : null;
 
   for (const product of products) {
-    if (SKIP_PRODUCTS.has(product.name)) continue;
     if (targetSlug && product.name !== targetSlug) continue;
     const repo = GO_REPOS[product.name];
     if (!repo) continue;

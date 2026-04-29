@@ -5,9 +5,6 @@ import { buildTrend } from "@/lib/metago/score-trend";
 import { IssueTrendSection } from "@/components/delivery/issue-trend-section";
 import { IssueList } from "@/components/delivery/issue-list";
 
-// 計測対象外プロダクト (scanner 側 SKIP_PRODUCTS と同期)
-const DS_EXCLUDED = new Set(["designsystem"]);
-
 const GO_COLORS: Record<string, string> = {
   nativego: "#0052CC",
   carego: "#00875A",
@@ -15,6 +12,7 @@ const GO_COLORS: Record<string, string> = {
   cookgo: "#FF991F",
   physicalgo: "#6554C0",
   taskgo: "#00B8D9",
+  designsystem: "#7C3AED",
 };
 
 export default async function DesignSystemPage({
@@ -51,13 +49,11 @@ export default async function DesignSystemPage({
   const allItems = items ?? [];
   const allProducts = products ?? [];
 
-  const trendSeries = allProducts
-    .filter((p) => !DS_EXCLUDED.has(p.name))
-    .map((p) => ({
-      id: p.id,
-      name: p.display_name,
-      color: p.primary_color || GO_COLORS[p.name] || "#6B7280",
-    }));
+  const trendSeries = allProducts.map((p) => ({
+    id: p.id,
+    name: p.display_name,
+    color: p.primary_color || GO_COLORS[p.name] || "#6B7280",
+  }));
   const trendData = buildTrend(
     trendScores ?? [],
     trendSeries.map((p) => p.id),

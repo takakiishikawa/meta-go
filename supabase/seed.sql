@@ -24,14 +24,6 @@ ON CONFLICT (name) DO UPDATE SET
   priority      = EXCLUDED.priority;
 
 -- ============================================================
--- 過去の収集ミスデータのクリーンアップ（idempotent）
--- ============================================================
--- designsystemはDS自身を測れないのでdesign_systemスコアを削除
-DELETE FROM metago.scores_history
-WHERE product_id = (SELECT id FROM metago.products WHERE name = 'designsystem')
-  AND category = 'design_system';
-
--- ============================================================
 -- psf_metrics_definitions
 -- ============================================================
 
