@@ -89,15 +89,15 @@ export default function EngagementPage() {
   return (
     <>
       <PageHeader
-        title="使用パターン"
-        description="エンゲージメント推移（全go）"
+        title="利用状況"
+        description="各goの利用回数と利用パターンの推移"
       />
 
       {history.length === 0 ? (
         <EmptyState
           icon={<Activity className="size-12" />}
-          title="データがまだありません"
-          description="使用パターンの収集が開始されると表示されます"
+          title="利用データがまだありません"
+          description="日次の収集が走るとここに各goの利用数が表示されます"
         />
       ) : (
         <>
@@ -106,7 +106,7 @@ export default function EngagementPage() {
             <Table>
               <TableHeader className="bg-surface-subtle">
                 <TableRow>
-                  {["プロダクト", "最新利用数", "トレンド", "測定日"].map(
+                  {["プロダクト", "直近の利用数", "傾向", "測定日"].map(
                     (h) => (
                       <TableHead key={h} className="px-4 py-3 text-xs">
                         {h}
@@ -174,7 +174,7 @@ export default function EngagementPage() {
                 className="mb-4 font-semibold text-foreground"
                 style={{ fontSize: "var(--text-base)" }}
               >
-                利用数推移（30日間）
+                直近30日の利用数推移
               </h2>
               <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={chartArray}>

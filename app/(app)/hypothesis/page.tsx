@@ -50,14 +50,14 @@ export default async function HypothesisPage() {
     <>
       <PageHeader
         title="仮説・バックログ"
-        description="プロダクト別の課題仮説・解決策仮説・バックログ"
+        description="各goで検証中の課題仮説・解決策仮説と、優先度つきのバックログ"
       />
 
       {isEmpty ? (
         <EmptyState
           icon={<Lightbulb className="size-12" />}
-          title="データがまだありません"
-          description="仮説とバックログが追加されると表示されます"
+          title="仮説がまだありません"
+          description="課題・解決策の仮説とバックログが追加されるとここに表示されます"
         />
       ) : (
         <>

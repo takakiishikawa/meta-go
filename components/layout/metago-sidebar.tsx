@@ -77,6 +77,7 @@ export interface SidebarScores {
   security: number | null;
   design_system: number | null;
   performance: number | null;
+  dependencies: number | null;
 }
 
 type ScoreKey = keyof SidebarScores;
@@ -92,47 +93,52 @@ const navGroups: { label: string; items: NavItem[] }[] = [
   {
     label: "Overview",
     items: [
-      { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-      { title: "Approvals", href: "/approval", icon: ClipboardList },
+      { title: "ダッシュボード", href: "/dashboard", icon: LayoutDashboard },
+      { title: "承認", href: "/approval", icon: ClipboardList },
     ],
   },
   {
     label: "Delivery",
     items: [
       {
-        title: "Code Quality",
+        title: "コード品質",
         href: "/quality",
         icon: Code2,
         scoreKey: "quality",
       },
       {
-        title: "Security",
+        title: "セキュリティ",
         href: "/security",
         icon: ShieldCheck,
         scoreKey: "security",
       },
-      { title: "Dependencies", href: "/dependency", icon: Package },
       {
-        title: "Design System",
+        title: "依存パッケージ",
+        href: "/dependency",
+        icon: Package,
+        scoreKey: "dependencies",
+      },
+      {
+        title: "デザインシステム",
         href: "/design-system",
         icon: Palette,
         scoreKey: "design_system",
       },
       {
-        title: "Performance",
+        title: "パフォーマンス",
         href: "/performance",
         icon: Gauge,
         scoreKey: "performance",
       },
-      { title: "Deployments", href: "/deployments", icon: Rocket },
+      { title: "デプロイ", href: "/deployments", icon: Rocket },
     ],
   },
   {
     label: "Discovery",
     items: [
       { title: "PSF", href: "/psf", icon: TrendingUp },
-      { title: "Engagement", href: "/engagement", icon: Activity },
-      { title: "Hypotheses", href: "/hypothesis", icon: Lightbulb },
+      { title: "利用状況", href: "/engagement", icon: Activity },
+      { title: "仮説・バックログ", href: "/hypothesis", icon: Lightbulb },
     ],
   },
 ];
@@ -228,19 +234,19 @@ export function MetaGoSidebar({ scores }: { scores?: SidebarScores }) {
           avatarUrl={avatarUrl}
           items={[
             {
-              title: "Concept",
+              title: "コンセプト",
               icon: Layers,
               onSelect: () => router.push("/concept"),
               isActive: pathname === "/concept",
             },
             {
-              title: "API Keys",
+              title: "APIキー",
               icon: Key,
               onSelect: () => router.push("/apis"),
               isActive: pathname === "/apis",
             },
             {
-              title: isDark ? "Dark" : "Light",
+              title: isDark ? "ダーク" : "ライト",
               icon: isDark ? Moon : Sun,
               onSelect: toggleTheme,
             },

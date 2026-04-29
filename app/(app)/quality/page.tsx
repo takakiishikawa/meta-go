@@ -63,7 +63,7 @@ export default async function QualityPage({
     <>
       <PageHeader
         title="コード品質"
-        description="goシリーズ全体のコード品質スコアと問題点一覧"
+        description="ESLint / TypeScript / Prettier 等の検査結果と改善状況"
       />
 
       <IssueTrendSection items={allItems} />

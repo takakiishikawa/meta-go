@@ -67,7 +67,7 @@ export default async function DesignSystemPage({
     <>
       <PageHeader
         title="デザインシステム"
-        description="go-design-system準拠率と違反一覧"
+        description="go-design-system への準拠率と違反箇所"
       />
 
       <IssueTrendSection items={allItems} noun="違反" />

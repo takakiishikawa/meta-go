@@ -58,7 +58,7 @@ export default async function PerformancePage({
     <>
       <PageHeader
         title="パフォーマンス"
-        description="Core Web Vitals とバンドルサイズの測定結果"
+        description="Lighthouse による Core Web Vitals 計測結果"
       />
 
       <IssueTrendSection items={allItems} />

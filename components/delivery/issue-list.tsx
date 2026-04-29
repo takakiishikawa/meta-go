@@ -51,8 +51,8 @@ export function IssueList({
   if (open.length === 0) {
     return (
       <EmptyState
-        title={`未解決の${noun}はありません`}
-        description="新たな検出があるまでこのリストは空です"
+        title="すべて解決済み"
+        description={`未解決の${noun}はありません。新しい検出があれば自動でここに追加されます。`}
       />
     );
   }
@@ -104,15 +104,15 @@ export function IssueList({
                 {showSeverity && (
                   <TableCell className="px-4 py-3">
                     {item.severity ? (
-                      <span
-                        className="rounded px-1.5 py-0.5 text-xs font-medium text-white"
+                      <Badge
+                        className="text-white"
                         style={{
                           backgroundColor:
                             SEVERITY_COLORS[item.severity] ?? "#6B7280",
                         }}
                       >
                         {item.severity}
-                      </span>
+                      </Badge>
                     ) : (
                       <span className="text-xs text-muted-foreground">—</span>
                     )}

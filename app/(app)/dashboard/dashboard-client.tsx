@@ -45,7 +45,12 @@ interface ApprovalItem {
   created_at: string;
 }
 
-type Cat = "quality" | "security" | "design_system" | "performance";
+type Cat =
+  | "quality"
+  | "security"
+  | "design_system"
+  | "performance"
+  | "dependencies";
 
 export type TrendByProduct = Record<
   string,
@@ -75,7 +80,13 @@ const GO_COLORS: Record<string, string> = {
   taskgo: "#00B8D9",
 };
 
-const CATS: Cat[] = ["quality", "security", "design_system", "performance"];
+const CATS: Cat[] = [
+  "quality",
+  "security",
+  "design_system",
+  "performance",
+  "dependencies",
+];
 
 export function DashboardClient({
   products,
@@ -87,7 +98,7 @@ export function DashboardClient({
 }: DashboardClientProps) {
   const hasData = products.length > 0;
 
-  // 全プロダクトの overall (4カテゴリ平均) スコアの全期間トレンド
+  // 全プロダクトの overall (CATS 平均) スコアの全期間トレンド
   const overviewTrend = useMemo<MultiTrendPoint[]>(() => {
     const allDateKeys = new Set<string>();
     for (const productId of Object.keys(trendByProduct)) {
@@ -150,7 +161,7 @@ export function DashboardClient({
   return (
     <>
       <PageHeader
-        title="Dashboard"
+        title="ダッシュボード"
         description="goシリーズ全体の健全性を俯瞰する"
         actions={
           pendingApprovals.length > 0 ? (
@@ -174,14 +185,14 @@ export function DashboardClient({
       <div className="flex flex-wrap gap-3">
         <KpiCard
           icon={<GitMerge className="size-4" />}
-          label="直近7日に解決"
+          label="直近7日の解決数"
           value={kpi.resolvedLast7Days}
           delta={kpi.resolvedDelta}
           accent="#36B37E"
         />
         <KpiCard
           icon={<Activity className="size-4" />}
-          label="直近7日に検知"
+          label="直近7日の検知数"
           value={kpi.detectedLast7Days}
           delta={kpi.detectedDelta}
           accent="#0052CC"
@@ -191,14 +202,14 @@ export function DashboardClient({
       {!hasData ? (
         <EmptyState
           title="データがまだありません"
-          description="GitHub Actions cronが実行されるとデータが表示されます"
+          description="日次収集が走るとここに表示されます"
         />
       ) : (
         <>
           {/* Issue trend + Deploy trend を 2 列で並べる (直近 7 日) */}
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <ChartCard
-              title="issue 検知 / 解決 推移"
+              title="issue の検知と解決"
               caption="直近 7 日 / 全カテゴリ合算"
             >
               <LineCountsChart
@@ -211,7 +222,7 @@ export function DashboardClient({
               />
             </ChartCard>
             <ChartCard
-              title="デプロイ 成功 / 失敗 推移"
+              title="デプロイの成功と失敗"
               caption="直近 7 日 / 全プロダクト合算"
               actions={
                 <Link
@@ -238,8 +249,8 @@ export function DashboardClient({
 
           {/* All-products score trend — 縦幅 2 倍 */}
           <ChartCard
-            title="総合スコア推移"
-            caption={`全期間 / 4カテゴリの平均 (${overviewTrend.length}日分)`}
+            title="総合スコアの推移"
+            caption={`全期間 / ${CATS.length}カテゴリの平均 (${overviewTrend.length}日分)`}
           >
             <MultiProductTrendChart
               data={overviewTrend}
@@ -331,7 +342,7 @@ function KpiCard({
             className="text-xs font-semibold tabular-nums"
             style={{ color: accent }}
           >
-            {formatDelta(delta)} vs 前7日
+            前週比 {formatDelta(delta)}
           </span>
         </div>
       </div>

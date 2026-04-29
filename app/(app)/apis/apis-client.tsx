@@ -4,6 +4,7 @@ import {
   PageHeader,
   EmptyState,
   Badge,
+  Button,
   Card,
   Table,
   TableBody,
@@ -171,8 +172,8 @@ export function ApisClient({
   return (
     <>
       <PageHeader
-        title="API管理"
-        description="goシリーズで利用する環境変数・APIキー一覧（週1回自動スキャン）"
+        title="APIキー"
+        description="goシリーズで使用中の環境変数・APIキー一覧 (週次で自動スキャン)"
         actions={
           <div className="flex items-center gap-3">
             {lastSeen && (
@@ -184,16 +185,17 @@ export function ApisClient({
                 最終スキャン: {new Date(lastSeen).toLocaleDateString("ja-JP")}
               </span>
             )}
-            <a
-              href={GOOGLE_PM_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-surface-subtle transition-colors"
-            >
-              <Key className="size-3.5" />
-              Google パスワードマネージャー
-              <ExternalLink className="size-3" />
-            </a>
+            <Button asChild variant="outline" size="sm" className="text-xs">
+              <a
+                href={GOOGLE_PM_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <Key className="size-3.5" />
+                Google パスワードマネージャー
+                <ExternalLink className="size-3" />
+              </a>
+            </Button>
           </div>
         }
       />
@@ -201,8 +203,8 @@ export function ApisClient({
       {apiKeys.length === 0 ? (
         <EmptyState
           icon={<Key className="size-12" />}
-          title="APIキーがまだ検出されていません"
-          description="週次ワークフローが実行されると各goリポジトリからAPIキー名が自動スキャンされます"
+          title="APIキーが検出されていません"
+          description="週次の収集ワークフローが走ると、各goリポジトリの環境変数を自動でスキャンしてここに表示します"
         />
       ) : (
         <div className="flex flex-col gap-6">

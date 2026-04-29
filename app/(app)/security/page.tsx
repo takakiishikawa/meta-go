@@ -62,7 +62,7 @@ export default async function SecurityPage({
     <>
       <PageHeader
         title="セキュリティ"
-        description="脆弱性と依存関係のセキュリティ問題"
+        description="検出された脆弱性と修正状況"
       />
 
       <IssueTrendSection items={allItems} noun="脆弱性" />

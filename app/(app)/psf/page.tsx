@@ -97,14 +97,14 @@ export default function PsfPage() {
     <>
       <PageHeader
         title="PSF"
-        description="Product Super-specific Fit — 各goの課題適合度スコア"
+        description="Product Super-specific Fit — 各goがオーナーの課題にどれだけフィットしているか"
       />
 
       {products.length === 0 ? (
         <EmptyState
           icon={<TrendingUp className="size-12" />}
-          title="データがまだありません"
-          description="PSFスコアの収集が開始されると表示されます"
+          title="PSFスコアがまだありません"
+          description="週次の収集が走ると各goのスコアがここに表示されます"
         />
       ) : (
         <>
@@ -199,7 +199,7 @@ export default function PsfPage() {
                 className="mb-4 font-semibold text-foreground"
                 style={{ fontSize: "var(--text-base)" }}
               >
-                PSFトレンド
+                PSFスコアの推移
               </h2>
               <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={chartArray}>

@@ -18,11 +18,11 @@ export default async function ApprovalPage() {
   return (
     <>
       <PageHeader
-        title="承認待ち"
+        title="承認"
         description={
           pendingCount > 0
-            ? `${pendingCount}件の承認が必要なPRがあります`
-            : "人間の判断が必要なアイテム一覧"
+            ? `${pendingCount} 件のPRがあなたの判断を待っています`
+            : "MetaGoが自動実行できない、判断が必要な変更を集約します"
         }
       />
       <ApprovalClient items={(items ?? []) as any} />

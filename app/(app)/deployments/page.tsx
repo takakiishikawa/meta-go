@@ -150,17 +150,17 @@ export default async function DeploymentsPage() {
   return (
     <>
       <PageHeader
-        title="Deployments"
-        description={`Vercel への全デプロイと結果（直近 ${STATUS_WINDOW_HOURS}h、7日分のbudget可視化）`}
+        title="デプロイ"
+        description={`Vercel への全デプロイ履歴と日次の枠消費 (直近 ${STATUS_WINDOW_HOURS} 時間)`}
       />
 
       <IssueTrendSection items={deployIssueItems} noun="デプロイ問題" />
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
         <StatCard
-          label="今日の使用率"
+          label="本日の消費"
           value={`${todayCount} / ${HOBBY_DAILY_BUDGET}`}
-          sublabel="Hobby plan day budget (Asia/Tokyo)"
+          sublabel="Hobby プランの日次上限 (JST)"
           accent={
             todayCount >= 90
               ? "#DC2626"
@@ -170,7 +170,7 @@ export default async function DeploymentsPage() {
           }
         />
 
-        <StatCard label="直近24h 結果" accent="#059669">
+        <StatCard label="直近24時間の結果" accent="#059669">
           <div className="mt-1 flex items-end gap-4">
             <div>
               <div className="text-2xl font-semibold text-success">
@@ -183,7 +183,7 @@ export default async function DeploymentsPage() {
                 {sum24h.failure}
               </div>
               <div className="text-xs text-muted-foreground">
-                失敗{sum24h.rateLimited > 0 && ` (rate ${sum24h.rateLimited})`}
+                失敗{sum24h.rateLimited > 0 && ` (うちレート制限 ${sum24h.rateLimited})`}
               </div>
             </div>
             {sum24h.pending > 0 && (
@@ -197,7 +197,7 @@ export default async function DeploymentsPage() {
           </div>
         </StatCard>
 
-        <StatCard label="直近7日 daily budget" accent="#6554C0">
+        <StatCard label="直近7日の日次消費" accent="#6554C0">
           <div className="mt-2 flex items-end justify-between gap-1">
             {daily.map((d, i) => {
               const ratio = Math.min(1, d.count / HOBBY_DAILY_BUDGET);
@@ -243,10 +243,10 @@ export default async function DeploymentsPage() {
       <Card className="p-4">
         <div className="mb-3 flex items-baseline justify-between">
           <span className="text-sm font-semibold text-foreground">
-            デプロイ成功数の推移
+            成功デプロイの推移
           </span>
           <span className="text-xs text-muted-foreground">
-            直近 {CHART_DAYS} 日 / プロダクト別 (合計 {totalSuccess7d})
+            直近 {CHART_DAYS} 日 / プロダクト別 (合計 {totalSuccess7d} 件)
           </span>
         </div>
         <DeploySuccessTrendChart data={successTrend} products={productSeries} />
@@ -255,11 +255,11 @@ export default async function DeploymentsPage() {
       {tableRows.length === 0 ? (
         <EmptyState
           icon={<Rocket className="size-12" />}
-          title="deployment がまだありません"
+          title="デプロイ履歴がありません"
           description={
             process.env.GITHUB_TOKEN
-              ? `直近 ${STATUS_WINDOW_HOURS}h に Vercel deployment が観測されませんでした`
-              : "GITHUB_TOKEN が未設定です。Vercel deployment 履歴を取得できません"
+              ? `直近 ${STATUS_WINDOW_HOURS} 時間以内に Vercel へのデプロイは検出されませんでした`
+              : "GITHUB_TOKEN が未設定のためデプロイ履歴を取得できません"
           }
         />
       ) : (

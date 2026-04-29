@@ -4,7 +4,12 @@ import { useState } from "react";
 import {
   Badge,
   Card,
+  EmptyState as GdsEmptyState,
   PageHeader,
+  Table,
+  TableBody,
+  TableCell,
+  TableRow,
   Tabs,
   TabsContent,
   TabsList,
@@ -125,7 +130,7 @@ export function ProductDetailClient({
         {/* PSF Tab */}
         <TabsContent value="psf" className="mt-4">
           {psfScores.length === 0 ? (
-            <EmptyState message="PSFデータがありません" />
+            <EmptyState message="PSFスコアがまだありません" />
           ) : (
             <div className="flex flex-col gap-4">
               <div className="flex items-center gap-6">
@@ -340,65 +345,48 @@ function Section({
 }
 
 function EmptyState({ message }: { message: string }) {
-  return (
-    <div className="flex items-center justify-center py-10 rounded-lg border border-dashed border-border">
-      <p
-        style={{
-          fontSize: "var(--text-sm)",
-          color: "var(--color-text-secondary)",
-        }}
-      >
-        {message}
-      </p>
-    </div>
-  );
+  return <GdsEmptyState title={message} />;
 }
 
 function ItemTable({ items, columns }: { items: any[]; columns: string[] }) {
-  if (items.length === 0) return <EmptyState message="データなし" />;
+  if (items.length === 0) return <EmptyState message="該当なし" />;
   return (
-    <div className="rounded-lg border border-border overflow-hidden">
-      <table className="w-full">
-        <tbody>
+    <Card className="overflow-hidden">
+      <Table>
+        <TableBody>
           {items.map((item) => (
-            <tr
-              key={item.id}
-              className="border-b border-border last:border-0 hover:bg-surface-subtle"
-            >
-              <td className="px-4 py-2 text-sm text-foreground">
+            <TableRow key={item.id}>
+              <TableCell className="px-4 py-2 text-sm text-foreground">
                 {item.title}
-              </td>
-              <td className="px-4 py-2">
+              </TableCell>
+              <TableCell className="px-4 py-2">
                 <Badge variant="outline">{item.category}</Badge>
-              </td>
-              <td className="px-4 py-2">
+              </TableCell>
+              <TableCell className="px-4 py-2">
                 <Badge variant={isResolved(item.state) ? "default" : "outline"}>
                   {item.state}
                 </Badge>
-              </td>
-            </tr>
+              </TableCell>
+            </TableRow>
           ))}
-        </tbody>
-      </table>
-    </div>
+        </TableBody>
+      </Table>
+    </Card>
   );
 }
 
 function SecurityTable({ items }: { items: any[] }) {
-  if (items.length === 0) return <EmptyState message="データなし" />;
+  if (items.length === 0) return <EmptyState message="該当なし" />;
   return (
-    <div className="rounded-lg border border-border overflow-hidden">
-      <table className="w-full">
-        <tbody>
+    <Card className="overflow-hidden">
+      <Table>
+        <TableBody>
           {items.map((item) => (
-            <tr
-              key={item.id}
-              className="border-b border-border last:border-0 hover:bg-surface-subtle"
-            >
-              <td className="px-4 py-2 text-sm text-foreground">
+            <TableRow key={item.id}>
+              <TableCell className="px-4 py-2 text-sm text-foreground">
                 {item.title}
-              </td>
-              <td className="px-4 py-2">
+              </TableCell>
+              <TableCell className="px-4 py-2">
                 <Badge
                   className="text-white"
                   style={{
@@ -408,96 +396,87 @@ function SecurityTable({ items }: { items: any[] }) {
                 >
                   {item.severity}
                 </Badge>
-              </td>
-              <td className="px-4 py-2">
+              </TableCell>
+              <TableCell className="px-4 py-2">
                 <Badge variant={isResolved(item.state) ? "default" : "outline"}>
                   {item.state}
                 </Badge>
-              </td>
-            </tr>
+              </TableCell>
+            </TableRow>
           ))}
-        </tbody>
-      </table>
-    </div>
+        </TableBody>
+      </Table>
+    </Card>
   );
 }
 
 function DepTable({ items }: { items: any[] }) {
-  if (items.length === 0) return <EmptyState message="データなし" />;
+  if (items.length === 0) return <EmptyState message="該当なし" />;
   return (
-    <div className="rounded-lg border border-border overflow-hidden">
-      <table className="w-full">
-        <tbody>
+    <Card className="overflow-hidden">
+      <Table>
+        <TableBody>
           {items.map((item) => (
-            <tr
-              key={item.id}
-              className="border-b border-border last:border-0 hover:bg-surface-subtle"
-            >
-              <td className="px-4 py-2 text-sm font-mono text-foreground">
+            <TableRow key={item.id}>
+              <TableCell className="px-4 py-2 text-sm font-mono text-foreground">
                 {item.package_name}
-              </td>
-              <td
+              </TableCell>
+              <TableCell
                 className="px-4 py-2 text-sm font-mono"
                 style={{ color: "var(--color-text-secondary)" }}
               >
                 {item.current_version} → {item.latest_version}
-              </td>
-              <td className="px-4 py-2">
+              </TableCell>
+              <TableCell className="px-4 py-2">
                 <Badge variant="outline">{item.update_type}</Badge>
-              </td>
-            </tr>
+              </TableCell>
+            </TableRow>
           ))}
-        </tbody>
-      </table>
-    </div>
+        </TableBody>
+      </Table>
+    </Card>
   );
 }
 
 function HypoTable({ items }: { items: any[] }) {
-  if (items.length === 0) return <EmptyState message="データなし" />;
+  if (items.length === 0) return <EmptyState message="該当なし" />;
   return (
-    <div className="rounded-lg border border-border overflow-hidden">
-      <table className="w-full">
-        <tbody>
+    <Card className="overflow-hidden">
+      <Table>
+        <TableBody>
           {items.map((item) => (
-            <tr
-              key={item.id}
-              className="border-b border-border last:border-0 hover:bg-surface-subtle"
-            >
-              <td className="px-4 py-2 text-sm text-foreground">
+            <TableRow key={item.id}>
+              <TableCell className="px-4 py-2 text-sm text-foreground">
                 {item.title}
-              </td>
-              <td className="px-4 py-2">
+              </TableCell>
+              <TableCell className="px-4 py-2">
                 <Badge variant="outline">{item.state}</Badge>
-              </td>
-            </tr>
+              </TableCell>
+            </TableRow>
           ))}
-        </tbody>
-      </table>
-    </div>
+        </TableBody>
+      </Table>
+    </Card>
   );
 }
 
 function BacklogTable({ items }: { items: any[] }) {
-  if (items.length === 0) return <EmptyState message="データなし" />;
+  if (items.length === 0) return <EmptyState message="該当なし" />;
   const PRIORITY_COLORS: Record<string, string> = {
     High: "#FF5630",
     Med: "#FF991F",
     Low: "#36B37E",
   };
   return (
-    <div className="rounded-lg border border-border overflow-hidden">
-      <table className="w-full">
-        <tbody>
+    <Card className="overflow-hidden">
+      <Table>
+        <TableBody>
           {items.map((item) => (
-            <tr
-              key={item.id}
-              className="border-b border-border last:border-0 hover:bg-surface-subtle"
-            >
-              <td className="px-4 py-2 text-sm text-foreground">
+            <TableRow key={item.id}>
+              <TableCell className="px-4 py-2 text-sm text-foreground">
                 {item.title}
-              </td>
-              <td className="px-4 py-2">
+              </TableCell>
+              <TableCell className="px-4 py-2">
                 <Badge
                   className="text-white"
                   style={{
@@ -507,14 +486,16 @@ function BacklogTable({ items }: { items: any[] }) {
                 >
                   {item.priority}
                 </Badge>
-              </td>
-              <td className="px-4 py-2">
-                <Badge variant="outline">{item.state}</Badge>
-              </td>
-            </tr>
+              </TableCell>
+              <TableCell className="px-4 py-2">
+                <Badge variant={isResolved(item.state) ? "default" : "outline"}>
+                  {item.state}
+                </Badge>
+              </TableCell>
+            </TableRow>
           ))}
-        </tbody>
-      </table>
-    </div>
+        </TableBody>
+      </Table>
+    </Card>
   );
 }

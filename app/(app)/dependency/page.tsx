@@ -181,29 +181,29 @@ export default async function DependencyPage() {
   return (
     <>
       <PageHeader
-        title="依存・技術スタック"
-        description="各プロダクトの技術スタックとパッケージ更新状況"
+        title="依存パッケージ"
+        description="各goの技術スタックとパッケージ更新状況"
       />
 
       <IssueTrendSection items={allItems} noun="更新" />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard
-          label="プロダクト"
+          label="プロダクト数"
           value={total}
-          sublabel="登録済み"
+          sublabel="管理対象"
           accent="#1E3A8A"
         />
         <StatCard
-          label="共通スタック"
+          label="共通パッケージ"
           value={shared.length}
-          sublabel="全プロダクト共通"
+          sublabel="全goで使用"
           accent="#059669"
         />
         <StatCard
-          label="部分共通 / 個別"
+          label="一部共通 / 個別"
           value={`${partial.length} / ${totalUnique}`}
-          sublabel="部分共通 packages / 個別固有 packages"
+          sublabel="複数go利用 / 単独利用"
           accent="#D97706"
         />
         <StatCard
@@ -218,7 +218,7 @@ export default async function DependencyPage() {
         <EmptyState
           icon={<Layers className="size-12" />}
           title="技術スタックがまだ収集されていません"
-          description="GitHub Actions の週次ワークフローが実行されるか、手動トリガーすると自動収集されます"
+          description="週次の収集ワークフローが走ると自動で表示されます"
         />
       ) : (
         <DependencyTables
@@ -233,10 +233,10 @@ export default async function DependencyPage() {
       <Card>
         <CardHeader className="flex-row items-baseline justify-between gap-3 space-y-0 border-b border-border bg-muted/40 px-5 py-3">
           <div className="flex items-baseline gap-2">
-            <CardTitle className="text-sm">未解決のアップデート</CardTitle>
+            <CardTitle className="text-sm">未解決の更新</CardTitle>
           </div>
           <Badge variant="outline" className="font-mono">
-            {openItems.length} items
+            {openItems.length} 件
           </Badge>
         </CardHeader>
         <CardContent className="p-0">
@@ -244,8 +244,8 @@ export default async function DependencyPage() {
             <div className="p-6">
               <EmptyState
                 icon={<Package className="size-12" />}
-                title="データがまだありません"
-                description="GitHub Actions cron が実行されるとデータが表示されます"
+                title="未解決の更新はありません"
+                description="新しい更新が検出されると自動でここに追加されます"
               />
             </div>
           ) : (
