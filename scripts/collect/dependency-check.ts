@@ -244,22 +244,33 @@ async function processRepo(product: any, repo: string) {
     const outdated = await getOutdated(repoDir);
 
     // DB に全件記録
+    // サイレント失敗を許さない: スキーマ未適用などで upsert が落ちると
+    // 「未解決の更新 0件」になり、外からは workflow 成功に見えてしまう。
+    // 1件でも失敗したら throw して processRepo の catch で execution_logs に残す。
     for (const pkg of outdated) {
       // 一度 'done' になった package が新しい version で再び outdated になった
       // 場合、再度 workflow を回したいので state='new' でリセットする。
-      await supabase.schema("metago").from("dependency_items").upsert(
-        {
-          product_id: product.id,
-          package_name: pkg.name,
-          current_version: pkg.current,
-          latest_version: pkg.latest,
-          update_type: pkg.updateType,
-          state: "new",
-          resolved_at: null,
-          last_seen_at: new Date().toISOString(),
-        },
-        { onConflict: "product_id,package_name", ignoreDuplicates: false },
-      );
+      const { error } = await supabase
+        .schema("metago")
+        .from("dependency_items")
+        .upsert(
+          {
+            product_id: product.id,
+            package_name: pkg.name,
+            current_version: pkg.current,
+            latest_version: pkg.latest,
+            update_type: pkg.updateType,
+            state: "new",
+            resolved_at: null,
+            last_seen_at: new Date().toISOString(),
+          },
+          { onConflict: "product_id,package_name", ignoreDuplicates: false },
+        );
+      if (error) {
+        throw new Error(
+          `dependency_items upsert failed (${pkg.name}): ${error.message}`,
+        );
+      }
     }
 
     const patchMinor = outdated.filter(
@@ -300,12 +311,18 @@ ${patchMinor.map((p) => `- \`${p.name}\`: ${p.current} → ${p.latest} (${p.upda
           });
 
           for (const pkg of patchMinor) {
-            await supabase
+            const { error } = await supabase
               .schema("metago")
               .from("dependency_items")
               .update({ state: "done", resolved_at: new Date().toISOString() })
               .eq("product_id", product.id)
               .eq("package_name", pkg.name);
+            if (error) {
+              console.error(
+                `  dependency_items update(done) failed (${pkg.name}):`,
+                error.message,
+              );
+            }
           }
         }
       }
@@ -390,7 +407,7 @@ ${fixedSection}${warningSection}
             });
 
             for (const pkg of majorUpdates) {
-              await supabase
+              const { error } = await supabase
                 .schema("metago")
                 .from("dependency_items")
                 .update({
@@ -399,6 +416,12 @@ ${fixedSection}${warningSection}
                 })
                 .eq("product_id", product.id)
                 .eq("package_name", pkg.name);
+              if (error) {
+                console.error(
+                  `  dependency_items update(done) failed (${pkg.name}):`,
+                  error.message,
+                );
+              }
             }
           }
         } else {

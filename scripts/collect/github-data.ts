@@ -343,17 +343,26 @@ async function collectDependencyUpdates(product: any, pkg: any) {
       const updateType =
         latMajor > curMajor ? "major" : latMinor > curMinor ? "minor" : "patch";
 
-      await supabase.schema("metago").from("dependency_items").upsert(
-        {
-          product_id: product.id,
-          package_name: packageName,
-          current_version: ver,
-          latest_version: latestVersion,
-          update_type: updateType,
-          state: "new",
-        },
-        { onConflict: "product_id,package_name", ignoreDuplicates: false },
-      );
+      const { error } = await supabase
+        .schema("metago")
+        .from("dependency_items")
+        .upsert(
+          {
+            product_id: product.id,
+            package_name: packageName,
+            current_version: ver,
+            latest_version: latestVersion,
+            update_type: updateType,
+            state: "new",
+          },
+          { onConflict: "product_id,package_name", ignoreDuplicates: false },
+        );
+      if (error) {
+        console.error(
+          `dependency_items upsert error for ${packageName}:`,
+          error.message,
+        );
+      }
     } catch (e) {
       console.warn(`Failed to check ${packageName}:`, e);
     }

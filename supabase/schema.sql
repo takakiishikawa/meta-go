@@ -70,7 +70,9 @@ CREATE TABLE IF NOT EXISTS metago.dependency_items (
   update_type     TEXT NOT NULL CHECK (update_type IN ('patch','minor','major','framework')),
   state           TEXT NOT NULL DEFAULT 'new' CHECK (state IN ('new','done','in_progress')),
   pr_url          TEXT,
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  resolved_at     TIMESTAMPTZ,
+  last_seen_at    TIMESTAMPTZ DEFAULT now()
 );
 
 -- design_system_items: デザインシステム違反
