@@ -146,9 +146,7 @@ async function lastAttemptYieldedNoPatches(
       reason?: string;
       patch_count?: number;
     };
-    return (
-      parsed.reason === "build_still_failing" && parsed.patch_count === 0
-    );
+    return parsed.reason === "build_still_failing" && parsed.patch_count === 0;
   } catch {
     return false;
   }
@@ -336,7 +334,10 @@ async function fixForProduct(product: {
   // 前回の試行で Claude が patch を返せなかった (patch_count=0) 場合、同じ
   // build error に再度 Claude を投げても結果は同じ可能性が極めて高い。残り
   // attempts 枠を Claude に投げず早期に abandoned にする。
-  if (attempts > 0 && (await lastAttemptYieldedNoPatches(product.id, commitSha))) {
+  if (
+    attempts > 0 &&
+    (await lastAttemptYieldedNoPatches(product.id, commitSha))
+  ) {
     console.log(
       `  ⛔ ${commitSha.slice(0, 7)}: 前回 patch_count=0 — Claude では直せない判定で諦め`,
     );
