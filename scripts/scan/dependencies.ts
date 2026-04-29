@@ -223,9 +223,7 @@ function computeScore(
   const coverageRatio = coverage.total > 0 ? coverage.have / coverage.total : 1;
   const alignmentRatio =
     alignment.total > 0 ? alignment.have / alignment.total : 1;
-  const standardization = Math.round(
-    coverageRatio * 50 + alignmentRatio * 50,
-  );
+  const standardization = Math.round(coverageRatio * 50 + alignmentRatio * 50);
 
   const finalScore = Math.round(0.5 * updateCurrency + 0.5 * standardization);
 
@@ -246,7 +244,10 @@ function computeScore(
 async function loadAll() {
   const [{ data: products }, { data: techStack }, { data: depItems }] =
     await Promise.all([
-      supabase.schema("metago").from("products").select("id, name, display_name"),
+      supabase
+        .schema("metago")
+        .from("products")
+        .select("id, name, display_name"),
       supabase
         .schema("metago")
         .from("tech_stack_items")
@@ -275,7 +276,12 @@ async function scoreProduct(
   console.log(`\n📦 [SCAN] dependencies: ${product.display_name}`);
   const scanStartedAt = new Date();
 
-  const breakdown = computeScore(product, productTech, productDeps, modalMajors);
+  const breakdown = computeScore(
+    product,
+    productTech,
+    productDeps,
+    modalMajors,
+  );
 
   // 共通化違反を quality_items に可視化 (category='dependency-standardization')
   // — ダッシュボード/issue trend と統合される。dependency_items は
@@ -348,12 +354,14 @@ async function main() {
 
   const techByProduct = new Map<string, TechStackRow[]>();
   for (const row of techStack) {
-    if (!techByProduct.has(row.product_id)) techByProduct.set(row.product_id, []);
+    if (!techByProduct.has(row.product_id))
+      techByProduct.set(row.product_id, []);
     techByProduct.get(row.product_id)!.push(row);
   }
   const depsByProduct = new Map<string, DependencyItemRow[]>();
   for (const row of depItems) {
-    if (!depsByProduct.has(row.product_id)) depsByProduct.set(row.product_id, []);
+    if (!depsByProduct.has(row.product_id))
+      depsByProduct.set(row.product_id, []);
     depsByProduct.get(row.product_id)!.push(row);
   }
 

@@ -122,8 +122,7 @@ export function IssueTrendSection({
     () => buildBuckets(items, range.days),
     [items, range.days],
   );
-  const headline =
-    title ?? (noun ? `${noun}の検知と解決` : "検知と解決の推移");
+  const headline = title ?? (noun ? `${noun}の検知と解決` : "検知と解決の推移");
 
   return (
     <Card className="p-4">
