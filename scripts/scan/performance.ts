@@ -20,6 +20,7 @@ import {
   upsertItem,
   markStaleItemsResolved,
   reviveResolvedItems,
+  resetStaleFailedItems,
 } from "../../lib/metago/items";
 
 const supabase = getSupabase();
@@ -154,6 +155,15 @@ async function scanProduct(product: any) {
     ["Performance"],
   );
 
+  const reset = await resetStaleFailedItems(
+    supabase,
+    "quality_items",
+    product.id,
+    scanStartedAt,
+    3,
+    ["Performance"],
+  );
+
   const resolved = await markStaleItemsResolved(
     supabase,
     "quality_items",
@@ -163,7 +173,7 @@ async function scanProduct(product: any) {
   );
 
   console.log(
-    `  ${issues.length} issues found${resolved > 0 ? `, ${resolved} resolved` : ""}${revived > 0 ? `, ${revived} revived` : ""}`,
+    `  ${issues.length} issues found${resolved > 0 ? `, ${resolved} resolved` : ""}${revived > 0 ? `, ${revived} revived` : ""}${reset > 0 ? `, ${reset} reset` : ""}`,
   );
 }
 
