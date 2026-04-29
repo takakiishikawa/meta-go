@@ -63,7 +63,7 @@ export default async function QualityPage({
     <>
       <PageHeader
         title="コード品質"
-        description="ESLint / TypeScript / Prettier 等の検査結果と改善状況"
+        description="Claude による 7 軸 (クリーン / 可読 / 拡張 / エラー / 型安全 / コンポーネント / テスト) 評価と改善状況"
       />
 
       <IssueTrendSection items={allItems} />

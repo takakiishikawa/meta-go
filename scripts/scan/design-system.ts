@@ -19,6 +19,7 @@ import {
   reviveResolvedItems,
   upsertItem,
   markStaleItemsResolved,
+  resetStaleFailedItems,
 } from "../../lib/metago/items";
 
 const supabase = getSupabase();
@@ -350,6 +351,13 @@ async function scanRepo(product: any, repo: string) {
       scanStartedAt,
     );
 
+    const reset = await resetStaleFailedItems(
+      supabase,
+      "design_system_items",
+      product.id,
+      scanStartedAt,
+    );
+
     const resolved = await markStaleItemsResolved(
       supabase,
       "design_system_items",
@@ -358,7 +366,7 @@ async function scanRepo(product: any, repo: string) {
     );
 
     console.log(
-      `  ✓ ${violationsByKey.size} 種類の違反 (合計 ${totalCount} 箇所), score: ${score}${resolved > 0 ? `, ${resolved} resolved` : ""}${revived > 0 ? `, ${revived} revived` : ""}`,
+      `  ✓ ${violationsByKey.size} 種類の違反 (合計 ${totalCount} 箇所), score: ${score}${resolved > 0 ? `, ${resolved} resolved` : ""}${revived > 0 ? `, ${revived} revived` : ""}${reset > 0 ? `, ${reset} reset` : ""}`,
     );
   } catch (e) {
     console.error(`  ❌ Failed: ${repo}`, e);

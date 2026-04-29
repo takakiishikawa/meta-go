@@ -22,6 +22,8 @@ import {
   saveScore,
   upsertItem,
   reviveResolvedItems,
+  markStaleItemsResolved,
+  resetStaleFailedItems,
 } from "../../lib/metago/items";
 import { runClaudeForJSON } from "../../lib/metago/claude-cli";
 
@@ -271,33 +273,41 @@ async function scanRepo(product: any, repo: string) {
       return;
     }
 
-    // 各軸の findings を UPSERT
+    // 各軸の findings を (file, axis) 単位で集約して UPSERT。
+    // title = file (ファイル不明なら GENERAL_LABEL) を安定キーとして使うことで
+    // Claude のタイトルゆらぎ (日替わりで完全入れ替わり) を吸収し、
+    // markStaleItemsResolved が意味のある解決検知として機能する。
+    const GENERAL_LABEL = "(プロジェクト全体)";
     for (const axisResult of evaluation.axes) {
       const def = QUALITY_AXES.find((q) => q.id === axisResult.axisId);
       if (!def) continue;
 
+      const byFile = new Map<
+        string,
+        { descs: string[]; severities: Array<"high" | "medium" | "low"> }
+      >();
       for (const finding of axisResult.findings) {
+        const fileKey = finding.file ?? GENERAL_LABEL;
+        const bucket = byFile.get(fileKey) ?? { descs: [], severities: [] };
+        bucket.descs.push(finding.description);
+        bucket.severities.push(finding.severity);
+        byFile.set(fileKey, bucket);
+      }
+
+      for (const [file, { descs, severities }] of byFile) {
+        const hasHigh = severities.includes("high");
         await upsertItem(supabase, "quality_items", {
           product_id: product.id,
           category: def.name,
-          title: finding.title,
-          description: finding.file
-            ? `[${finding.file}] ${finding.description}`
-            : finding.description,
-          level: finding.severity === "high" ? "L1" : "L2",
+          title: file,
+          description: descs.join(" / "),
+          level: hasHigh ? "L1" : "L2",
         });
       }
 
-      // 軸スコアが低い場合のサマリー
-      if (axisResult.score < 60) {
-        await upsertItem(supabase, "quality_items", {
-          product_id: product.id,
-          category: def.name,
-          title: `[${def.name}] スコア低下: ${axisResult.score}点`,
-          description: `${def.name}の評価が${axisResult.score}点と基準(60点)を下回っています。${def.criterion.split("\n")[0]}`,
-          level: axisResult.score < 40 ? "L1" : "L2",
-        });
-      }
+      // 「スコア低下サマリ」は意図的に出力しない: title にスコア値が入ると
+      // 日々ゆらぎ、安定キーの前提を壊す。スコア自体は scores_history で別途
+      // 保存・可視化されている。
     }
 
     await saveScore(supabase, product.id, "quality", evaluation.overallScore);
@@ -315,13 +325,28 @@ async function scanRepo(product: any, repo: string) {
       evaluatedCategories,
     );
 
-    // NOTE: Claude 評価は非決定的 (タイトルが日々ゆらぐ) なため、
-    // markStaleItemsResolved は意図的に呼ばない。出力ゆらぎだけで items が
-    // new ↔ fixed を毎日往復し churn する原因になっていたため除去した。
-    // score は上の saveScore で別途保存しているのでダッシュボードへの影響は無い。
+    // attempt_count 上限スタックの 'failed' item をクールダウン経過後に 'new' に戻す。
+    const reset = await resetStaleFailedItems(
+      supabase,
+      "quality_items",
+      product.id,
+      scanStartedAt,
+      3,
+      evaluatedCategories,
+    );
+
+    // 今回 scan で再検出されなかった items を 'fixed' に確定させる。
+    // (file, axis) 単位の安定キーになったので、tuple overlap 70%+ が見込め churn しない。
+    const resolved = await markStaleItemsResolved(
+      supabase,
+      "quality_items",
+      product.id,
+      scanStartedAt,
+      evaluatedCategories,
+    );
 
     console.log(
-      `  ✅ score: ${evaluation.overallScore}点、findings: ${evaluation.axes.reduce((s, a) => s + a.findings.length, 0)}件${revived > 0 ? `, ${revived} revived` : ""}`,
+      `  ✅ score: ${evaluation.overallScore}点、findings: ${evaluation.axes.reduce((s, a) => s + a.findings.length, 0)}件${revived > 0 ? `, ${revived} revived` : ""}${resolved > 0 ? `, ${resolved} resolved` : ""}${reset > 0 ? `, ${reset} reset` : ""}`,
     );
   } catch (e) {
     console.error(`  ❌ Failed: ${repo}`, e);

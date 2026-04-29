@@ -119,10 +119,20 @@ export async function reviveResolvedItems(
   scanStartedAt: Date,
   categories?: string[],
 ): Promise<number> {
+  // attempt_count / last_attempted_at / error_message も同時にリセットする。
+  // これを忘れると、過去に MAX_FIX_ATTEMPTS まで失敗した item が
+  // state='new' で revive されたとき pickAndLockItems の attempt_count<MAX
+  // フィルタで永遠にピックされないゾンビになる (= fix-cron が拾わない)。
   let q = supabase
     .schema("metago")
     .from(table)
-    .update({ state: "new", resolved_at: null })
+    .update({
+      state: "new",
+      resolved_at: null,
+      attempt_count: 0,
+      last_attempted_at: null,
+      error_message: null,
+    })
     .eq("product_id", productId)
     .in("state", ["fixed", "done"])
     .gte("last_seen_at", scanStartedAt.toISOString())
@@ -135,6 +145,68 @@ export async function reviveResolvedItems(
   const { data, error } = await q;
   if (error) {
     throw new Error(`reviveResolvedItems failed (${table}): ${error.message}`);
+  }
+  return data?.length ?? 0;
+}
+
+/**
+ * attempt_count が MAX_FIX_ATTEMPTS に達して 'failed' で詰まった item を、
+ * クールダウン経過後に 'new' に戻して再挑戦できるようにする。
+ *
+ * 背景: pickAndLockItems は state='new' AND attempt_count<MAX_FIX_ATTEMPTS の
+ * 行しか拾わない。fix-routine が連続で失敗 (例: Claude が narration を返す、
+ * 一時的な GitHub API エラー等) して attempt_count が上限に達すると、その違反は
+ * 'failed' のまま誰にも触られず永久に未解決として残る。markStaleItemsResolved
+ * は last_seen_at < scanStartedAt の行しか fixed にしないため、scan で再検出
+ * されている stuck item は救済されない。reviveResolvedItems も 'fixed'/'done'
+ * のみ対象なので 'failed' は対象外。
+ *
+ * 対象条件:
+ *   - state='failed'
+ *   - attempt_count >= MAX_FIX_ATTEMPTS (上限スタック)
+ *   - last_seen_at >= scanStartedAt (今回の scan で再検出された = まだ違反が
+ *     残っている)
+ *   - last_attempted_at < NOW() - cooldownDays (毎日リトライしても Claude が
+ *     直せないような根本的な失敗ケースで API を浪費しない)
+ *
+ * 効果: state='new', attempt_count=0, error_message=null。次回の fix-routine
+ * で改めて pickAndLockItems の対象になる。
+ *
+ * 呼び出し順序: 全ての upsertItem の **後** (last_seen_at 更新済み)、
+ * reviveResolvedItems / markStaleItemsResolved と同列のタイミング。
+ */
+export async function resetStaleFailedItems(
+  supabase: SupabaseClient,
+  table: ItemTable,
+  productId: string,
+  scanStartedAt: Date,
+  cooldownDays: number = 3,
+  categories?: string[],
+): Promise<number> {
+  const cooldownCutoff = new Date(
+    Date.now() - cooldownDays * 24 * 60 * 60 * 1000,
+  );
+
+  let q = supabase
+    .schema("metago")
+    .from(table)
+    .update({ state: "new", attempt_count: 0, error_message: null })
+    .eq("product_id", productId)
+    .eq("state", "failed")
+    .gte("attempt_count", MAX_FIX_ATTEMPTS)
+    .gte("last_seen_at", scanStartedAt.toISOString())
+    .lt("last_attempted_at", cooldownCutoff.toISOString())
+    .select("id");
+
+  if (categories && categories.length > 0) {
+    q = q.in("category", categories);
+  }
+
+  const { data, error } = await q;
+  if (error) {
+    throw new Error(
+      `resetStaleFailedItems failed (${table}): ${error.message}`,
+    );
   }
   return data?.length ?? 0;
 }
