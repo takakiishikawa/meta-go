@@ -1,26 +1,32 @@
 "use client";
 
 import { Info } from "lucide-react";
-import { useState } from "react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@takaki/go-design-system";
 
 export function InfoTooltip({ text }: { text: string }) {
-  const [show, setShow] = useState(false);
   return (
-    <span className="relative inline-flex items-center ml-1">
-      <Info
-        className="size-3 cursor-help"
-        style={{ color: "var(--color-text-secondary)" }}
-        onMouseEnter={() => setShow(true)}
-        onMouseLeave={() => setShow(false)}
-      />
-      {show && (
-        <span
-          className="absolute bottom-5 left-1/2 -translate-x-1/2 z-50 w-56 rounded-lg border border-border bg-surface p-2.5 text-xs leading-relaxed border border-border whitespace-normal"
-          style={{ color: "var(--color-text-secondary)" }}
+    <TooltipProvider delayDuration={150}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="ml-1 inline-flex items-center">
+            <Info
+              className="size-3 cursor-help"
+              style={{ color: "var(--color-text-secondary)" }}
+            />
+          </span>
+        </TooltipTrigger>
+        <TooltipContent
+          side="top"
+          className="max-w-56 whitespace-normal text-xs leading-relaxed"
         >
           {text}
-        </span>
-      )}
-    </span>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }

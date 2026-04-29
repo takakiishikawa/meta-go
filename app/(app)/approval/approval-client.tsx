@@ -150,7 +150,7 @@ function PendingCard({
   }
 
   return (
-    <div className="rounded-lg border border-border bg-surface overflow-hidden">
+    <Card className="overflow-hidden">
       {item.products?.primary_color && (
         <div
           className="h-0.5"
@@ -298,7 +298,7 @@ function PendingCard({
           </div>
         </div>
       </div>
-    </div>
+    </Card>
   );
 }
 

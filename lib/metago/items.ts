@@ -102,6 +102,44 @@ export async function upsertItem(
 }
 
 /**
+ * 当該 scan で「再検出された」のに state が 'fixed'/'done' のままになっている
+ * ゾンビ items を 'new' に戻す。
+ *
+ * 背景: upsertItem は onConflict で state を更新しないため、一度 fixed になった行
+ * が次の scan で再び違反として上がってきても last_seen_at だけ更新され、見かけ上
+ * 「解決済み」として扱われ続ける。本関数で last_seen_at >= scanStartedAt (今回の
+ * scan で観測された) かつ state IN ('fixed','done') の行を救済する。
+ *
+ * 呼び出し順序: 全ての upsertItem の **後**、markStaleItemsResolved の **前**。
+ */
+export async function reviveResolvedItems(
+  supabase: SupabaseClient,
+  table: ItemTable,
+  productId: string,
+  scanStartedAt: Date,
+  categories?: string[],
+): Promise<number> {
+  let q = supabase
+    .schema("metago")
+    .from(table)
+    .update({ state: "new", resolved_at: null })
+    .eq("product_id", productId)
+    .in("state", ["fixed", "done"])
+    .gte("last_seen_at", scanStartedAt.toISOString())
+    .select("id");
+
+  if (categories && categories.length > 0) {
+    q = q.in("category", categories);
+  }
+
+  const { data, error } = await q;
+  if (error) {
+    throw new Error(`reviveResolvedItems failed (${table}): ${error.message}`);
+  }
+  return data?.length ?? 0;
+}
+
+/**
  * 当該 scan 実行で再検出されなかった items を fixed に遷移させる。
  *
  * scan は最新の所見を upsertItem で書き込む際に last_seen_at を now() に更新する。
@@ -116,6 +154,11 @@ export async function upsertItem(
  * 場合、評価できなかった category の行を誤って fixed にしないため)。
  *
  * 呼び出し側の前提: scanStartedAt は scan 開始時刻(upsertItem の前に決定する)。
+ *
+ * 注意: scan が **非決定的** (例: Claude LLM 評価) な場合、本関数を呼ぶと
+ * 出力ゆらぎだけで items が new ↔ fixed を毎日往復し churn する。そういう scan
+ * では呼び出さず、items は履歴ログ扱いに留めること (score 自体は saveScore で
+ * 別途保存されるためダッシュボードへの影響は無い)。
  */
 export async function markStaleItemsResolved(
   supabase: SupabaseClient,

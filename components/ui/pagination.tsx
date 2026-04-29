@@ -2,6 +2,12 @@
 
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  Pagination as GdsPagination,
+  PaginationContent,
+  PaginationItem,
+  buttonVariants,
+} from "@takaki/go-design-system";
 
 interface PaginationProps {
   page: number;
@@ -21,63 +27,83 @@ export function Pagination({ page, totalPages, basePath }: PaginationProps) {
   const pages: number[] = [];
   for (let i = start; i <= end; i++) pages.push(i);
 
-  const linkBase =
-    "rounded px-2.5 py-1 text-sm transition-colors hover:bg-surface-subtle";
-  const inactive = "text-[color:var(--color-text-secondary)]";
-  const active = "bg-surface-subtle font-medium text-foreground";
-  const navBtn =
-    "flex items-center rounded p-1.5 transition-colors hover:bg-surface-subtle text-[color:var(--color-text-secondary)]";
+  const linkClass = (active: boolean) =>
+    buttonVariants({
+      variant: active ? "outline" : "ghost",
+      size: "icon",
+    });
+  const navClass = (disabled: boolean) =>
+    `${buttonVariants({ variant: "ghost", size: "icon" })} ${
+      disabled ? "pointer-events-none opacity-40" : ""
+    }`;
 
   return (
-    <div className="flex items-center justify-center gap-0.5 py-2">
-      <Link
-        href={makeHref(Math.max(1, page - 1))}
-        className={`${navBtn} ${page <= 1 ? "pointer-events-none opacity-40" : ""}`}
-        aria-disabled={page <= 1}
-      >
-        <ChevronLeft className="size-4" />
-      </Link>
-
-      {start > 1 && (
-        <>
-          <Link href={makeHref(1)} className={`${linkBase} ${inactive}`}>
-            1
-          </Link>
-          {start > 2 && <span className={`px-1 text-sm ${inactive}`}>…</span>}
-        </>
-      )}
-
-      {pages.map((p) => (
-        <Link
-          key={p}
-          href={makeHref(p)}
-          className={`${linkBase} ${p === page ? active : inactive}`}
-        >
-          {p}
-        </Link>
-      ))}
-
-      {end < totalPages && (
-        <>
-          {end < totalPages - 1 && (
-            <span className={`px-1 text-sm ${inactive}`}>…</span>
-          )}
+    <GdsPagination className="py-2">
+      <PaginationContent>
+        <PaginationItem>
           <Link
-            href={makeHref(totalPages)}
-            className={`${linkBase} ${inactive}`}
+            href={makeHref(Math.max(1, page - 1))}
+            className={navClass(page <= 1)}
+            aria-disabled={page <= 1}
+            aria-label="前のページ"
           >
-            {totalPages}
+            <ChevronLeft className="size-4" />
           </Link>
-        </>
-      )}
+        </PaginationItem>
 
-      <Link
-        href={makeHref(Math.min(totalPages, page + 1))}
-        className={`${navBtn} ${page >= totalPages ? "pointer-events-none opacity-40" : ""}`}
-        aria-disabled={page >= totalPages}
-      >
-        <ChevronRight className="size-4" />
-      </Link>
-    </div>
+        {start > 1 && (
+          <>
+            <PaginationItem>
+              <Link href={makeHref(1)} className={linkClass(false)}>
+                1
+              </Link>
+            </PaginationItem>
+            {start > 2 && (
+              <PaginationItem>
+                <span className="px-1 text-sm text-muted-foreground">…</span>
+              </PaginationItem>
+            )}
+          </>
+        )}
+
+        {pages.map((p) => (
+          <PaginationItem key={p}>
+            <Link
+              href={makeHref(p)}
+              className={linkClass(p === page)}
+              aria-current={p === page ? "page" : undefined}
+            >
+              {p}
+            </Link>
+          </PaginationItem>
+        ))}
+
+        {end < totalPages && (
+          <>
+            {end < totalPages - 1 && (
+              <PaginationItem>
+                <span className="px-1 text-sm text-muted-foreground">…</span>
+              </PaginationItem>
+            )}
+            <PaginationItem>
+              <Link href={makeHref(totalPages)} className={linkClass(false)}>
+                {totalPages}
+              </Link>
+            </PaginationItem>
+          </>
+        )}
+
+        <PaginationItem>
+          <Link
+            href={makeHref(Math.min(totalPages, page + 1))}
+            className={navClass(page >= totalPages)}
+            aria-disabled={page >= totalPages}
+            aria-label="次のページ"
+          >
+            <ChevronRight className="size-4" />
+          </Link>
+        </PaginationItem>
+      </PaginationContent>
+    </GdsPagination>
   );
 }

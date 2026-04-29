@@ -21,7 +21,7 @@ import {
   getSupabase,
   saveScore,
   upsertItem,
-  markStaleItemsResolved,
+  reviveResolvedItems,
 } from "../../lib/metago/items";
 import { runClaudeForJSON } from "../../lib/metago/claude-cli";
 
@@ -306,7 +306,8 @@ async function scanRepo(product: any, repo: string) {
       .map((a) => QUALITY_AXES.find((q) => q.id === a.axisId)?.name)
       .filter((c): c is string => Boolean(c));
 
-    const resolved = await markStaleItemsResolved(
+    // 再検出されたのに state='fixed' のままになっているゾンビを 'new' に戻す。
+    const revived = await reviveResolvedItems(
       supabase,
       "quality_items",
       product.id,
@@ -314,8 +315,13 @@ async function scanRepo(product: any, repo: string) {
       evaluatedCategories,
     );
 
+    // NOTE: Claude 評価は非決定的 (タイトルが日々ゆらぐ) なため、
+    // markStaleItemsResolved は意図的に呼ばない。出力ゆらぎだけで items が
+    // new ↔ fixed を毎日往復し churn する原因になっていたため除去した。
+    // score は上の saveScore で別途保存しているのでダッシュボードへの影響は無い。
+
     console.log(
-      `  ✅ score: ${evaluation.overallScore}点、findings: ${evaluation.axes.reduce((s, a) => s + a.findings.length, 0)}件${resolved > 0 ? `, ${resolved} resolved` : ""}`,
+      `  ✅ score: ${evaluation.overallScore}点、findings: ${evaluation.axes.reduce((s, a) => s + a.findings.length, 0)}件${revived > 0 ? `, ${revived} revived` : ""}`,
     );
   } catch (e) {
     console.error(`  ❌ Failed: ${repo}`, e);

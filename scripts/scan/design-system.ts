@@ -16,6 +16,7 @@ import {
   REPO_TO_SLUG,
   getSupabase,
   saveScore,
+  reviveResolvedItems,
   upsertItem,
   markStaleItemsResolved,
 } from "../../lib/metago/items";
@@ -315,6 +316,13 @@ async function scanRepo(product: any, repo: string) {
     const score = Math.max(0, 100 - totalPenalty);
     await saveScore(supabase, product.id, "design_system", score);
 
+    const revived = await reviveResolvedItems(
+      supabase,
+      "design_system_items",
+      product.id,
+      scanStartedAt,
+    );
+
     const resolved = await markStaleItemsResolved(
       supabase,
       "design_system_items",
@@ -323,7 +331,7 @@ async function scanRepo(product: any, repo: string) {
     );
 
     console.log(
-      `  ✓ ${violationsByKey.size} 種類の違反 (合計 ${totalCount} 箇所), score: ${score}${resolved > 0 ? `, ${resolved} resolved` : ""}`,
+      `  ✓ ${violationsByKey.size} 種類の違反 (合計 ${totalCount} 箇所), score: ${score}${resolved > 0 ? `, ${resolved} resolved` : ""}${revived > 0 ? `, ${revived} revived` : ""}`,
     );
   } catch (e) {
     console.error(`  ❌ Failed: ${repo}`, e);

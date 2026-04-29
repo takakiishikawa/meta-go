@@ -245,6 +245,8 @@ async function processRepo(product: any, repo: string) {
 
     // DB に全件記録
     for (const pkg of outdated) {
+      // 一度 'done' になった package が新しい version で再び outdated になった
+      // 場合、再度 workflow を回したいので state='new' でリセットする。
       await supabase.schema("metago").from("dependency_items").upsert(
         {
           product_id: product.id,
@@ -253,6 +255,8 @@ async function processRepo(product: any, repo: string) {
           latest_version: pkg.latest,
           update_type: pkg.updateType,
           state: "new",
+          resolved_at: null,
+          last_seen_at: new Date().toISOString(),
         },
         { onConflict: "product_id,package_name", ignoreDuplicates: false },
       );
@@ -299,7 +303,7 @@ ${patchMinor.map((p) => `- \`${p.name}\`: ${p.current} → ${p.latest} (${p.upda
             await supabase
               .schema("metago")
               .from("dependency_items")
-              .update({ state: "done" })
+              .update({ state: "done", resolved_at: new Date().toISOString() })
               .eq("product_id", product.id)
               .eq("package_name", pkg.name);
           }
@@ -389,7 +393,10 @@ ${fixedSection}${warningSection}
               await supabase
                 .schema("metago")
                 .from("dependency_items")
-                .update({ state: "done" })
+                .update({
+                  state: "done",
+                  resolved_at: new Date().toISOString(),
+                })
                 .eq("product_id", product.id)
                 .eq("package_name", pkg.name);
             }

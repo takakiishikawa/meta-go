@@ -19,6 +19,7 @@ import {
   saveScore,
   upsertItem,
   markStaleItemsResolved,
+  reviveResolvedItems,
 } from "../../lib/metago/items";
 
 const supabase = getSupabase();
@@ -145,6 +146,14 @@ async function scanProduct(product: any) {
     });
   }
 
+  const revived = await reviveResolvedItems(
+    supabase,
+    "quality_items",
+    product.id,
+    scanStartedAt,
+    ["Performance"],
+  );
+
   const resolved = await markStaleItemsResolved(
     supabase,
     "quality_items",
@@ -154,7 +163,7 @@ async function scanProduct(product: any) {
   );
 
   console.log(
-    `  ${issues.length} issues found${resolved > 0 ? `, ${resolved} resolved` : ""}`,
+    `  ${issues.length} issues found${resolved > 0 ? `, ${resolved} resolved` : ""}${revived > 0 ? `, ${revived} revived` : ""}`,
   );
 }
 

@@ -14,6 +14,9 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  Tabs,
+  TabsList,
+  TabsTrigger,
 } from "@takaki/go-design-system";
 import { PACKAGE_DESCRIPTIONS } from "@/lib/package-descriptions";
 
@@ -291,35 +294,33 @@ export function DependencyTables({
           </CardContent>
         ) : (
           <>
-            <div className="flex flex-wrap gap-1 border-b border-border px-3 pt-2">
-              {productsWithUnique.map((p) => {
-                const active = activeTab === p.id;
-                const count = perProduct[p.id]?.length ?? 0;
-                return (
-                  <button
-                    key={p.id}
-                    onClick={() => setActiveTab(p.id)}
-                    className={`relative -mb-px flex items-center gap-1.5 border-b-2 px-3 pb-2 pt-1 text-sm font-medium transition-colors ${
-                      active
-                        ? "border-primary text-foreground"
-                        : "border-transparent text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    <ProductDot product={p} size={8} />
-                    {p.display_name}
-                    <span
-                      className={`inline-flex min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-semibold ${
-                        active
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-muted text-muted-foreground"
-                      }`}
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <TabsList className="flex-wrap gap-1 px-3 pt-2">
+                {productsWithUnique.map((p) => {
+                  const active = activeTab === p.id;
+                  const count = perProduct[p.id]?.length ?? 0;
+                  return (
+                    <TabsTrigger
+                      key={p.id}
+                      value={p.id}
+                      className="gap-1.5 px-3 pb-2 pt-1"
                     >
-                      {count}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+                      <ProductDot product={p} size={8} />
+                      {p.display_name}
+                      <span
+                        className={`inline-flex min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-semibold ${
+                          active
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted text-muted-foreground"
+                        }`}
+                      >
+                        {count}
+                      </span>
+                    </TabsTrigger>
+                  );
+                })}
+              </TabsList>
+            </Tabs>
             <CardContent className="p-0">
               {activeTab && (
                 <PackageTable

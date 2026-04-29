@@ -26,6 +26,7 @@ import {
   saveScore,
   upsertItem,
   markStaleItemsResolved,
+  reviveResolvedItems,
 } from "../../lib/metago/items";
 
 const supabase = getSupabase();
@@ -219,6 +220,14 @@ async function scanRepo(product: any, repo: string) {
     const score = Math.max(0, 100 - totalPenalty);
     await saveScore(supabase, product.id, "tech_stack", score);
 
+    const revived = await reviveResolvedItems(
+      supabase,
+      "quality_items",
+      product.id,
+      scanStartedAt,
+      ["tech-stack"],
+    );
+
     const resolved = await markStaleItemsResolved(
       supabase,
       "quality_items",
@@ -228,7 +237,7 @@ async function scanRepo(product: any, repo: string) {
     );
 
     console.log(
-      `  ✓ ${violations.length} violations, score: ${score}${resolved > 0 ? `, ${resolved} resolved` : ""}`,
+      `  ✓ ${violations.length} violations, score: ${score}${resolved > 0 ? `, ${resolved} resolved` : ""}${revived > 0 ? `, ${revived} revived` : ""}`,
     );
   } catch (e) {
     console.error(`  ❌ Failed: ${repo}`, e);
