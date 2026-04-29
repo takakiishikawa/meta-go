@@ -183,7 +183,9 @@ export default async function DeploymentsPage() {
                 {sum24h.failure}
               </div>
               <div className="text-xs text-muted-foreground">
-                失敗{sum24h.rateLimited > 0 && ` (うちレート制限 ${sum24h.rateLimited})`}
+                失敗
+                {sum24h.rateLimited > 0 &&
+                  ` (うちレート制限 ${sum24h.rateLimited})`}
               </div>
             </div>
             {sum24h.pending > 0 && (

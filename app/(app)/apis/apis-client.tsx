@@ -186,11 +186,7 @@ export function ApisClient({
               </span>
             )}
             <Button asChild variant="outline" size="sm" className="text-xs">
-              <a
-                href={GOOGLE_PM_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
+              <a href={GOOGLE_PM_URL} target="_blank" rel="noopener noreferrer">
                 <Key className="size-3.5" />
                 Google パスワードマネージャー
                 <ExternalLink className="size-3" />

@@ -106,13 +106,11 @@ export default function EngagementPage() {
             <Table>
               <TableHeader className="bg-surface-subtle">
                 <TableRow>
-                  {["プロダクト", "直近の利用数", "傾向", "測定日"].map(
-                    (h) => (
-                      <TableHead key={h} className="px-4 py-3 text-xs">
-                        {h}
-                      </TableHead>
-                    ),
-                  )}
+                  {["プロダクト", "直近の利用数", "傾向", "測定日"].map((h) => (
+                    <TableHead key={h} className="px-4 py-3 text-xs">
+                      {h}
+                    </TableHead>
+                  ))}
                 </TableRow>
               </TableHeader>
               <TableBody>
