@@ -65,9 +65,9 @@ interface DashboardClientProps {
   deployTrend: LineCountsPoint[];
   kpi: {
     resolvedLast7Days: number;
-    resolvedDelta: number;
+    resolvedDelta: number | null;
     detectedLast7Days: number;
-    detectedDelta: number;
+    detectedDelta: number | null;
   };
 }
 
@@ -321,7 +321,7 @@ function KpiCard({
   icon: React.ReactNode;
   label: string;
   value: number;
-  delta: number;
+  delta: number | null;
   accent: string;
 }) {
   return (
@@ -338,12 +338,18 @@ function KpiCard({
           <span className="text-2xl font-semibold text-foreground tabular-nums">
             {value}
           </span>
-          <span
-            className="text-xs font-semibold tabular-nums"
-            style={{ color: accent }}
-          >
-            前週比 {formatDelta(delta)}
-          </span>
+          {delta === null ? (
+            <span className="text-xs text-muted-foreground tabular-nums">
+              比較データなし
+            </span>
+          ) : (
+            <span
+              className="text-xs font-semibold tabular-nums"
+              style={{ color: accent }}
+            >
+              前週比 {formatDelta(delta)}
+            </span>
+          )}
         </div>
       </div>
     </Card>

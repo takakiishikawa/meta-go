@@ -106,6 +106,13 @@ export default async function DashboardPage() {
       i.resolved_at < sevenDaysAgo,
   ).length;
 
+  // 7日より古い items が 1 行も無い = 比較対象の履歴が存在しない。
+  // この状態で「前週比 +N」と出すと、実態は「今週の合計」なのに増分のように
+  // 見える嘘になるため、delta を null にして表示側で非表示にする。
+  const hasHistoryBeforeWindow = allDetectionItems.some(
+    (i) => i.created_at < sevenDaysAgo,
+  );
+
   // 直近 7 日の日次 detected / resolved
   const fmtKey = new Intl.DateTimeFormat("en-CA", {
     timeZone: TZ,
@@ -179,8 +186,8 @@ export default async function DashboardPage() {
       )
         b.failure++;
     }
-  } catch {
-    // GITHUB_TOKEN が未設定 / fetch 失敗時は 0 のまま
+  } catch (err) {
+    console.error("[dashboard] fetchAllDeployments failed:", err);
   }
   const deployTrend: LineCountsPoint[] = [];
   for (let i = DEPLOY_TREND_DAYS - 1; i >= 0; i--) {
@@ -203,9 +210,13 @@ export default async function DashboardPage() {
       deployTrend={deployTrend}
       kpi={{
         resolvedLast7Days,
-        resolvedDelta: resolvedLast7Days - resolvedPrev7Days,
+        resolvedDelta: hasHistoryBeforeWindow
+          ? resolvedLast7Days - resolvedPrev7Days
+          : null,
         detectedLast7Days,
-        detectedDelta: detectedLast7Days - detectedPrev7Days,
+        detectedDelta: hasHistoryBeforeWindow
+          ? detectedLast7Days - detectedPrev7Days
+          : null,
       }}
     />
   );
