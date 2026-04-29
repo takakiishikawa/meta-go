@@ -159,31 +159,83 @@ async function fetchPackageJson(repo: string): Promise<any | null> {
 }
 
 async function collectDependabotAlerts(product: any, repo: string) {
-  const alerts = await githubFetch(
+  // open: 現在生きているアラート → state='new' で UPSERT
+  const openAlerts = await githubFetch(
     `/repos/${GITHUB_OWNER}/${repo}/dependabot/alerts?state=open&per_page=100`,
   );
-  if (!alerts || !Array.isArray(alerts)) return;
-
-  for (const alert of alerts) {
-    const advisory = alert.security_advisory;
-    const { error } = await supabase
-      .schema("metago")
-      .from("security_items")
-      .upsert(
-        {
-          product_id: product.id,
-          severity: advisory.severity?.toLowerCase() ?? "medium",
-          title: advisory.summary ?? `Dependabot Alert #${alert.number}`,
-          cve: advisory.cve_id ?? null,
-          description: advisory.description?.substring(0, 500) ?? null,
-          state: alert.state === "fixed" ? "done" : "new",
-        },
-        { onConflict: "product_id,title", ignoreDuplicates: false },
-      );
-    if (error) console.error("security_items upsert error:", error);
+  if (Array.isArray(openAlerts)) {
+    for (const alert of openAlerts) {
+      const advisory = alert.security_advisory;
+      const severity = advisory.severity?.toLowerCase() ?? "medium";
+      const title = advisory.summary ?? `Dependabot Alert #${alert.number}`;
+      // unique index: uniq_security_items_key (product_id, severity, title)
+      const { error } = await supabase
+        .schema("metago")
+        .from("security_items")
+        .upsert(
+          {
+            product_id: product.id,
+            severity,
+            title,
+            cve: advisory.cve_id ?? null,
+            description: advisory.description?.substring(0, 500) ?? null,
+            state: "new",
+            last_seen_at: new Date().toISOString(),
+          },
+          {
+            onConflict: "product_id,severity,title",
+            ignoreDuplicates: false,
+          },
+        );
+      if (error) console.error("security_items upsert error:", error);
+    }
   }
+
+  // fixed/dismissed: GitHub側で解決されたアラート → DB行を fixed に揃える
+  // (open フィルタからは消えるだけなので、ここで明示的に取得して解決遷移させる)
+  const resolvedAlerts = await githubFetch(
+    `/repos/${GITHUB_OWNER}/${repo}/dependabot/alerts?state=fixed&per_page=100`,
+  );
+  let resolvedCount = 0;
+  if (Array.isArray(resolvedAlerts)) {
+    for (const alert of resolvedAlerts) {
+      const advisory = alert.security_advisory;
+      const severity = advisory.severity?.toLowerCase() ?? "medium";
+      const title = advisory.summary ?? `Dependabot Alert #${alert.number}`;
+      const fixedAt =
+        alert.fixed_at ?? alert.dismissed_at ?? new Date().toISOString();
+      // 既存行があれば fixed に遷移、無ければ最初から fixed として記録。
+      const { data, error } = await supabase
+        .schema("metago")
+        .from("security_items")
+        .upsert(
+          {
+            product_id: product.id,
+            severity,
+            title,
+            cve: advisory.cve_id ?? null,
+            description: advisory.description?.substring(0, 500) ?? null,
+            state: "fixed",
+            resolved_at: fixedAt,
+            last_seen_at: new Date().toISOString(),
+          },
+          {
+            onConflict: "product_id,severity,title",
+            ignoreDuplicates: false,
+          },
+        )
+        .select("id");
+      if (error) {
+        console.error("security_items resolved upsert error:", error);
+      } else if (data && data.length > 0) {
+        resolvedCount++;
+      }
+    }
+  }
+
+  const openCount = Array.isArray(openAlerts) ? openAlerts.length : 0;
   console.log(
-    `✓ ${product.name}: ${alerts.length} Dependabot alerts collected`,
+    `✓ ${product.name}: ${openCount} open + ${resolvedCount} resolved Dependabot alerts`,
   );
 }
 

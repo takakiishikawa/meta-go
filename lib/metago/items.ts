@@ -71,11 +71,16 @@ export async function upsertItem(
 
   const row: Record<string, unknown> = {
     product_id: input.product_id,
-    category: input.category,
     title: input.title.substring(0, 200),
     description: input.description?.substring(0, 500) ?? null,
     last_seen_at: new Date().toISOString(),
   };
+
+  // category は security_items には存在しない (severity が分類軸)。
+  // 他テーブル(quality / design_system 等)には NOT NULL で必要。
+  if (table !== "security_items") {
+    row.category = input.category;
+  }
 
   if (input.level) row.level = input.level;
   if (table === "security_items") {
