@@ -42,22 +42,22 @@ export default async function DashboardPage() {
     supabase
       .schema("metago")
       .from("quality_items")
-      .select("id, state, created_at, resolved_at")
+      .select("id, state, created_at, resolved_at, pr_url")
       .limit(10000),
     supabase
       .schema("metago")
       .from("security_items")
-      .select("id, state, created_at, resolved_at")
+      .select("id, state, created_at, resolved_at, pr_url")
       .limit(10000),
     supabase
       .schema("metago")
       .from("design_system_items")
-      .select("id, state, created_at, resolved_at")
+      .select("id, state, created_at, resolved_at, pr_url")
       .limit(10000),
     supabase
       .schema("metago")
       .from("dependency_items")
-      .select("id, state, created_at, resolved_at")
+      .select("id, state, created_at, resolved_at, pr_url")
       .limit(10000),
   ]);
 
@@ -87,6 +87,14 @@ export default async function DashboardPage() {
     ...(depItems ?? []),
   ];
 
+  // 「本物の解決」= PR がマージされたもの (markItemFixed が pr_url を埋める)。
+  // markStaleItemsResolved 経由の fixed (pr_url=NULL) は「scan が検出しなかった」
+  // だけで実際にコードが直っているとは限らないため、KPI からは除外する。
+  // (背景: 2026-04-26〜29 に Claude の出力ゆらぎで code-quality items が
+  //  1153 件 stale 化し KPI が大幅に水増しされた。b958a8c で根治済み)
+  const isReallyResolved = (i: { state: string; pr_url?: string | null }) =>
+    isResolved(i.state) && !!i.pr_url;
+
   // 直近7日 / 前7日の検知・解決
   const detectedLast7Days = allDetectionItems.filter(
     (i) => i.created_at >= sevenDaysAgo,
@@ -96,11 +104,11 @@ export default async function DashboardPage() {
   ).length;
   const resolvedLast7Days = allDetectionItems.filter(
     (i) =>
-      isResolved(i.state) && i.resolved_at && i.resolved_at >= sevenDaysAgo,
+      isReallyResolved(i) && i.resolved_at && i.resolved_at >= sevenDaysAgo,
   ).length;
   const resolvedPrev7Days = allDetectionItems.filter(
     (i) =>
-      isResolved(i.state) &&
+      isReallyResolved(i) &&
       i.resolved_at &&
       i.resolved_at >= fourteenDaysAgo &&
       i.resolved_at < sevenDaysAgo,
@@ -141,7 +149,7 @@ export default async function DashboardPage() {
       const b = issueBuckets.get(k);
       if (b) b.detected++;
     }
-    if (isResolved(item.state) && item.resolved_at) {
+    if (isReallyResolved(item) && item.resolved_at) {
       const resolvedMs = new Date(item.resolved_at).getTime();
       if (resolvedMs >= trendStartMs) {
         const k = fmtKey.format(new Date(item.resolved_at));

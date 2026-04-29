@@ -159,6 +159,14 @@ export async function reviveResolvedItems(
  * 出力ゆらぎだけで items が new ↔ fixed を毎日往復し churn する。そういう scan
  * では呼び出さず、items は履歴ログ扱いに留めること (score 自体は saveScore で
  * 別途保存されるためダッシュボードへの影響は無い)。
+ *
+ * **KPI 上の契約**: 本関数は pr_url を埋めない。
+ *   - markItemFixed (= 修正 PR がマージ) → state='fixed', pr_url=<PR URL>
+ *   - markStaleItemsResolved (= scan で再検出されず)→ state='fixed', pr_url=NULL
+ * ダッシュボードの「解決数」KPI は pr_url IS NOT NULL のみカウントする
+ * (app/(app)/dashboard/page.tsx の isReallyResolved 参照)。本関数の役割は
+ * items テーブルの整理 (new のまま無限蓄積させない) であり、KPI 上の「解決」では
+ * ない、という二層構造を守ること。
  */
 export async function markStaleItemsResolved(
   supabase: SupabaseClient,
