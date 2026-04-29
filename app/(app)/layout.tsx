@@ -1,6 +1,9 @@
 import { redirect } from "next/navigation";
 import { AppLayout } from "@takaki/go-design-system";
-import { MetaGoSidebar, type SidebarScores } from "@/components/layout/metago-sidebar";
+import {
+  MetaGoSidebar,
+  type SidebarScores,
+} from "@/components/layout/metago-sidebar";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function AppRootLayout({

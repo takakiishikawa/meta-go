@@ -2,7 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { Card, EmptyState, PageHeader, Spinner } from "@takaki/go-design-system";
+import {
+  Card,
+  EmptyState,
+  PageHeader,
+  Spinner,
+} from "@takaki/go-design-system";
 import { ScoreDonut } from "@/components/score/score-donut";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import {
