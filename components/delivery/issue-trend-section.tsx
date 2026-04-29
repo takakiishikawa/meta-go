@@ -2,6 +2,11 @@
 
 import { useMemo, useState } from "react";
 import {
+  Card,
+  ToggleGroup,
+  ToggleGroupItem,
+} from "@takaki/go-design-system";
+import {
   LineCountsChart,
   type LineCountsPoint,
 } from "@/components/charts/line-counts-chart";
@@ -127,7 +132,7 @@ export function IssueTrendSection({
   const headline = title ?? `${noun} 検知 / 解決 推移`;
 
   return (
-    <div className="rounded-lg border border-border bg-surface p-4">
+    <Card className="p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
         <span className="text-sm font-semibold text-foreground">
           {headline}
@@ -142,7 +147,7 @@ export function IssueTrendSection({
           { key: "resolved", name: "解決", color: "#36B37E" },
         ]}
       />
-    </div>
+    </Card>
   );
 }
 
@@ -154,28 +159,24 @@ function RangeTabs({
   onChange: (v: RangeId) => void;
 }) {
   return (
-    <div className="inline-flex rounded-md border border-border bg-surface-subtle p-0.5">
-      {RANGES.map((r) => {
-        const active = r.id === value;
-        return (
-          <button
-            key={r.id}
-            type="button"
-            onClick={() => onChange(r.id)}
-            className="rounded px-2.5 py-1 text-xs transition-colors"
-            style={{
-              backgroundColor: active ? "var(--color-surface)" : "transparent",
-              color: active
-                ? "var(--color-text-primary)"
-                : "var(--color-text-secondary)",
-              fontWeight: active ? 600 : 500,
-              boxShadow: active ? "0 1px 2px rgba(0,0,0,0.05)" : undefined,
-            }}
-          >
-            {r.label}
-          </button>
-        );
-      })}
-    </div>
+    <ToggleGroup
+      type="single"
+      value={value}
+      onValueChange={(v) => {
+        if (v) onChange(v as RangeId);
+      }}
+      size="sm"
+      className="rounded-md border border-border bg-surface-subtle p-0.5 gap-0"
+    >
+      {RANGES.map((r) => (
+        <ToggleGroupItem
+          key={r.id}
+          value={r.id}
+          className="px-2.5 py-1 text-xs data-[state=on]:bg-surface data-[state=on]:font-semibold data-[state=on]:text-foreground"
+        >
+          {r.label}
+        </ToggleGroupItem>
+      ))}
+    </ToggleGroup>
   );
 }

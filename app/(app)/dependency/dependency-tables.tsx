@@ -94,13 +94,14 @@ function ProductBadges({
   return (
     <div className="flex flex-wrap items-center gap-1">
       {sorted.map((p) => (
-        <span
+        <Badge
           key={p.id}
-          className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/40 px-1.5 py-0.5 text-xs"
+          variant="outline"
+          className="gap-1 rounded-full bg-muted/40 font-normal"
         >
           <ProductDot product={p} size={8} />
           {p.display_name}
-        </span>
+        </Badge>
       ))}
     </div>
   );
@@ -169,17 +170,18 @@ function PackageTable({
                     {ver.display}
                   </span>
                   {ver.varied && (
-                    <span
+                    <Badge
                       title={Object.entries(row.versions)
                         .map(
                           ([id, v]) =>
                             `${productMap[id]?.display_name ?? id}: ${v}`,
                         )
                         .join("\n")}
-                      className="rounded-full border border-warning bg-warning-subtle px-1.5 py-0.5 text-xs font-medium text-warning"
+                      variant="outline"
+                      className="rounded-full border-warning bg-warning-subtle text-warning"
                     >
                       混在
-                    </span>
+                    </Badge>
                   )}
                 </div>
               </TableCell>

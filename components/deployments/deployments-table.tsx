@@ -10,7 +10,20 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
-import { Button } from "@takaki/go-design-system";
+import {
+  Badge,
+  Button,
+  Card,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+  Tabs,
+  TabsList,
+  TabsTrigger,
+} from "@takaki/go-design-system";
 import type {
   DeploymentRow,
   DeploymentState,
@@ -99,13 +112,14 @@ const STATE_STYLE: Record<
 function StateBadge({ state }: { state: DeploymentState }) {
   const s = STATE_STYLE[state] ?? STATE_STYLE.unknown;
   return (
-    <span
-      className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-semibold"
+    <Badge
+      variant="outline"
+      className="gap-1 rounded-full"
       style={{ backgroundColor: s.bg, color: s.fg, borderColor: s.border }}
     >
       <s.Icon className="size-3" />
       {s.label}
-    </span>
+    </Badge>
   );
 }
 
@@ -206,35 +220,34 @@ export function DeploymentsTable({ rows }: { rows: DeploymentRow[] }) {
   return (
     <div className="flex flex-col gap-3">
       {/* state tabs */}
-      <div className="flex flex-wrap gap-1 border-b border-border">
-        {STATE_TABS.map((tab) => {
-          const active = stateFilter === tab.key;
-          return (
-            <Button
-              key={tab.key}
-              variant="ghost"
-              size="sm"
-              onClick={() => setStateFilter(tab.key)}
-              className={`relative -mb-px h-auto rounded-none border-b-2 px-3 pb-2 pt-1 text-sm font-medium hover:bg-transparent ${
-                active
-                  ? "border-primary text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {tab.label}
-              <span
-                className={`inline-flex min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-semibold ${
-                  active
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground"
-                }`}
+      <Tabs
+        value={stateFilter}
+        onValueChange={(v) => setStateFilter(v as StateFilter)}
+      >
+        <TabsList className="flex-wrap gap-1">
+          {STATE_TABS.map((tab) => {
+            const active = stateFilter === tab.key;
+            return (
+              <TabsTrigger
+                key={tab.key}
+                value={tab.key}
+                className="gap-2 px-3 pb-2 pt-1"
               >
-                {stateCounts[tab.key]}
-              </span>
-            </Button>
-          );
-        })}
-      </div>
+                {tab.label}
+                <span
+                  className={`inline-flex min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-semibold ${
+                    active
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground"
+                  }`}
+                >
+                  {stateCounts[tab.key]}
+                </span>
+              </TabsTrigger>
+            );
+          })}
+        </TabsList>
+      </Tabs>
 
       {/* product chip filter */}
       <div className="flex flex-wrap items-center gap-2">
@@ -278,10 +291,10 @@ export function DeploymentsTable({ rows }: { rows: DeploymentRow[] }) {
       </div>
 
       {/* table */}
-      <div className="rounded-lg border border-border overflow-hidden">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-border bg-muted/30">
+      <Card className="overflow-hidden">
+        <Table>
+          <TableHeader className="bg-muted/30">
+            <TableRow>
               {[
                 "プロダクト",
                 "Commit / 変更内容",
@@ -290,32 +303,29 @@ export function DeploymentsTable({ rows }: { rows: DeploymentRow[] }) {
                 "作成",
                 "",
               ].map((h) => (
-                <th
+                <TableHead
                   key={h}
-                  className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground"
+                  className="px-4 py-3 text-xs uppercase tracking-wider"
                 >
                   {h}
-                </th>
+                </TableHead>
               ))}
-            </tr>
-          </thead>
-          <tbody>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {paged.length === 0 ? (
-              <tr>
-                <td
+              <TableRow>
+                <TableCell
                   colSpan={6}
                   className="px-4 py-10 text-center text-sm text-muted-foreground"
                 >
                   該当する deployment はありません。
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ) : (
               paged.map((r) => (
-                <tr
-                  key={r.deploymentId}
-                  className="border-b border-border last:border-0 hover:bg-muted/20"
-                >
-                  <td className="px-4 py-2.5">
+                <TableRow key={r.deploymentId}>
+                  <TableCell className="px-4 py-2.5">
                     <span className="inline-flex items-center gap-2 text-sm">
                       <span
                         className="size-1.5 shrink-0 rounded-full"
@@ -325,8 +335,8 @@ export function DeploymentsTable({ rows }: { rows: DeploymentRow[] }) {
                       />
                       {r.productDisplayName}
                     </span>
-                  </td>
-                  <td className="px-4 py-2.5 max-w-md">
+                  </TableCell>
+                  <TableCell className="px-4 py-2.5 max-w-md">
                     <div className="flex items-baseline gap-2">
                       {r.commitUrl ? (
                         <a
@@ -349,17 +359,17 @@ export function DeploymentsTable({ rows }: { rows: DeploymentRow[] }) {
                         {r.commitSubject ?? "—"}
                       </span>
                     </div>
-                  </td>
-                  <td className="px-4 py-2.5">
+                  </TableCell>
+                  <TableCell className="px-4 py-2.5">
                     <StateBadge state={r.state} />
-                  </td>
-                  <td className="px-4 py-2.5 text-xs text-muted-foreground max-w-md truncate">
+                  </TableCell>
+                  <TableCell className="px-4 py-2.5 text-xs text-muted-foreground max-w-md truncate">
                     {r.state === "success" ? "—" : r.description || "—"}
-                  </td>
-                  <td className="px-4 py-2.5 text-xs text-muted-foreground whitespace-nowrap">
+                  </TableCell>
+                  <TableCell className="px-4 py-2.5 text-xs text-muted-foreground whitespace-nowrap">
                     {relTime(r.createdAt)}
-                  </td>
-                  <td className="px-4 py-2.5">
+                  </TableCell>
+                  <TableCell className="px-4 py-2.5">
                     {r.targetUrl && (
                       <a
                         href={r.targetUrl}
@@ -371,13 +381,13 @@ export function DeploymentsTable({ rows }: { rows: DeploymentRow[] }) {
                         <ExternalLink className="size-4" />
                       </a>
                     )}
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))
             )}
-          </tbody>
-        </table>
-      </div>
+          </TableBody>
+        </Table>
+      </Card>
 
       {filtered.length > PAGE_SIZE && (
         <div className="flex items-center justify-between gap-3">

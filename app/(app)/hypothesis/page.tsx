@@ -1,5 +1,16 @@
 import { createClient } from "@/lib/supabase/server";
-import { Badge, EmptyState, PageHeader } from "@takaki/go-design-system";
+import {
+  Badge,
+  Card,
+  EmptyState,
+  PageHeader,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@takaki/go-design-system";
 import { Lightbulb } from "lucide-react";
 
 const PRIORITY_COLORS: Record<string, string> = {
@@ -59,10 +70,10 @@ export default async function HypothesisPage() {
               >
                 課題仮説
               </h2>
-              <div className="rounded-lg border border-border overflow-hidden">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-border bg-surface-subtle">
+              <Card className="overflow-hidden">
+                <Table>
+                  <TableHeader className="bg-surface-subtle">
+                    <TableRow>
                       {[
                         "プロダクト",
                         "タイトル",
@@ -70,26 +81,19 @@ export default async function HypothesisPage() {
                         "状態",
                         "作成日",
                       ].map((h) => (
-                        <th
-                          key={h}
-                          className="px-4 py-3 text-left text-xs font-medium"
-                          style={{ color: "var(--color-text-secondary)" }}
-                        >
+                        <TableHead key={h} className="px-4 py-3 text-xs">
                           {h}
-                        </th>
+                        </TableHead>
                       ))}
-                    </tr>
-                  </thead>
-                  <tbody>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {problems.map((h) => (
-                      <tr
-                        key={h.id}
-                        className="border-b border-border last:border-0 hover:bg-surface-subtle"
-                      >
-                        <td className="px-4 py-3 text-sm">
+                      <TableRow key={h.id}>
+                        <TableCell className="px-4 py-3 text-sm">
                           {h.products?.display_name ?? "—"}
-                        </td>
-                        <td className="px-4 py-3">
+                        </TableCell>
+                        <TableCell className="px-4 py-3">
                           <div className="text-sm font-medium text-foreground">
                             {h.title}
                           </div>
@@ -101,24 +105,24 @@ export default async function HypothesisPage() {
                               {h.description}
                             </div>
                           )}
-                        </td>
-                        <td className="px-4 py-3 text-sm">
+                        </TableCell>
+                        <TableCell className="px-4 py-3 text-sm">
                           {h.confidence ? `${h.confidence}%` : "—"}
-                        </td>
-                        <td className="px-4 py-3">
+                        </TableCell>
+                        <TableCell className="px-4 py-3">
                           <Badge variant="outline">{h.state}</Badge>
-                        </td>
-                        <td
+                        </TableCell>
+                        <TableCell
                           className="px-4 py-3 text-sm"
                           style={{ color: "var(--color-text-secondary)" }}
                         >
                           {new Date(h.created_at).toLocaleDateString("ja-JP")}
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     ))}
-                  </tbody>
-                </table>
-              </div>
+                  </TableBody>
+                </Table>
+              </Card>
             </div>
           )}
 
@@ -131,10 +135,10 @@ export default async function HypothesisPage() {
               >
                 解決策仮説
               </h2>
-              <div className="rounded-lg border border-border overflow-hidden">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-border bg-surface-subtle">
+              <Card className="overflow-hidden">
+                <Table>
+                  <TableHeader className="bg-surface-subtle">
+                    <TableRow>
                       {[
                         "プロダクト",
                         "タイトル",
@@ -142,26 +146,19 @@ export default async function HypothesisPage() {
                         "状態",
                         "作成日",
                       ].map((h) => (
-                        <th
-                          key={h}
-                          className="px-4 py-3 text-left text-xs font-medium"
-                          style={{ color: "var(--color-text-secondary)" }}
-                        >
+                        <TableHead key={h} className="px-4 py-3 text-xs">
                           {h}
-                        </th>
+                        </TableHead>
                       ))}
-                    </tr>
-                  </thead>
-                  <tbody>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {solutions.map((h) => (
-                      <tr
-                        key={h.id}
-                        className="border-b border-border last:border-0 hover:bg-surface-subtle"
-                      >
-                        <td className="px-4 py-3 text-sm">
+                      <TableRow key={h.id}>
+                        <TableCell className="px-4 py-3 text-sm">
                           {h.products?.display_name ?? "—"}
-                        </td>
-                        <td className="px-4 py-3">
+                        </TableCell>
+                        <TableCell className="px-4 py-3">
                           <div className="text-sm font-medium text-foreground">
                             {h.title}
                           </div>
@@ -173,24 +170,24 @@ export default async function HypothesisPage() {
                               {h.description}
                             </div>
                           )}
-                        </td>
-                        <td className="px-4 py-3 text-sm">
+                        </TableCell>
+                        <TableCell className="px-4 py-3 text-sm">
                           {h.confidence ? `${h.confidence}%` : "—"}
-                        </td>
-                        <td className="px-4 py-3">
+                        </TableCell>
+                        <TableCell className="px-4 py-3">
                           <Badge variant="outline">{h.state}</Badge>
-                        </td>
-                        <td
+                        </TableCell>
+                        <TableCell
                           className="px-4 py-3 text-sm"
                           style={{ color: "var(--color-text-secondary)" }}
                         >
                           {new Date(h.created_at).toLocaleDateString("ja-JP")}
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     ))}
-                  </tbody>
-                </table>
-              </div>
+                  </TableBody>
+                </Table>
+              </Card>
             </div>
           )}
 
@@ -203,10 +200,10 @@ export default async function HypothesisPage() {
               >
                 バックログ
               </h2>
-              <div className="rounded-lg border border-border overflow-hidden">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-border bg-surface-subtle">
+              <Card className="overflow-hidden">
+                <Table>
+                  <TableHeader className="bg-surface-subtle">
+                    <TableRow>
                       {[
                         "プロダクト",
                         "タイトル",
@@ -214,26 +211,19 @@ export default async function HypothesisPage() {
                         "状態",
                         "作成日",
                       ].map((h) => (
-                        <th
-                          key={h}
-                          className="px-4 py-3 text-left text-xs font-medium"
-                          style={{ color: "var(--color-text-secondary)" }}
-                        >
+                        <TableHead key={h} className="px-4 py-3 text-xs">
                           {h}
-                        </th>
+                        </TableHead>
                       ))}
-                    </tr>
-                  </thead>
-                  <tbody>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {backlog.map((item) => (
-                      <tr
-                        key={item.id}
-                        className="border-b border-border last:border-0 hover:bg-surface-subtle"
-                      >
-                        <td className="px-4 py-3 text-sm">
+                      <TableRow key={item.id}>
+                        <TableCell className="px-4 py-3 text-sm">
                           {item.products?.display_name ?? "—"}
-                        </td>
-                        <td className="px-4 py-3">
+                        </TableCell>
+                        <TableCell className="px-4 py-3">
                           <div className="text-sm font-medium text-foreground">
                             {item.title}
                           </div>
@@ -245,34 +235,34 @@ export default async function HypothesisPage() {
                               {item.description}
                             </div>
                           )}
-                        </td>
-                        <td className="px-4 py-3">
-                          <span
-                            className="rounded px-1.5 py-0.5 text-xs font-medium text-white"
+                        </TableCell>
+                        <TableCell className="px-4 py-3">
+                          <Badge
+                            className="text-white"
                             style={{
                               backgroundColor:
                                 PRIORITY_COLORS[item.priority] ?? "#6B7280",
                             }}
                           >
                             {item.priority}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="px-4 py-3">
                           <Badge variant="outline">{item.state}</Badge>
-                        </td>
-                        <td
+                        </TableCell>
+                        <TableCell
                           className="px-4 py-3 text-sm"
                           style={{ color: "var(--color-text-secondary)" }}
                         >
                           {new Date(item.created_at).toLocaleDateString(
                             "ja-JP",
                           )}
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     ))}
-                  </tbody>
-                </table>
-              </div>
+                  </TableBody>
+                </Table>
+              </Card>
             </div>
           )}
         </>

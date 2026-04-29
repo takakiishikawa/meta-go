@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { EmptyState, PageHeader } from "@takaki/go-design-system";
+import { Card, EmptyState, PageHeader } from "@takaki/go-design-system";
 import { Rocket } from "lucide-react";
 import {
   fetchAllDeployments,
@@ -37,7 +37,7 @@ function StatCard({
   children?: React.ReactNode;
 }) {
   return (
-    <div className="overflow-hidden rounded-lg border border-border bg-surface">
+    <Card className="overflow-hidden">
       <div className="h-1" style={{ backgroundColor: accent }} />
       <div className="p-4">
         <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -53,7 +53,7 @@ function StatCard({
         )}
         {children}
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -240,7 +240,7 @@ export default async function DeploymentsPage() {
         </StatCard>
       </div>
 
-      <div className="rounded-lg border border-border bg-surface p-4">
+      <Card className="p-4">
         <div className="mb-3 flex items-baseline justify-between">
           <span className="text-sm font-semibold text-foreground">
             デプロイ成功数の推移
@@ -250,7 +250,7 @@ export default async function DeploymentsPage() {
           </span>
         </div>
         <DeploySuccessTrendChart data={successTrend} products={productSeries} />
-      </div>
+      </Card>
 
       {tableRows.length === 0 ? (
         <EmptyState

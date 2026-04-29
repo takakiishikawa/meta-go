@@ -137,12 +137,6 @@ const navGroups: { label: string; items: NavItem[] }[] = [
   },
 ];
 
-function scoreColor(score: number): string {
-  if (score >= 80) return "#36B37E";
-  if (score >= 60) return "#FF8B00";
-  return "#FF5630";
-}
-
 export function MetaGoSidebar({ scores }: { scores?: SidebarScores }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -212,10 +206,7 @@ export function MetaGoSidebar({ scores }: { scores?: SidebarScores }) {
                           <item.icon className="h-4 w-4 shrink-0" />
                           <span className="flex-1 truncate">{item.title}</span>
                           {score !== null && (
-                            <span
-                              className="ml-auto text-xs font-semibold tabular-nums"
-                              style={{ color: scoreColor(score) }}
-                            >
+                            <span className="ml-auto text-xs font-semibold tabular-nums">
                               {score}
                             </span>
                           )}

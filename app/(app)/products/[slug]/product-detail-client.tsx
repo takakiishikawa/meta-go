@@ -3,6 +3,7 @@
 import { useState } from "react";
 import {
   Badge,
+  Card,
   PageHeader,
   Tabs,
   TabsContent,
@@ -163,7 +164,7 @@ export function ProductDetailClient({
                 </div>
               </div>
               {psfChartData.length > 1 && (
-                <div className="rounded-lg border border-border bg-surface p-4">
+                <Card className="p-4">
                   <h3
                     className="mb-3 font-medium text-foreground"
                     style={{ fontSize: "var(--text-sm)" }}
@@ -204,7 +205,7 @@ export function ProductDetailClient({
                       />
                     </LineChart>
                   </ResponsiveContainer>
-                </div>
+                </Card>
               )}
             </div>
           )}
@@ -267,7 +268,7 @@ function StatCard({
   color: string;
 }) {
   return (
-    <div className="rounded-lg border border-border bg-surface p-4 flex flex-col items-center gap-2">
+    <Card className="p-4 flex flex-col items-center gap-2">
       <ScoreDonut score={value} size={56} color={color} />
       <span
         style={{
@@ -277,7 +278,7 @@ function StatCard({
       >
         {label}
       </span>
-    </div>
+    </Card>
   );
 }
 
@@ -291,7 +292,7 @@ function InfoCard({
   link?: string;
 }) {
   return (
-    <div className="rounded-lg border border-border bg-surface p-3">
+    <Card className="p-3">
       <div
         style={{
           fontSize: "var(--text-xs)",
@@ -314,7 +315,7 @@ function InfoCard({
       ) : (
         <div className="text-sm font-medium text-foreground">{value}</div>
       )}
-    </div>
+    </Card>
   );
 }
 
@@ -398,15 +399,15 @@ function SecurityTable({ items }: { items: any[] }) {
                 {item.title}
               </td>
               <td className="px-4 py-2">
-                <span
-                  className="rounded px-1.5 py-0.5 text-xs font-medium text-white"
+                <Badge
+                  className="text-white"
                   style={{
                     backgroundColor:
                       SEVERITY_COLORS[item.severity] ?? "#6B7280",
                   }}
                 >
                   {item.severity}
-                </span>
+                </Badge>
               </td>
               <td className="px-4 py-2">
                 <Badge variant={isResolved(item.state) ? "default" : "outline"}>
@@ -497,15 +498,15 @@ function BacklogTable({ items }: { items: any[] }) {
                 {item.title}
               </td>
               <td className="px-4 py-2">
-                <span
-                  className="rounded px-1.5 py-0.5 text-xs font-medium text-white"
+                <Badge
+                  className="text-white"
                   style={{
                     backgroundColor:
                       PRIORITY_COLORS[item.priority] ?? "#6B7280",
                   }}
                 >
                   {item.priority}
-                </span>
+                </Badge>
               </td>
               <td className="px-4 py-2">
                 <Badge variant="outline">{item.state}</Badge>

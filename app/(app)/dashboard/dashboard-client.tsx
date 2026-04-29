@@ -3,7 +3,13 @@
 import Link from "next/link";
 import { useMemo } from "react";
 import { AlertCircle, Clock, ArrowUpRight, GitMerge, Activity } from "lucide-react";
-import { Badge, EmptyState, PageHeader } from "@takaki/go-design-system";
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  PageHeader,
+} from "@takaki/go-design-system";
 import {
   MultiProductTrendChart,
   type TrendPoint as MultiTrendPoint,
@@ -142,14 +148,18 @@ export function DashboardClient({
         description="goシリーズ全体の健全性を俯瞰する"
         actions={
           pendingApprovals.length > 0 ? (
-            <Link
-              href="/approval"
-              className="flex items-center gap-2 rounded-md border border-warning bg-warning-subtle px-3 py-2 text-sm font-medium text-warning transition-colors hover:opacity-80"
+            <Button
+              asChild
+              variant="outline"
+              size="sm"
+              className="border-warning bg-warning-subtle text-warning hover:bg-warning-subtle hover:opacity-80"
             >
-              <AlertCircle className="size-4" />
-              承認待ち {pendingApprovals.length}件
-              <ArrowUpRight className="size-3" />
-            </Link>
+              <Link href="/approval">
+                <AlertCircle className="size-4" />
+                承認待ち {pendingApprovals.length}件
+                <ArrowUpRight className="size-3" />
+              </Link>
+            </Button>
           ) : undefined
         }
       />
@@ -231,7 +241,7 @@ export function DashboardClient({
 
           {/* Recent Approvals */}
           {pendingApprovals.length > 0 && (
-            <div className="rounded-lg border border-border bg-surface p-4">
+            <Card className="p-4">
               <div className="mb-3 flex items-center justify-between">
                 <h2
                   className="font-semibold text-foreground"
@@ -268,7 +278,7 @@ export function DashboardClient({
                   </div>
                 ))}
               </div>
-            </div>
+            </Card>
           )}
         </>
       )}
@@ -295,7 +305,7 @@ function KpiCard({
   accent: string;
 }) {
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-border bg-surface px-4 py-3">
+    <Card className="flex items-center gap-3 px-4 py-3">
       <span
         className="inline-flex size-8 shrink-0 items-center justify-center rounded-md"
         style={{ backgroundColor: accent + "1A", color: accent }}
@@ -316,7 +326,7 @@ function KpiCard({
           </span>
         </div>
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -332,7 +342,7 @@ function ChartCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-lg border border-border bg-surface p-4">
+    <Card className="p-4">
       <div className="mb-3 flex items-baseline justify-between gap-3">
         <span className="text-sm font-semibold text-foreground">{title}</span>
         {actions ? (
@@ -347,6 +357,6 @@ function ChartCard({
         </div>
       )}
       {children}
-    </div>
+    </Card>
   );
 }

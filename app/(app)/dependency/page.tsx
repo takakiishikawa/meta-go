@@ -127,6 +127,9 @@ export default async function DependencyPage() {
     info.versions[item.product_id] = item.version ?? "—";
   }
 
+  // アップデート状況テーブル / IssueTrendSection 用 issue リスト (未解決のみ)
+  const openItems = allItems.filter((i) => !isResolved(i.state));
+
   const total = allProducts.length;
   const shared: PackageRow[] = [];
   const partial: PackageRow[] = [];
@@ -226,18 +229,18 @@ export default async function DependencyPage() {
         />
       )}
 
-      {/* アップデート状況 */}
+      {/* アップデート状況 (未解決のみ) */}
       <Card>
         <CardHeader className="flex-row items-baseline justify-between gap-3 space-y-0 border-b border-border bg-muted/40 px-5 py-3">
           <div className="flex items-baseline gap-2">
-            <CardTitle className="text-sm">アップデート状況</CardTitle>
+            <CardTitle className="text-sm">未解決のアップデート</CardTitle>
           </div>
           <Badge variant="outline" className="font-mono">
-            {allItems.length} items
+            {openItems.length} items
           </Badge>
         </CardHeader>
         <CardContent className="p-0">
-          {allItems.length === 0 ? (
+          {openItems.length === 0 ? (
             <div className="p-6">
               <EmptyState
                 icon={<Package className="size-12" />}
@@ -273,7 +276,7 @@ export default async function DependencyPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {allItems.map((item) => {
+                {openItems.map((item) => {
                   const accent =
                     (item.products as { primary_color?: string } | null)
                       ?.primary_color ?? "#6B7280";

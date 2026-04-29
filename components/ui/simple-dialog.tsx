@@ -1,8 +1,11 @@
 "use client";
 
-import { Button } from "@takaki/go-design-system";
-import { X } from "lucide-react";
-import { useEffect } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@takaki/go-design-system";
 
 interface SimpleDialogProps {
   open: boolean;
@@ -17,38 +20,19 @@ export function SimpleDialog({
   title,
   children,
 }: SimpleDialogProps) {
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
-  }, [open, onClose]);
-
-  if (!open) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-2xl rounded-lg border border-border bg-surface border border-border flex flex-col max-h-[85vh]">
-        <div className="flex items-start justify-between gap-4 px-6 py-4 border-b border-border shrink-0">
-          <h2 className="text-base font-semibold text-foreground">{title}</h2>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onClose}
-            className="size-7 shrink-0"
-            aria-label="Close dialog"
-          >
-            <X
-              className="size-4"
-              style={{ color: "var(--color-text-secondary)" }}
-            />
-          </Button>
-        </div>
-        <div className="overflow-y-auto px-6 py-4">{children}</div>
-      </div>
-    </div>
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) onClose();
+      }}
+    >
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+        </DialogHeader>
+        {children}
+      </DialogContent>
+    </Dialog>
   );
 }

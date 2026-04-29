@@ -1,6 +1,17 @@
 "use client";
 
-import { PageHeader, EmptyState, Badge } from "@takaki/go-design-system";
+import {
+  PageHeader,
+  EmptyState,
+  Badge,
+  Card,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@takaki/go-design-system";
 import { Key, ExternalLink, RefreshCw } from "lucide-react";
 
 interface ApiKey {
@@ -94,21 +105,23 @@ function ProductDots({
     <div className="flex flex-wrap gap-1">
       {slugs.map((slug) => {
         const p = products.find((p) => p.name === slug);
+        const color = p?.primary_color ?? "#6B7280";
         return (
-          <span
+          <Badge
             key={slug}
-            className="flex items-center gap-1 rounded-full px-1.5 py-0.5 text-xs font-medium"
+            variant="outline"
+            className="gap-1 rounded-full border-transparent"
             style={{
-              backgroundColor: (p?.primary_color ?? "#6B7280") + "22",
-              color: p?.primary_color ?? "#6B7280",
+              backgroundColor: color + "22",
+              color,
             }}
           >
             <span
               className="size-1.5 rounded-full inline-block"
-              style={{ backgroundColor: p?.primary_color ?? "#6B7280" }}
+              style={{ backgroundColor: color }}
             />
             {p?.display_name ?? slug}
-          </span>
+          </Badge>
         );
       })}
     </div>
@@ -206,10 +219,10 @@ export function ApisClient({
                   {keys.length}件
                 </span>
               </div>
-              <div className="rounded-lg border border-border overflow-hidden">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-border bg-surface-subtle">
+              <Card className="overflow-hidden">
+                <Table>
+                  <TableHeader className="bg-surface-subtle">
+                    <TableRow>
                       {[
                         "環境変数名",
                         "サービス",
@@ -217,28 +230,21 @@ export function ApisClient({
                         "メモ",
                         "最終検出",
                       ].map((h) => (
-                        <th
-                          key={h}
-                          className="px-4 py-2.5 text-left text-xs font-medium"
-                          style={{ color: "var(--color-text-secondary)" }}
-                        >
+                        <TableHead key={h} className="px-4 py-2.5 text-xs">
                           {h}
-                        </th>
+                        </TableHead>
                       ))}
-                    </tr>
-                  </thead>
-                  <tbody>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {keys.map((key) => {
                       const displayName =
                         key.name || inferDisplayName(key.env_var_name);
                       const displayProvider = key.provider;
                       return (
-                        <tr
-                          key={key.id}
-                          className="border-b border-border last:border-0 hover:bg-surface-subtle"
-                        >
+                        <TableRow key={key.id}>
                           {/* 環境変数名 */}
-                          <td className="px-4 py-3">
+                          <TableCell className="px-4 py-3">
                             <div className="flex items-center gap-2">
                               <code className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono text-foreground">
                                 {key.env_var_name}
@@ -256,10 +262,10 @@ export function ApisClient({
                                 </span>
                               )}
                             </div>
-                          </td>
+                          </TableCell>
 
                           {/* サービス名 */}
-                          <td className="px-4 py-3">
+                          <TableCell className="px-4 py-3">
                             {displayName ? (
                               <div>
                                 <div className="text-sm font-medium text-foreground">
@@ -284,28 +290,28 @@ export function ApisClient({
                                 —
                               </span>
                             )}
-                          </td>
+                          </TableCell>
 
                           {/* 利用プロダクト */}
-                          <td className="px-4 py-3 max-w-[220px]">
+                          <TableCell className="px-4 py-3 max-w-[220px]">
                             <ProductDots
                               slugs={key.used_by}
                               products={products}
                             />
-                          </td>
+                          </TableCell>
 
                           {/* メモ */}
-                          <td className="px-4 py-3 max-w-[180px]">
+                          <TableCell className="px-4 py-3 max-w-[180px]">
                             <span
                               className="text-xs line-clamp-2"
                               style={{ color: "var(--color-text-secondary)" }}
                             >
                               {key.notes || "—"}
                             </span>
-                          </td>
+                          </TableCell>
 
                           {/* 最終検出 */}
-                          <td
+                          <TableCell
                             className="px-4 py-3 text-xs whitespace-nowrap"
                             style={{ color: "var(--color-text-secondary)" }}
                           >
@@ -314,13 +320,13 @@ export function ApisClient({
                                   "ja-JP",
                                 )
                               : "—"}
-                          </td>
-                        </tr>
+                          </TableCell>
+                        </TableRow>
                       );
                     })}
-                  </tbody>
-                </table>
-              </div>
+                  </TableBody>
+                </Table>
+              </Card>
             </div>
           ))}
         </div>

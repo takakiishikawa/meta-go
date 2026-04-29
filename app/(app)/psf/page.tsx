@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { EmptyState, PageHeader, Spinner } from "@takaki/go-design-system";
+import { Card, EmptyState, PageHeader, Spinner } from "@takaki/go-design-system";
 import { ScoreDonut } from "@/components/score/score-donut";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import {
@@ -110,10 +110,7 @@ export default function PsfPage() {
               const color =
                 product.primary_color || GO_COLORS[product.name] || "#6B7280";
               return (
-                <div
-                  key={product.id}
-                  className="rounded-lg border border-border bg-surface p-4"
-                >
+                <Card key={product.id} className="p-4">
                   <div className="mb-3 flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div
@@ -185,14 +182,14 @@ export default function PsfPage() {
                       </span>
                     </div>
                   )}
-                </div>
+                </Card>
               );
             })}
           </div>
 
           {/* PSF Trend Chart */}
           {chartArray.length > 0 && (
-            <div className="rounded-lg border border-border bg-surface p-4">
+            <Card className="p-4">
               <h2
                 className="mb-4 font-semibold text-foreground"
                 style={{ fontSize: "var(--text-base)" }}
@@ -222,7 +219,7 @@ export default function PsfPage() {
                   ))}
                 </LineChart>
               </ResponsiveContainer>
-            </div>
+            </Card>
           )}
         </>
       )}

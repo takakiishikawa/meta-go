@@ -1,7 +1,16 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Badge, Button, EmptyState } from "@takaki/go-design-system";
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  Table,
+  TableBody,
+  TableCell,
+  TableRow,
+} from "@takaki/go-design-system";
 import {
   CheckCircle2,
   CheckCircle,
@@ -356,15 +365,12 @@ export function ApprovalClient({ items }: { items: ApprovalItem[] }) {
           <h2 className="mb-3 text-sm font-semibold text-foreground">
             処理済み（直近）
           </h2>
-          <div className="rounded-lg border border-border overflow-hidden">
-            <table className="w-full">
-              <tbody>
+          <Card className="overflow-hidden">
+            <Table>
+              <TableBody>
                 {resolved.slice(0, 15).map((item) => (
-                  <tr
-                    key={item.id}
-                    className="border-b border-border last:border-0 hover:bg-surface-subtle"
-                  >
-                    <td className="px-4 py-3">
+                  <TableRow key={item.id}>
+                    <TableCell className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <div
                           className="size-2 rounded-full shrink-0"
@@ -380,16 +386,16 @@ export function ApprovalClient({ items }: { items: ApprovalItem[] }) {
                           {item.products?.display_name ?? "—"}
                         </span>
                       </div>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-foreground">
+                    </TableCell>
+                    <TableCell className="px-4 py-3 text-sm text-foreground">
                       {item.title}
-                    </td>
-                    <td className="px-4 py-3">
+                    </TableCell>
+                    <TableCell className="px-4 py-3">
                       <Badge variant="outline">
                         {CATEGORY_LABELS[item.category] ?? item.category}
                       </Badge>
-                    </td>
-                    <td className="px-4 py-3">
+                    </TableCell>
+                    <TableCell className="px-4 py-3">
                       {item.meta?.pr_url && (
                         <a
                           href={item.meta.pr_url}
@@ -402,8 +408,8 @@ export function ApprovalClient({ items }: { items: ApprovalItem[] }) {
                           PR
                         </a>
                       )}
-                    </td>
-                    <td className="px-4 py-3">
+                    </TableCell>
+                    <TableCell className="px-4 py-3">
                       {item.state === "approved" ? (
                         <div className="flex items-center gap-1 text-xs text-success">
                           <CheckCircle className="size-3" />
@@ -415,20 +421,20 @@ export function ApprovalClient({ items }: { items: ApprovalItem[] }) {
                           却下
                         </div>
                       )}
-                    </td>
-                    <td
+                    </TableCell>
+                    <TableCell
                       className="px-4 py-3 text-xs whitespace-nowrap"
                       style={{ color: "var(--color-text-secondary)" }}
                     >
                       {item.resolved_at
                         ? new Date(item.resolved_at).toLocaleDateString("ja-JP")
                         : "—"}
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </TableBody>
+            </Table>
+          </Card>
         </div>
       )}
     </>

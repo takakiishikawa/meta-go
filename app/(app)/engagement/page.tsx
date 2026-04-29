@@ -2,7 +2,18 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { EmptyState, PageHeader, Spinner } from "@takaki/go-design-system";
+import {
+  Card,
+  EmptyState,
+  PageHeader,
+  Spinner,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@takaki/go-design-system";
 import { Activity, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import {
   LineChart,
@@ -91,24 +102,20 @@ export default function EngagementPage() {
       ) : (
         <>
           {/* Summary table */}
-          <div className="rounded-lg border border-border overflow-hidden">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border bg-surface-subtle">
+          <Card className="overflow-hidden">
+            <Table>
+              <TableHeader className="bg-surface-subtle">
+                <TableRow>
                   {["プロダクト", "最新利用数", "トレンド", "測定日"].map(
                     (h) => (
-                      <th
-                        key={h}
-                        className="px-4 py-3 text-left text-xs font-medium"
-                        style={{ color: "var(--color-text-secondary)" }}
-                      >
+                      <TableHead key={h} className="px-4 py-3 text-xs">
                         {h}
-                      </th>
+                      </TableHead>
                     ),
                   )}
-                </tr>
-              </thead>
-              <tbody>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {products.map((product) => {
                   const latest = latestPerProduct[product.id];
                   const color =
@@ -116,11 +123,8 @@ export default function EngagementPage() {
                     GO_COLORS[product.name] ||
                     "#6B7280";
                   return (
-                    <tr
-                      key={product.id}
-                      className="border-b border-border last:border-0 hover:bg-surface-subtle"
-                    >
-                      <td className="px-4 py-3">
+                    <TableRow key={product.id}>
+                      <TableCell className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           <div
                             className="size-2.5 rounded-full"
@@ -130,11 +134,11 @@ export default function EngagementPage() {
                             {product.display_name}
                           </span>
                         </div>
-                      </td>
-                      <td className="px-4 py-3 text-sm font-medium text-foreground">
+                      </TableCell>
+                      <TableCell className="px-4 py-3 text-sm font-medium text-foreground">
                         {latest ? latest.usage_count : "—"}
-                      </td>
-                      <td className="px-4 py-3">
+                      </TableCell>
+                      <TableCell className="px-4 py-3">
                         {latest?.trend === "up" ? (
                           <TrendingUp className="size-4 text-success" />
                         ) : latest?.trend === "down" ? (
@@ -145,8 +149,8 @@ export default function EngagementPage() {
                             style={{ color: "var(--color-text-secondary)" }}
                           />
                         )}
-                      </td>
-                      <td
+                      </TableCell>
+                      <TableCell
                         className="px-4 py-3 text-sm"
                         style={{ color: "var(--color-text-secondary)" }}
                       >
@@ -155,17 +159,17 @@ export default function EngagementPage() {
                               "ja-JP",
                             )
                           : "—"}
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   );
                 })}
-              </tbody>
-            </table>
-          </div>
+              </TableBody>
+            </Table>
+          </Card>
 
           {/* Chart */}
           {chartArray.length > 0 && (
-            <div className="rounded-lg border border-border bg-surface p-4">
+            <Card className="p-4">
               <h2
                 className="mb-4 font-semibold text-foreground"
                 style={{ fontSize: "var(--text-base)" }}
@@ -195,7 +199,7 @@ export default function EngagementPage() {
                   ))}
                 </LineChart>
               </ResponsiveContainer>
-            </div>
+            </Card>
           )}
         </>
       )}
