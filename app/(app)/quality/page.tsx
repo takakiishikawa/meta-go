@@ -147,26 +147,11 @@ export default async function QualityPage({
 
       <IssueStatsBanner stats={issueStats} />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="flex items-center gap-4 rounded-lg border border-border bg-surface p-4">
-          <ScoreDonut score={avgScore} size={72} />
-          <div>
-            <div className="text-2xl font-semibold text-foreground">
-              {avgScore ?? "—"}
-            </div>
-            <div
-              style={{
-                fontSize: "var(--text-sm)",
-                color: "var(--color-text-secondary)",
-              }}
-            >
-              全go平均スコア
-            </div>
-          </div>
-        </div>
-        <div className="rounded-lg border border-border bg-surface p-4">
+      <div className="flex w-fit items-center gap-4 rounded-lg border border-border bg-surface p-4">
+        <ScoreDonut score={avgScore} size={72} />
+        <div>
           <div className="text-2xl font-semibold text-foreground">
-            {allItems.filter((i) => i.state === "new").length}
+            {avgScore ?? "—"}
           </div>
           <div
             style={{
@@ -174,20 +159,7 @@ export default async function QualityPage({
               color: "var(--color-text-secondary)",
             }}
           >
-            未対応の問題
-          </div>
-        </div>
-        <div className="rounded-lg border border-border bg-surface p-4">
-          <div className="text-2xl font-semibold text-foreground">
-            {allItems.filter((i) => isResolved(i.state)).length}
-          </div>
-          <div
-            style={{
-              fontSize: "var(--text-sm)",
-              color: "var(--color-text-secondary)",
-            }}
-          >
-            解決済み
+            全go平均スコア
           </div>
         </div>
       </div>

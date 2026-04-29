@@ -1,29 +1,24 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
   AlertCircle,
   Clock,
   ArrowUpRight,
   GitMerge,
   Activity,
-  AlertTriangle,
-  TrendingUp,
-  TrendingDown,
-  Minus,
+  Rocket,
 } from "lucide-react";
 import { Badge, EmptyState, PageHeader } from "@takaki/go-design-system";
-import { ScoreDonut } from "@/components/score/score-donut";
-import { SimpleDialog } from "@/components/ui/simple-dialog";
-import {
-  ScoreTrendChart,
-  type TrendPoint,
-} from "@/components/charts/score-trend-chart";
 import {
   MultiProductTrendChart,
   type TrendPoint as MultiTrendPoint,
 } from "@/components/charts/multi-product-trend";
+import {
+  IssueTrendChart,
+  type IssueTrendPoint,
+} from "@/components/charts/issue-trend-chart";
 
 interface Product {
   id: string;
@@ -55,13 +50,14 @@ export type TrendByProduct = Record<
 interface DashboardClientProps {
   products: Product[];
   pendingApprovals: ApprovalItem[];
-  latestByPC: Record<string, number>;
-  weekAgoByPC: Record<string, number>;
   trendByProduct: TrendByProduct;
+  issueTrend: IssueTrendPoint[];
+  deployStats: { success: number; failure: number; pending: number };
   kpi: {
     resolvedLast7Days: number;
+    resolvedDelta: number;
     detectedLast7Days: number;
-    openIssues: number;
+    detectedDelta: number;
   };
 }
 
@@ -74,45 +70,20 @@ const GO_COLORS: Record<string, string> = {
   taskgo: "#00B8D9",
 };
 
-const CATEGORY_LABELS: Record<Cat, string> = {
-  quality: "コード品質",
-  security: "セキュリティ",
-  design_system: "デザインシステム",
-  performance: "パフォーマンス",
-};
-
 const CATS: Cat[] = ["quality", "security", "design_system", "performance"];
-
-function avg(values: number[]): number | null {
-  if (values.length === 0) return null;
-  return Math.round(values.reduce((a, b) => a + b, 0) / values.length);
-}
-
-function overallScore(
-  productId: string,
-  latestByPC: Record<string, number>,
-): number | null {
-  const values = CATS.map((c) => latestByPC[`${productId}|${c}`]).filter(
-    (v): v is number => v != null,
-  );
-  return avg(values);
-}
 
 export function DashboardClient({
   products,
   pendingApprovals,
-  latestByPC,
-  weekAgoByPC,
   trendByProduct,
+  issueTrend,
+  deployStats,
   kpi,
 }: DashboardClientProps) {
   const hasData = products.length > 0;
-  const [trendOpen, setTrendOpen] = useState<Product | null>(null);
 
-  // 全プロダクトの overall (4カテゴリ平均) スコアの全期間トレンドを組み立て
-  // 範囲は trendByProduct 内に存在する最古〜最新の日付。空き日は null で埋める
+  // 全プロダクトの overall (4カテゴリ平均) スコアの全期間トレンド
   const overviewTrend = useMemo<MultiTrendPoint[]>(() => {
-    // page.tsx 側で collected_at.slice(0,10) を date key にしているのでそれをそのまま使う
     const allDateKeys = new Set<string>();
     for (const productId of Object.keys(trendByProduct)) {
       for (const dateKey of Object.keys(trendByProduct[productId])) {
@@ -171,6 +142,9 @@ export function DashboardClient({
     [products],
   );
 
+  const deployTotal =
+    deployStats.success + deployStats.failure + deployStats.pending;
+
   return (
     <>
       <PageHeader
@@ -190,28 +164,23 @@ export function DashboardClient({
         }
       />
 
-      {/* Global KPI strip — 全て issue (item) 単位で統一 */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      {/* KPI: 直近7日の検知 / 解決 (前7日比) */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <KpiCard
           icon={<GitMerge className="size-4" />}
-          label="直近1週間で解決済み"
+          label="直近7日に解決"
           value={kpi.resolvedLast7Days}
-          sublabel="解決された issue 数"
+          delta={kpi.resolvedDelta}
+          sublabel="解決された issue 数 / 前7日比"
           accent="#36B37E"
         />
         <KpiCard
           icon={<Activity className="size-4" />}
-          label="直近1週間で検知"
+          label="直近7日に検知"
           value={kpi.detectedLast7Days}
-          sublabel="新たに検知された issue 数"
+          delta={kpi.detectedDelta}
+          sublabel="新規検知された issue 数 / 前7日比"
           accent="#0052CC"
-        />
-        <KpiCard
-          icon={<AlertTriangle className="size-4" />}
-          label="未解決の問題"
-          value={kpi.openIssues}
-          sublabel="残 issue の総数"
-          accent="#FF8B00"
         />
       </div>
 
@@ -222,6 +191,63 @@ export function DashboardClient({
         />
       ) : (
         <>
+          {/* Issue trend (検知 vs 解決) */}
+          <div className="rounded-lg border border-border bg-surface p-4">
+            <div className="mb-3 flex items-baseline justify-between">
+              <span className="text-sm font-semibold text-foreground">
+                issue 検知 / 解決 推移
+              </span>
+              <span className="text-xs text-muted-foreground">
+                過去 {issueTrend.length} 日 / 全カテゴリ合算
+              </span>
+            </div>
+            <IssueTrendChart data={issueTrend} height={260} />
+          </div>
+
+          {/* Deploy summary */}
+          <div className="rounded-lg border border-border bg-surface p-4">
+            <div className="mb-3 flex items-baseline justify-between">
+              <span className="text-sm font-semibold text-foreground">
+                デプロイ
+              </span>
+              <Link
+                href="/deployments"
+                className="flex items-center gap-1 text-xs"
+                style={{ color: "var(--color-primary)" }}
+              >
+                詳細
+                <ArrowUpRight className="size-3" />
+              </Link>
+            </div>
+            {deployTotal === 0 ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Rocket className="size-4" />
+                直近7日のデプロイは観測されていません
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 gap-3">
+                <DeployStat
+                  label="成功"
+                  value={deployStats.success}
+                  accent="#36B37E"
+                />
+                <DeployStat
+                  label="失敗"
+                  value={deployStats.failure}
+                  accent="#FF5630"
+                />
+                <DeployStat
+                  label="進行中"
+                  value={deployStats.pending}
+                  accent="#0052CC"
+                />
+              </div>
+            )}
+            <div className="mt-2 text-xs text-muted-foreground">
+              直近7日 / 全プロダクト合算
+            </div>
+          </div>
+
           {/* All-products score trend */}
           <div className="rounded-lg border border-border bg-surface p-4">
             <div className="mb-3 flex items-baseline justify-between">
@@ -237,32 +263,6 @@ export function DashboardClient({
               products={overviewSeries}
               height={260}
             />
-          </div>
-
-          {/* Product Grid */}
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
-            {products.map((product) => {
-              const score = overallScore(product.id, latestByPC);
-              const prevValues = CATS.map(
-                (c) => weekAgoByPC[`${product.id}|${c}`],
-              ).filter((v): v is number => v != null);
-              const prev = avg(prevValues);
-              const delta =
-                score !== null && prev !== null ? score - prev : null;
-              const color =
-                product.primary_color || GO_COLORS[product.name] || "#6B7280";
-              return (
-                <ProductCard
-                  key={product.id}
-                  product={product}
-                  score={score}
-                  delta={delta}
-                  color={color}
-                  latestByPC={latestByPC}
-                  onOpenTrend={() => setTrendOpen(product)}
-                />
-              );
-            })}
           </div>
 
           {/* Recent Approvals */}
@@ -306,40 +306,29 @@ export function DashboardClient({
               </div>
             </div>
           )}
-
-          {/* Trend modal */}
-          {trendOpen && (
-            <SimpleDialog
-              open={!!trendOpen}
-              onClose={() => setTrendOpen(null)}
-              title={`${trendOpen.display_name} — 過去30日のスコア推移`}
-            >
-              <TrendModalBody
-                trend={trendByProduct[trendOpen.id] ?? {}}
-                color={
-                  trendOpen.primary_color ||
-                  GO_COLORS[trendOpen.name] ||
-                  "#6B7280"
-                }
-              />
-            </SimpleDialog>
-          )}
         </>
       )}
     </>
   );
 }
 
+function formatDelta(n: number): string {
+  if (n === 0) return "±0";
+  return n > 0 ? `+${n}` : `${n}`;
+}
+
 function KpiCard({
   icon,
   label,
   value,
+  delta,
   sublabel,
   accent,
 }: {
   icon: React.ReactNode;
   label: string;
   value: number;
+  delta: number;
   sublabel: string;
   accent: string;
 }) {
@@ -347,18 +336,26 @@ function KpiCard({
     <div className="overflow-hidden rounded-lg border border-border bg-surface">
       <div className="h-1" style={{ backgroundColor: accent }} />
       <div className="p-4">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span
+              className="inline-flex size-7 items-center justify-center rounded-md"
+              style={{ backgroundColor: accent + "1A", color: accent }}
+            >
+              {icon}
+            </span>
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              {label}
+            </span>
+          </div>
           <span
-            className="inline-flex size-7 items-center justify-center rounded-md"
-            style={{ backgroundColor: accent + "1A", color: accent }}
+            className="text-xs font-semibold tabular-nums"
+            style={{ color: accent }}
           >
-            {icon}
-          </span>
-          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            {label}
+            {formatDelta(delta)} / 7d
           </span>
         </div>
-        <div className="mt-2 text-3xl font-semibold text-foreground">
+        <div className="mt-2 text-3xl font-semibold text-foreground tabular-nums">
           {value}
         </div>
         <div className="mt-0.5 text-xs text-muted-foreground">{sublabel}</div>
@@ -367,200 +364,24 @@ function KpiCard({
   );
 }
 
-function DeltaBadge({ delta }: { delta: number | null }) {
-  if (delta === null) {
-    return (
-      <span className="inline-flex items-center gap-0.5 rounded-full border border-border bg-muted/40 px-1.5 py-0.5 text-xs text-muted-foreground">
-        <Minus className="size-3" />—
-      </span>
-    );
-  }
-  if (delta === 0) {
-    return (
-      <span className="inline-flex items-center gap-0.5 rounded-full border border-border bg-muted/40 px-1.5 py-0.5 text-xs text-muted-foreground">
-        <Minus className="size-3" />
-        ±0
-      </span>
-    );
-  }
-  const positive = delta > 0;
-  const styles = positive
-    ? {
-        bg: "#DCFCE7",
-        fg: "#166534",
-        border: "#BBF7D0",
-        Icon: TrendingUp,
-        label: `+${delta}`,
-      }
-    : {
-        bg: "#FEE2E2",
-        fg: "#991B1B",
-        border: "#FECACA",
-        Icon: TrendingDown,
-        label: `${delta}`,
-      };
-  return (
-    <span
-      className="inline-flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-xs font-semibold"
-      style={{
-        backgroundColor: styles.bg,
-        color: styles.fg,
-        borderColor: styles.border,
-      }}
-    >
-      <styles.Icon className="size-3" />
-      {styles.label}
-    </span>
-  );
-}
-
-function ProductCard({
-  product,
-  score,
-  delta,
-  color,
-  latestByPC,
-  onOpenTrend,
+function DeployStat({
+  label,
+  value,
+  accent,
 }: {
-  product: Product;
-  score: number | null;
-  delta: number | null;
-  color: string;
-  latestByPC: Record<string, number>;
-  onOpenTrend: () => void;
+  label: string;
+  value: number;
+  accent: string;
 }) {
   return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={onOpenTrend}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onOpenTrend();
-        }
-      }}
-      className="group cursor-pointer rounded-lg border border-border bg-surface p-4 transition-colors hover:border-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-    >
-      {/* Product Header */}
-      <div className="mb-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div
-            className="size-3 rounded-full"
-            style={{ backgroundColor: color }}
-          />
-          <span
-            className="font-semibold text-foreground"
-            style={{
-              fontSize: "var(--text-base)",
-              fontWeight: "var(--font-weight-semibold)",
-            }}
-          >
-            {product.display_name}
-          </span>
-        </div>
-        <Link
-          href={`/products/${product.name}`}
-          onClick={(e) => e.stopPropagation()}
-          className="opacity-0 transition-opacity group-hover:opacity-100"
-          aria-label="プロダクト詳細を開く"
-        >
-          <ArrowUpRight
-            className="size-4"
-            style={{ color: "var(--color-text-secondary)" }}
-          />
-        </Link>
+    <div className="rounded-md border border-border p-3">
+      <div
+        className="text-2xl font-semibold tabular-nums"
+        style={{ color: value > 0 ? accent : "var(--color-foreground)" }}
+      >
+        {value}
       </div>
-
-      {/* Overall Score */}
-      <div className="mb-4 flex items-center gap-4">
-        <ScoreDonut score={score} size={64} color={color} />
-        <div>
-          <div className="flex items-baseline gap-2">
-            <span
-              className="font-semibold text-foreground"
-              style={{
-                fontSize: "var(--text-2xl)",
-                fontWeight: "var(--font-weight-bold)",
-              }}
-            >
-              {score !== null ? score : "—"}
-            </span>
-            <DeltaBadge delta={delta} />
-          </div>
-          <div
-            style={{
-              fontSize: "var(--text-xs)",
-              color: "var(--color-text-secondary)",
-            }}
-          >
-            総合スコア（前週比）
-          </div>
-        </div>
-      </div>
-
-      {/* Category Scores */}
-      <div className="grid grid-cols-2 gap-2">
-        {CATS.map((cat) => {
-          const v = latestByPC[`${product.id}|${cat}`];
-          return (
-            <div
-              key={cat}
-              className="flex items-center justify-between rounded border border-border px-2 py-1"
-            >
-              <span
-                style={{
-                  fontSize: "var(--text-xs)",
-                  color: "var(--color-text-secondary)",
-                }}
-              >
-                {CATEGORY_LABELS[cat]}
-              </span>
-              <span
-                className="font-medium"
-                style={{
-                  fontSize: "var(--text-xs)",
-                  color: "var(--color-text-primary)",
-                }}
-              >
-                {v != null ? v : "—"}
-              </span>
-            </div>
-          );
-        })}
-      </div>
+      <div className="text-xs text-muted-foreground">{label}</div>
     </div>
   );
-}
-
-function TrendModalBody({
-  trend,
-  color: _color,
-}: {
-  trend: Record<string, Partial<Record<Cat, number>>>;
-  color: string;
-}) {
-  const points = useMemo<TrendPoint[]>(() => {
-    const dates = Object.keys(trend).sort();
-    return dates.map((date) => {
-      const cats = trend[date];
-      const values = CATS.map((c) => cats[c]).filter(
-        (v): v is number => v != null,
-      );
-      const overall =
-        values.length > 0
-          ? Math.round(values.reduce((a, b) => a + b, 0) / values.length)
-          : null;
-      return {
-        date: date.slice(5), // MM-DD
-        quality: cats.quality ?? null,
-        security: cats.security ?? null,
-        design_system: cats.design_system ?? null,
-        performance: cats.performance ?? null,
-        overall,
-      };
-    });
-  }, [trend]);
-
-  return <ScoreTrendChart data={points} />;
 }

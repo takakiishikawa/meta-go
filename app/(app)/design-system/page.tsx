@@ -105,7 +105,6 @@ export default async function DesignSystemPage() {
       ? Math.round(scoreValues.reduce((a, b) => a + b, 0) / scoreValues.length)
       : null;
 
-  const openItems = allItems.filter((i) => !isResolved(i.state));
   const issueStats = summarize(allItems);
 
   const byCategory: Record<string, number> = {};
@@ -137,7 +136,7 @@ export default async function DesignSystemPage() {
 
       <IssueStatsBanner stats={issueStats} noun="違反" />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="flex items-center gap-4 rounded-lg border border-border bg-surface p-4">
           <ScoreDonut score={avgScore} size={72} />
           <div>
@@ -150,21 +149,8 @@ export default async function DesignSystemPage() {
                 color: "var(--color-text-secondary)",
               }}
             >
-              全go平均準拠率
+              全go平均スコア
             </div>
-          </div>
-        </div>
-        <div className="rounded-lg border border-border bg-surface p-4">
-          <div className="text-2xl font-semibold text-foreground">
-            {openItems.length}
-          </div>
-          <div
-            style={{
-              fontSize: "var(--text-sm)",
-              color: "var(--color-text-secondary)",
-            }}
-          >
-            未修正の違反
           </div>
         </div>
         <div className="rounded-lg border border-border bg-surface p-4">

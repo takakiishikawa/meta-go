@@ -126,7 +126,7 @@ export default async function SecurityPage() {
 
       <IssueStatsBanner stats={issueStats} noun="脆弱性" />
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="flex items-center gap-4 rounded-lg border border-border bg-surface p-4">
           <ScoreDonut score={avgScore} size={64} />
           <div>
@@ -139,7 +139,7 @@ export default async function SecurityPage() {
                 color: "var(--color-text-secondary)",
               }}
             >
-              平均スコア
+              全go平均スコア
             </div>
           </div>
         </div>
@@ -192,19 +192,6 @@ export default async function SecurityPage() {
             }}
           >
             High
-          </div>
-        </div>
-        <div className="rounded-lg border border-border bg-surface p-4">
-          <div className="text-2xl font-semibold text-foreground">
-            {openItems.length}
-          </div>
-          <div
-            style={{
-              fontSize: "var(--text-sm)",
-              color: "var(--color-text-secondary)",
-            }}
-          >
-            未対応
           </div>
         </div>
       </div>

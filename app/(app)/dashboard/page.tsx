@@ -1,12 +1,27 @@
 import { createClient } from "@/lib/supabase/server";
 import { DashboardClient, type TrendByProduct } from "./dashboard-client";
 import { isResolved } from "@/lib/metago/items";
+import {
+  fetchAllDeployments,
+  summarize as summarizeDeploys,
+} from "@/lib/metago/github-deployments";
+import type { IssueTrendPoint } from "@/components/charts/issue-trend-chart";
+
+const ISSUE_TREND_DAYS = 30;
+const DEPLOY_WINDOW_HOURS = 168; // 7日
+const TZ = "Asia/Tokyo";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
 
   const now = Date.now();
-  const sevenDaysAgo = new Date(now - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const sevenDaysAgo = new Date(
+    now - 7 * 24 * 60 * 60 * 1000,
+  ).toISOString();
+  const fourteenDaysAgo = new Date(
+    now - 14 * 24 * 60 * 60 * 1000,
+  ).toISOString();
+  const trendStartMs = now - ISSUE_TREND_DAYS * 24 * 60 * 60 * 1000;
 
   const [
     { data: products },
@@ -53,20 +68,8 @@ export default async function DashboardPage() {
 
   const allScores = scoresHistory ?? [];
 
-  // 各カテゴリの最新値・1週間前の値を product 単位で計算
   type Cat = "quality" | "security" | "design_system" | "performance";
   const CATS: Cat[] = ["quality", "security", "design_system", "performance"];
-  const latestByPC = new Map<string, number>(); // `${product_id}|${cat}`
-  const weekAgoByPC = new Map<string, number>();
-
-  for (const row of allScores) {
-    const k = `${row.product_id}|${row.category}`;
-    // ascending order なので末尾が最新
-    latestByPC.set(k, row.score);
-    if (row.collected_at <= sevenDaysAgo) {
-      weekAgoByPC.set(k, row.score);
-    }
-  }
 
   // 過去30日のトレンド: product_id × date(YYYY-MM-DD) → カテゴリ毎に最新値
   const trendByProduct: TrendByProduct = {};
@@ -75,41 +78,115 @@ export default async function DashboardPage() {
     if (!trendByProduct[row.product_id]) trendByProduct[row.product_id] = {};
     if (!trendByProduct[row.product_id][date])
       trendByProduct[row.product_id][date] = {};
-    // 同日複数あれば最後のものが残る (ascending order)
     trendByProduct[row.product_id][date][row.category as Cat] = row.score;
   }
 
-  // 全アイテム合算
+  // 全カテゴリの item を合算
   const allDetectionItems = [
     ...(qualityItems ?? []),
     ...(securityItems ?? []),
     ...(designItems ?? []),
     ...(depItems ?? []),
   ];
+
+  // 直近7日 / 前7日の検知・解決
   const detectedLast7Days = allDetectionItems.filter(
     (i) => i.created_at >= sevenDaysAgo,
   ).length;
-  const openIssues = allDetectionItems.filter(
-    (i) => !isResolved(i.state),
+  const detectedPrev7Days = allDetectionItems.filter(
+    (i) => i.created_at >= fourteenDaysAgo && i.created_at < sevenDaysAgo,
   ).length;
-  // PR 単位ではなく **issue (item) 単位** で集計する。1 PR で複数 item を解決する
-  // ことがあり、PR 数で語ると検知/未解決の単位と齟齬が出る。
   const resolvedLast7Days = allDetectionItems.filter(
     (i) =>
       isResolved(i.state) && i.resolved_at && i.resolved_at >= sevenDaysAgo,
   ).length;
+  const resolvedPrev7Days = allDetectionItems.filter(
+    (i) =>
+      isResolved(i.state) &&
+      i.resolved_at &&
+      i.resolved_at >= fourteenDaysAgo &&
+      i.resolved_at < sevenDaysAgo,
+  ).length;
+
+  // 過去30日の日次 detected / resolved
+  const fmtKey = new Intl.DateTimeFormat("en-CA", {
+    timeZone: TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const fmtLabel = new Intl.DateTimeFormat("ja-JP", {
+    timeZone: TZ,
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const trendBuckets = new Map<
+    string,
+    { detected: number; resolved: number }
+  >();
+  const today = new Date();
+  for (let i = ISSUE_TREND_DAYS - 1; i >= 0; i--) {
+    const d = new Date(today.getTime() - i * 24 * 60 * 60 * 1000);
+    trendBuckets.set(fmtKey.format(d), { detected: 0, resolved: 0 });
+  }
+  for (const item of allDetectionItems) {
+    const createdMs = new Date(item.created_at).getTime();
+    if (createdMs >= trendStartMs) {
+      const k = fmtKey.format(new Date(item.created_at));
+      const b = trendBuckets.get(k);
+      if (b) b.detected++;
+    }
+    if (isResolved(item.state) && item.resolved_at) {
+      const resolvedMs = new Date(item.resolved_at).getTime();
+      if (resolvedMs >= trendStartMs) {
+        const k = fmtKey.format(new Date(item.resolved_at));
+        const b = trendBuckets.get(k);
+        if (b) b.resolved++;
+      }
+    }
+  }
+  const issueTrend: IssueTrendPoint[] = [];
+  for (let i = ISSUE_TREND_DAYS - 1; i >= 0; i--) {
+    const d = new Date(today.getTime() - i * 24 * 60 * 60 * 1000);
+    const k = fmtKey.format(d);
+    const v = trendBuckets.get(k) ?? { detected: 0, resolved: 0 };
+    issueTrend.push({
+      date: fmtLabel.format(d),
+      detected: v.detected,
+      resolved: v.resolved,
+    });
+  }
+
+  // デプロイ集計 (直近7日)
+  let deployStats = { success: 0, failure: 0, pending: 0 };
+  try {
+    const deployRows = await fetchAllDeployments(
+      products ?? [],
+      DEPLOY_WINDOW_HOURS,
+      DEPLOY_WINDOW_HOURS,
+    );
+    const sum = summarizeDeploys(deployRows);
+    deployStats = {
+      success: sum.success,
+      failure: sum.failure + sum.rateLimited,
+      pending: sum.pending,
+    };
+  } catch {
+    // GITHUB_TOKEN が未設定 / fetch 失敗時は 0 のまま
+  }
 
   return (
     <DashboardClient
       products={products ?? []}
       pendingApprovals={pendingApprovals ?? []}
-      latestByPC={Object.fromEntries(latestByPC)}
-      weekAgoByPC={Object.fromEntries(weekAgoByPC)}
       trendByProduct={trendByProduct}
+      issueTrend={issueTrend}
+      deployStats={deployStats}
       kpi={{
         resolvedLast7Days,
+        resolvedDelta: resolvedLast7Days - resolvedPrev7Days,
         detectedLast7Days,
-        openIssues,
+        detectedDelta: detectedLast7Days - detectedPrev7Days,
       }}
     />
   );
