@@ -236,6 +236,7 @@ CREATE INDEX IF NOT EXISTS idx_scores_history_collected_at ON metago.scores_hist
 CREATE INDEX IF NOT EXISTS idx_quality_items_product ON metago.quality_items(product_id);
 CREATE INDEX IF NOT EXISTS idx_security_items_product ON metago.security_items(product_id);
 CREATE INDEX IF NOT EXISTS idx_dependency_items_product ON metago.dependency_items(product_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_dependency_items_key ON metago.dependency_items(product_id, package_name);
 CREATE INDEX IF NOT EXISTS idx_execution_logs_product ON metago.execution_logs(product_id);
 CREATE INDEX IF NOT EXISTS idx_approval_queue_state ON metago.approval_queue(state);
 CREATE INDEX IF NOT EXISTS idx_psf_scores_product ON metago.psf_scores(product_id);
