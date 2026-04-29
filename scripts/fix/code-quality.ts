@@ -30,10 +30,10 @@ import { runClaudeForText } from "../../lib/metago/claude-cli";
 
 const supabase = getSupabase();
 
-function countTscErrors(repoDir: string): number {
+function countTscErrorsIn(dir: string): number {
   try {
     execSync("npx tsc --noEmit", {
-      cwd: repoDir,
+      cwd: dir,
       stdio: "pipe",
       timeout: 120_000,
     });
@@ -43,6 +43,39 @@ function countTscErrors(repoDir: string): number {
     return out.split("\n").filter((l: string) => l.includes(": error TS"))
       .length;
   }
+}
+
+/**
+ * リポジトリ全体の TSC エラー数。ルートに加え、ネストした tsconfig.json を持つ
+ * 主要サブディレクトリ (例: go-design-system/showcase) も合算する。
+ * 2026-04-27 PR #23 が showcase 配下の型エラーを混入したのを root だけの TSC で
+ * 検知できなかった事故対策。
+ */
+function countTscErrors(repoDir: string): number {
+  let total = countTscErrorsIn(repoDir);
+  const subDirs = ["showcase"];
+  for (const sub of subDirs) {
+    const subPath = path.join(repoDir, sub);
+    if (
+      fs.existsSync(path.join(subPath, "tsconfig.json")) &&
+      fs.existsSync(path.join(subPath, "package.json"))
+    ) {
+      // showcase 配下は独自の node_modules が必要な場合 npm ci してから tsc
+      try {
+        execSync("npm ci", { cwd: subPath, stdio: "pipe", timeout: 300_000 });
+      } catch {
+        try {
+          execSync("npm install --legacy-peer-deps", {
+            cwd: subPath,
+            stdio: "pipe",
+            timeout: 300_000,
+          });
+        } catch {}
+      }
+      total += countTscErrorsIn(subPath);
+    }
+  }
+  return total;
 }
 
 async function fixTscErrors(repoDir: string): Promise<void> {

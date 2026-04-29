@@ -47,16 +47,27 @@ function stripFences(text: string): string {
  *   - shebang #!
  */
 function looksLikeNarration(content: string): boolean {
-  const first = (
-    content.split("\n").find((l) => l.trim().length > 0) ?? ""
-  ).trim();
-  if (!first) return true; // 空応答は narration 扱い (=書き込み禁止)
+  const lines = content.split("\n");
+  const nonEmpty = lines.filter((l) => l.trim().length > 0);
+  if (nonEmpty.length === 0) return true; // 空応答は narration 扱い (=書き込み禁止)
+
+  const first = nonEmpty[0].trim();
   // markdown fence
   if (/^```/.test(first)) return true;
   // 有効なコード先頭パターン (whitelist)
   const validStart =
     /^(import\b|export\b|type\b|interface\b|const\b|let\b|var\b|function\b|async\b|class\b|enum\b|namespace\b|declare\b|abstract\b|public\b|private\b|protected\b|readonly\b|return\b|void\b|"use |'use |\/\/|\/\*|@|\{|\(|#!)/;
-  return !validStart.test(first);
+  if (!validStart.test(first)) return true;
+
+  // 末尾 narration ガード (2026-04-27 PR #23 が末尾に説明文を追加した事故対策)
+  // 有効なコードの最終非空行は閉じ括弧・セミコロン・JSX 閉じタグ・コメント閉じ等で終わる。
+  // 平文の文章 ("Two changes made:..." 等) は通常そのいずれにも該当しない。
+  const last = nonEmpty[nonEmpty.length - 1].trim();
+  const validEnd = /([\};\)\]>`]|\*\/|^[}\];)>])\s*;?\s*$/;
+  // 閉じ記号で終わる、または // で始まるコメント、または } の後に注釈、を許容
+  if (!validEnd.test(last) && !/^\/\//.test(last)) return true;
+
+  return false;
 }
 
 /**
