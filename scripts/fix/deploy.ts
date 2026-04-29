@@ -117,6 +117,43 @@ async function countRecentAttempts(
   return data?.length ?? 0;
 }
 
+/**
+ * 直近のこの commit に対する最後の試行が「Claude が patch を 1 件も返せなかった」
+ * か。同じ build error に対して Claude が連続でゼロ patch を返すケースは、
+ * プロンプトの限界 / 環境固有エラーで Claude の手では直せない兆候なので、残り
+ * 試行枠を Claude に投げず即 abandoned にする (= API クォータ節約)。
+ */
+async function lastAttemptYieldedNoPatches(
+  productId: string,
+  commitSha: string,
+): Promise<boolean> {
+  const since = new Date(Date.now() - ATTEMPT_WINDOW_MS).toISOString();
+  const { data } = await supabase
+    .schema("metago")
+    .from("execution_logs")
+    .select("description, created_at")
+    .eq("product_id", productId)
+    .eq("category", "deploy-fix")
+    .gte("created_at", since)
+    .like("description", `%${commitSha}%`)
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+  const last = data?.[0];
+  if (!last?.description) return false;
+  try {
+    const parsed = JSON.parse(last.description) as {
+      reason?: string;
+      patch_count?: number;
+    };
+    return (
+      parsed.reason === "build_still_failing" && parsed.patch_count === 0
+    );
+  } catch {
+    return false;
+  }
+}
+
 async function logAttempt(
   productId: string,
   state: "merged" | "abandoned" | "failed",
@@ -292,6 +329,26 @@ async function fixForProduct(product: {
       "abandoned",
       { commit_sha: commitSha, reason: "max_attempts_exceeded", attempts },
       `Deploy fix abandoned: ${commitSha.slice(0, 7)}`,
+    );
+    return;
+  }
+
+  // 前回の試行で Claude が patch を返せなかった (patch_count=0) 場合、同じ
+  // build error に再度 Claude を投げても結果は同じ可能性が極めて高い。残り
+  // attempts 枠を Claude に投げず早期に abandoned にする。
+  if (attempts > 0 && (await lastAttemptYieldedNoPatches(product.id, commitSha))) {
+    console.log(
+      `  ⛔ ${commitSha.slice(0, 7)}: 前回 patch_count=0 — Claude では直せない判定で諦め`,
+    );
+    await logAttempt(
+      product.id,
+      "abandoned",
+      {
+        commit_sha: commitSha,
+        reason: "claude_cannot_patch",
+        attempts,
+      },
+      `Deploy fix abandoned (no patches): ${commitSha.slice(0, 7)}`,
     );
     return;
   }
