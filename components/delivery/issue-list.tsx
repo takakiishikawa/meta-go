@@ -9,7 +9,7 @@ import {
   TableHeader,
   TableRow,
 } from "@takaki/go-design-system";
-import { Pagination } from "@/components/ui/pagination";
+import { Pagination } from "@/components/common/pagination";
 import { isResolved } from "@/lib/metago/items";
 
 const SEVERITY_COLORS: Record<string, string> = {
